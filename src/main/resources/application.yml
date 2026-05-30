@@ -1,0 +1,25 @@
+orthrus:
+  http:
+    connect-timeout-ms: 5000
+    read-timeout-ms: 10000
+    max-redirects: 5
+    ignore-ssl-errors: false
+
+  scan:
+    concurrency: 10
+    include-scanners: []
+    exclude-scanners: []
+
+  report:
+    default-format: json # json, sarif, html, console
+
+  discovery:
+    blackbox-max-depth: 5
+    blackbox-timeout-ms: 5000
+
+server:
+  port: 8080
+
+spring:
+  main:
+    web-application-type: reactive
