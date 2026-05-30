@@ -20,6 +20,8 @@ public enum CWEReference {
     // SQL / NoSQL / Template / Generic Injection
     CWE_74("Improper Neutralization of Special Elements in Output Used by a Downstream Component ('Injection')", 74),
     CWE_89("Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')", 89),
+    CWE_94("Improper Control of Generation of Code ('Code Injection')", 94),
+    CWE_444("Inconsistent Interpretation of HTTP Requests ('HTTP Request Smuggling')", 444),
     CWE_943("Improper Neutralization of Special Elements in Data Query Logic", 943),
     CWE_1336("Improper Neutralization of Special Elements Used in a Template Engine", 1336),
 
@@ -70,6 +72,7 @@ public enum CWEReference {
     // Information Exposure & Verbose Errors
     CWE_200("Exposure of Sensitive Information to an Unauthorized Actor", 200),
     CWE_209("Generation of Error Message Containing Sensitive Information", 209),
+    CWE_598("Information Exposure Through Query Strings in GET Request", 598),
 
     // Open Redirect
     CWE_601("URL Redirection to Untrusted Site ('Open Redirect')", 601),
