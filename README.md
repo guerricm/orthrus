@@ -38,7 +38,7 @@ Orthrus VulnAPI is a modern, reactive Dynamic Application Security Testing (DAST
 
 ## Prerequisites
 
-- Java 17 or higher
+- Java 25 or higher
 - Maven 3.8+
 
 ## Building
@@ -84,6 +84,11 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d curl -t "https://api.example.com/
 java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d well-known -t https://example.com -f sarif --out vulnapi-results.sarif
 ```
 
+**Test for Cross-User BOLA (IDOR) with two distinct users:**
+```bash
+java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs --auth-bearer "TOKEN_USER_A" --auth-bearer-secondary "TOKEN_USER_B"
+```
+
 ### CLI Options
 - `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
 - `-t, --target`: Target URL or Spec path.
@@ -91,7 +96,8 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d well-known -t https://example.com
 - `-f, --format`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
 - `--lang`: Report language when using PDF or HTML format (`en`, `fr`). Default is `en`.
 - `-o, --out`: Output file path. If not provided, prints to standard output.
-- `--auth-bearer`: Provide a Bearer token to inject into all requests.
+- `--auth-bearer`: Provide a Bearer token to inject into all requests (Primary User).
+- `--auth-bearer-secondary`: Provide a secondary Bearer token for Cross-User BOLA testing (Secondary User).
 - `--include`: Comma-separated list of scanner IDs to run exclusively.
 - `--exclude`: Comma-separated list of scanner IDs to skip.
 
@@ -103,17 +109,53 @@ If you run the application without CLI arguments, it starts a Spring WebFlux ser
 java -jar target/orthrus-0.0.1-SNAPSHOT.jar
 ```
 
-**Trigger a scan:**
+**Trigger a basic scan:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "well-known",
     "target": "https://example.com",
-    "concurrency": 5,
+    "format": "json"
+  }'
+```
+
+**Generate a PDF report in French with a Bearer token:**
+```bash
+curl -X POST http://localhost:8080/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{
+    "discovererId": "openapi",
+    "target": "https://api.example.com/v3/api-docs",
+    "format": "pdf",
+    "language": "fr",
     "authScheme": {
       "type": "BEARER",
-      "value": "your-token",
+      "value": "TOKEN_USER_A",
+      "headerName": "Authorization",
+      "paramLocation": "HEADER"
+    }
+  }' --output report.pdf
+```
+
+**Test for Cross-User BOLA (IDOR) with two distinct users via API:**
+```bash
+curl -X POST http://localhost:8080/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{
+    "discovererId": "openapi",
+    "target": "https://api.example.com/v3/api-docs",
+    "format": "json",
+    "authScheme": {
+      "type": "BEARER",
+      "value": "TOKEN_USER_A",
+      "headerName": "Authorization",
+      "paramLocation": "HEADER"
+    },
+    "secondaryAuthScheme": {
+      "type": "BEARER",
+      "value": "TOKEN_USER_B",
+      "headerName": "Authorization",
       "paramLocation": "HEADER"
     }
   }'
