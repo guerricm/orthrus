@@ -33,7 +33,7 @@ Orthrus VulnAPI is a modern, reactive Dynamic Application Security Testing (DAST
   - `blackbox`: Crawls HTML pages and forms up to a configurable depth.
   - `well-known`: Probes common unprotected paths (`/actuator`, `/.env`, etc.).
   - `curl`: Directly scans a single specified URL.
-- **Reporting**: JSON, SARIF (for GitHub Advanced Security), HTML, and Console formats.
+- **Reporting**: JSON, SARIF (for GitHub Advanced Security), HTML, PDF, and Console formats.
 - **API & CLI**: Run as a command-line tool or as a long-running REST API service.
 
 ## Prerequisites
