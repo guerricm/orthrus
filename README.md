@@ -9,13 +9,14 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
 ## Features
 
 - **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
-- **25 Specialized Scanners**:
+- **26 Specialized Scanners**:
   - `broken-auth`: Missing Authentication for Critical Functions
   - `sqli`: SQL Injection in query parameters
   - `jwt-none-alg`: JWT 'none' algorithm bypass
   - `jwt-blank-secret`: JWT blank secret bypass
   - `cors`: Overly permissive CORS origins
   - `security-headers`: Missing critical security headers (HSTS, CSP, etc.)
+  - `cookie-security`: Missing Secure, HttpOnly, and SameSite attributes in cookies
   - `rate-limiting`: Lack of rate limiting on sensitive endpoints
   - `ssrf`: Server-Side Request Forgery via AWS metadata endpoints
   - `xss`: Reflected Cross-Site Scripting via query params, JSON bodies, and headers

@@ -53,9 +53,11 @@ public enum CWEReference {
     CWE_327("Use of a Broken or Risky Cryptographic Algorithm", 327),
     CWE_347("Improper Verification of Cryptographic Signature", 347),
 
-    // Security Headers
+    // Security Headers & Cookies
     CWE_693("Protection Mechanism Failure", 693),
     CWE_614("Sensitive Cookie in HTTPS Session Without 'Secure' Attribute", 614),
+    CWE_1004("Sensitive Cookie Without 'HttpOnly' Flag", 1004),
+    CWE_1275("Sensitive Cookie with Improper SameSite Attribute", 1275),
     CWE_1021("Improper Restriction of Rendered UI Layers or Frames", 1021),
 
     // Rate Limiting & Resource Consumption
