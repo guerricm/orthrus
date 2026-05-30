@@ -89,6 +89,17 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d well-known -t https://example.com
 java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs --auth-bearer "TOKEN_USER_A" --auth-bearer-secondary "TOKEN_USER_B"
 ```
 
+**Automated OAuth2 Token Fetching (e.g. Keycloak):**
+Automatically fetch tokens for one or multiple users before scanning (supports `password` or `client_credentials`):
+```bash
+java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
+  --oauth2-url "https://keycloak.example.com/realms/master/protocol/openid-connect/token" \
+  --oauth2-grant "password" \
+  --oauth2-client-id "orthrus-client" \
+  --oauth2-creds "alice:pwd123,bob:pwd456"
+```
+*(If exactly 2 sets of credentials are provided, they are mapped to the primary and secondary auth schemes for automated Cross-User BOLA testing).*
+
 ### CLI Options
 - `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
 - `-t, --target`: Target URL or Spec path.
@@ -98,6 +109,11 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.co
 - `-o, --out`: Output file path. If not provided, prints to standard output.
 - `--auth-bearer`: Provide a Bearer token to inject into all requests (Primary User).
 - `--auth-bearer-secondary`: Provide a secondary Bearer token for Cross-User BOLA testing (Secondary User).
+- `--oauth2-url`: OAuth2 token endpoint URL (e.g., Keycloak token endpoint).
+- `--oauth2-client-id`: OAuth2 Client ID.
+- `--oauth2-client-secret`: OAuth2 Client Secret.
+- `--oauth2-grant`: OAuth2 Grant Type (`password` or `client_credentials`).
+- `--oauth2-creds`: Comma-separated list of `username:password` credentials (for `password` grant).
 - `--include`: Comma-separated list of scanner IDs to run exclusively.
 - `--exclude`: Comma-separated list of scanner IDs to skip.
 
@@ -157,6 +173,23 @@ curl -X POST http://localhost:8080/api/v1/scans \
       "value": "TOKEN_USER_B",
       "headerName": "Authorization",
       "paramLocation": "HEADER"
+    }
+  }'
+```
+
+**Automated OAuth2 Token Fetching via API:**
+```bash
+curl -X POST http://localhost:8080/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{
+    "discovererId": "openapi",
+    "target": "https://api.example.com/v3/api-docs",
+    "format": "json",
+    "oauth2": {
+      "tokenUrl": "https://keycloak.example.com/realms/master/protocol/openid-connect/token",
+      "clientId": "orthrus-client",
+      "grantType": "password",
+      "credentials": ["alice:pwd123", "bob:pwd456"]
     }
   }'
 ```

@@ -20,6 +20,9 @@ import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import ch.hug.vulnapi.auth.OAuth2TokenFetcher;
+import ch.hug.vulnapi.model.OAuth2Config;
+
 @Component
 @Command(name = "scan", description = "Run a VulnAPI security scan", mixinStandardHelpOptions = true)
 public class ScanCommand implements Callable<Integer> {
@@ -28,11 +31,13 @@ public class ScanCommand implements Callable<Integer> {
 
     private final ScanService scanService;
     private final Map<String, ReportGenerator> reportGenerators;
+    private final OAuth2TokenFetcher tokenFetcher;
 
-    public ScanCommand(ScanService scanService, List<ReportGenerator> generators) {
+    public ScanCommand(ScanService scanService, List<ReportGenerator> generators, OAuth2TokenFetcher tokenFetcher) {
         this.scanService = scanService;
         this.reportGenerators = generators.stream()
                 .collect(Collectors.toMap(ReportGenerator::getFormat, Function.identity()));
+        this.tokenFetcher = tokenFetcher;
     }
 
     @Option(names = {"-d", "--discoverer"}, description = "Discoverer to use (openapi, blackbox, curl, well-known)", required = true)
@@ -65,6 +70,21 @@ public class ScanCommand implements Callable<Integer> {
     @Option(names = {"--exclude"}, description = "Comma-separated list of scanners to exclude", split = ",")
     List<String> excludeScanners;
 
+    @Option(names = {"--oauth2-url"}, description = "OAuth2 token endpoint URL")
+    String oauth2Url;
+
+    @Option(names = {"--oauth2-client-id"}, description = "OAuth2 Client ID")
+    String oauth2ClientId;
+
+    @Option(names = {"--oauth2-client-secret"}, description = "OAuth2 Client Secret")
+    String oauth2ClientSecret;
+
+    @Option(names = {"--oauth2-grant"}, description = "OAuth2 Grant Type (password, client_credentials)")
+    String oauth2Grant;
+
+    @Option(names = {"--oauth2-creds"}, description = "Comma-separated list of user:pass credentials", split = ",")
+    List<String> oauth2Creds;
+
     @Override
     public Integer call() throws Exception {
         log.info("Starting CLI scan. Discoverer: {}, Target: {}", discovererId, target);
@@ -77,6 +97,25 @@ public class ScanCommand implements Callable<Integer> {
         SecurityScheme secondaryAuthScheme = null;
         if (secondaryBearerToken != null && !secondaryBearerToken.isEmpty()) {
             secondaryAuthScheme = SecurityScheme.bearer(secondaryBearerToken);
+        }
+
+        // Handle OAuth2 automated token fetching
+        if (oauth2Url != null && oauth2Grant != null) {
+            log.info("Fetching OAuth2 tokens from {}", oauth2Url);
+            OAuth2Config oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds);
+            List<SecurityScheme> fetchedTokens = tokenFetcher.fetchTokens(oauth2Config).block();
+            
+            if (fetchedTokens != null && !fetchedTokens.isEmpty()) {
+                authScheme = fetchedTokens.get(0);
+                if (fetchedTokens.size() > 1) {
+                    secondaryAuthScheme = fetchedTokens.get(1);
+                    log.info("Successfully fetched 2+ tokens. Primary and Secondary Auth mapped for BOLA testing.");
+                } else {
+                    log.info("Successfully fetched 1 token.");
+                }
+            } else {
+                log.error("Failed to fetch any OAuth2 tokens. Proceeding without authentication.");
+            }
         }
 
         ScanConfiguration config = new ScanConfiguration(

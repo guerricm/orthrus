@@ -1,6 +1,8 @@
 package ch.hug.vulnapi.api;
 
 import ch.hug.vulnapi.engine.ScanService;
+import ch.hug.vulnapi.model.OAuth2Config;
+import ch.hug.vulnapi.auth.OAuth2TokenFetcher;
 import ch.hug.vulnapi.model.ScanConfiguration;
 import ch.hug.vulnapi.model.ScanResult;
 import ch.hug.vulnapi.model.SecurityScheme;
@@ -20,9 +22,11 @@ import java.util.List;
 public class ScanController {
 
     private final ScanService scanService;
+    private final OAuth2TokenFetcher tokenFetcher;
 
-    public ScanController(ScanService scanService) {
+    public ScanController(ScanService scanService, OAuth2TokenFetcher tokenFetcher) {
         this.scanService = scanService;
+        this.tokenFetcher = tokenFetcher;
     }
 
     /**
@@ -40,25 +44,40 @@ public class ScanController {
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<ScanResult>> triggerScan(@RequestBody ScanRequest request) {
-        
-        ScanConfiguration config = new ScanConfiguration(
-                request.includeScanners() != null ? request.includeScanners() : List.of(),
-                request.excludeScanners() != null ? request.excludeScanners() : List.of(),
-                request.concurrency() > 0 ? request.concurrency() : 10,
-                5000,
-                10000,
-                request.ignoreSslErrors(),
-                "json",
-                request.authScheme(),
-                request.secondaryAuthScheme(),
-                request.language() != null ? request.language() : "en"
-        );
 
-        return scanService.executeScan(request.discovererId(), request.target(), request.overrideHost(), config)
+        return Mono.justOrEmpty(request.oauth2())
+                .flatMap(oauth2Config -> tokenFetcher.fetchTokens(oauth2Config))
+                .defaultIfEmpty(List.of())
+                .flatMap(fetchedTokens -> {
+                    SecurityScheme authScheme = request.authScheme();
+                    SecurityScheme secondaryAuthScheme = request.secondaryAuthScheme();
+
+                    if (!fetchedTokens.isEmpty()) {
+                        authScheme = fetchedTokens.get(0);
+                        if (fetchedTokens.size() > 1) {
+                            secondaryAuthScheme = fetchedTokens.get(1);
+                        }
+                    }
+
+                    ScanConfiguration config = new ScanConfiguration(
+                            request.includeScanners() != null ? request.includeScanners() : List.of(),
+                            request.excludeScanners() != null ? request.excludeScanners() : List.of(),
+                            request.concurrency() > 0 ? request.concurrency() : 10,
+                            5000,
+                            10000,
+                            request.ignoreSslErrors(),
+                            "json",
+                            authScheme,
+                            secondaryAuthScheme,
+                            request.language() != null ? request.language() : "en"
+                    );
+
+                    return scanService.executeScan(request.discovererId(), request.target(), request.overrideHost(), config);
+                })
                 .map(result -> ResponseEntity.ok(result))
-                .onErrorResume(IllegalArgumentException.class, e -> 
+                .onErrorResume(IllegalArgumentException.class, e ->
                         Mono.just(ResponseEntity.badRequest().build()))
-                .onErrorResume(Exception.class, e -> 
+                .onErrorResume(Exception.class, e ->
                         Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
     }
 
@@ -73,6 +92,7 @@ public class ScanController {
             boolean ignoreSslErrors,
             SecurityScheme authScheme,
             SecurityScheme secondaryAuthScheme,
+            OAuth2Config oauth2,
             String language
     ) {}
 }
