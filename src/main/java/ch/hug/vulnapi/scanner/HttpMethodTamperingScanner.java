@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -63,6 +64,8 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_650,
                                 "Security Misconfiguration",
+                                List.of("CAPEC-274"),
+                                5.3,
                                 "Server responded with 200 OK and reflected the request when using the TRACE method.",
                                 "Disable the HTTP TRACE method on the web server.",
                                 "Sent TRACE request to " + operation.url(),
@@ -80,6 +83,8 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_650,
                                 "Security Misconfiguration",
+                                List.of("CAPEC-274"),
+                                5.3,
                                 "Server responded with " + response.statusCode() + " when using the " + method + " method.",
                                 "Restrict accepted HTTP methods to only those strictly necessary (e.g., GET, POST, PUT, DELETE).",
                                 "Sent " + method + " request to " + operation.url(),

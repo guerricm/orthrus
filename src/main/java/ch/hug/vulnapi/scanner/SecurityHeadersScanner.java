@@ -58,6 +58,8 @@ public class SecurityHeadersScanner implements SecurityScanner {
                     operation,
                     cwe,
                     "Security Misconfiguration",
+                    List.of("CAPEC-310"),
+                    4.3,
                     "Header '" + headerName + "' is missing from the response.",
                     "Configure your web server or application framework to include the '" + headerName + "' header in all responses.",
                     "Sent standard " + operation.method() + " request.",

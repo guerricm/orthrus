@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -77,6 +78,8 @@ public class SstiScanner implements SecurityScanner {
                             operation,
                             CWEReference.CWE_1336,
                             "Injection",
+                                List.of("CAPEC-137"),
+                                9.8,
                             "Response contains the evaluated result ('49') of the injected template expression '" + payload + "'.",
                             "Do not concatenate user input directly into templates. Use logic-less templates or securely pass input as context variables instead of template strings.",
                             "Injected template payload into query param: " + paramName + "=" + payload,

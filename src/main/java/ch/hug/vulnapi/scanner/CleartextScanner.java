@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -45,6 +46,8 @@ public class CleartextScanner implements SecurityScanner {
                     operation,
                     CWEReference.CWE_319,
                     "Cryptographic Failures",
+                                List.of("CAPEC-94"),
+                                7.4,
                     "Endpoint uses 'http://' scheme.",
                     "Ensure all API endpoints are exclusively accessible via HTTPS. Implement HSTS (HTTP Strict Transport Security).",
                     "Observed URL scheme: " + operation.url(),

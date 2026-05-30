@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -69,6 +70,8 @@ public class JwtNoneAlgorithmScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_287,
                                 "Broken Authentication",
+                                List.of("CAPEC-115"),
+                                9.8,
                                 "Endpoint returned " + response.statusCode() + " OK when a JWT with 'alg: none' was provided.",
                                 "Configure your JWT library to explicitly reject the 'none' algorithm and enforce expected algorithms.",
                                 "Sent JWT: " + noneAlgToken,

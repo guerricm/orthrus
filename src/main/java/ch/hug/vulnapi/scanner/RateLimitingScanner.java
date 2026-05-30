@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -56,6 +57,8 @@ public class RateLimitingScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_799,
                                 "Lack of Resources & Rate Limiting",
+                                List.of("CAPEC-115"),
+                                5.3,
                                 "After " + REQUEST_COUNT + " requests, the server returned status " + lastResponse.statusCode().value() + " instead of 429.",
                                 "Implement rate limiting using a gateway, WAF, or application logic (e.g. token bucket algorithm).",
                                 "Sent " + REQUEST_COUNT + " identical requests in rapid succession.",

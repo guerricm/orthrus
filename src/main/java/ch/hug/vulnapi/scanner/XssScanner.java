@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -146,6 +147,8 @@ public class XssScanner implements SecurityScanner {
                                 originalOp,
                                 CWEReference.CWE_79,
                                 "Injection",
+                                List.of("CAPEC-63"),
+                                6.1,
                                 "Response contains the exact unencoded XSS payload. " + severityContext,
                                 "Contextually encode user input before reflecting it in responses. Ensure the Content-Type header is strictly set to application/json for APIs.",
                                 "Injected XSS payload into " + location + ": " + fieldName + "=" + PAYLOAD,

@@ -21,5 +21,7 @@ server:
   port: 8080
 
 spring:
+  messages:
+    fallback-to-system-locale: false
   main:
     web-application-type: reactive

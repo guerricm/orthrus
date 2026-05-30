@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -69,6 +70,8 @@ public class CorsScanner implements SecurityScanner {
                         operation,
                         CWEReference.CWE_942,
                         "Security Misconfiguration",
+                                List.of("CAPEC-63"),
+                                5.3,
                         evidence,
                         "Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly.",
                         "OPTIONS request sent with Origin: " + MALICIOUS_ORIGIN,

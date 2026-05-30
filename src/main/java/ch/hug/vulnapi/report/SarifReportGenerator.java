@@ -23,11 +23,23 @@ public class SarifReportGenerator implements ReportGenerator {
     private static final Logger log = LoggerFactory.getLogger(SarifReportGenerator.class);
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /**
+     * Gets the format identifier for this generator.
+     *
+     * @return the format string "sarif"
+     */
     @Override
     public String getFormat() {
         return "sarif";
     }
 
+    /**
+     * Generates a SARIF report from a ScanResult and writes it to the output stream.
+     *
+     * @param result the scan result containing vulnerabilities and execution attempts
+     * @param output the output stream to write the SARIF content to
+     * @return a Mono signaling completion
+     */
     @Override
     public Mono<Void> generateReport(ScanResult result, OutputStream output) {
          return Mono.fromRunnable(() -> {

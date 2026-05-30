@@ -17,6 +17,7 @@ public record ScanResult(
         List<Vulnerability> vulnerabilities,
         Map<RiskLevel, Long> riskSummary,
         Map<String, Integer> scannerSummary,
-        ScanConfiguration configuration
+        ScanConfiguration configuration,
+        List<ScanAttempt> attempts
 ) {
 }

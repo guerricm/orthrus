@@ -15,7 +15,8 @@ public record ScanConfiguration(
         String reportFormat,
         SecurityScheme authScheme,
         SecurityScheme secondaryAuthScheme,
-        String language
+        String language,
+        boolean includePassed
 ) {
 
     public static ScanConfiguration defaults() {
@@ -29,7 +30,8 @@ public record ScanConfiguration(
                 "json",
                 null,
                 null,
-                "en"
+                "en",
+                false
         );
     }
 

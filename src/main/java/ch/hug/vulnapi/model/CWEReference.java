@@ -26,6 +26,7 @@ public enum CWEReference {
     // Authentication
     CWE_287("Improper Authentication", 287),
     CWE_306("Missing Authentication for Critical Function", 306),
+    CWE_521("Weak Password Requirements", 521),
 
     // CSRF
     CWE_352("Cross-Site Request Forgery (CSRF)", 352),

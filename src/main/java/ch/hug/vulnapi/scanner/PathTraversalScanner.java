@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -78,6 +79,8 @@ public class PathTraversalScanner implements SecurityScanner {
                             operation,
                             CWEReference.CWE_22,
                             "Broken Access Control",
+                                List.of("CAPEC-126"),
+                                7.5,
                             "Response contains contents of a sensitive OS file when payload '" + payload + "' was injected.",
                             "Validate input against an allowlist. Avoid passing raw user input to filesystem APIs. Use path canonicalization and verify the target path is within the expected directory.",
                             "Injected payload into query param: " + paramName + "=" + payload,

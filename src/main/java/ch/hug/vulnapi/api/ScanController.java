@@ -69,7 +69,8 @@ public class ScanController {
                             "json",
                             authScheme,
                             secondaryAuthScheme,
-                            request.language() != null ? request.language() : "en"
+                            request.language() != null ? request.language() : "en",
+                            Boolean.TRUE.equals(request.includePassed())
                     );
 
                     return scanService.executeScan(request.discovererId(), request.target(), request.overrideHost(), config);
@@ -93,6 +94,7 @@ public class ScanController {
             SecurityScheme authScheme,
             SecurityScheme secondaryAuthScheme,
             OAuth2Config oauth2,
-            String language
+            String language,
+            Boolean includePassed
     ) {}
 }

@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.model.Operation;
 import ch.hug.vulnapi.model.Vulnerability;

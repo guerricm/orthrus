@@ -17,6 +17,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+/**
+ * Generates a PDF report using Thymeleaf and OpenHTMLToPDF.
+ * 
+ * This generator uses a pre-defined Thymeleaf template (the same as the HTML generator) 
+ * to produce a styled HTML string, which is then converted into a PDF document containing 
+ * vulnerability summaries, details, and optionally, full execution logs.
+ */
 @Component
 public class PdfReportGenerator implements ReportGenerator {
 
@@ -31,6 +38,13 @@ public class PdfReportGenerator implements ReportGenerator {
         return "pdf";
     }
 
+    /**
+     * Generates a PDF report from a ScanResult and writes it to the output stream.
+     *
+     * @param result the scan result containing vulnerabilities and execution attempts
+     * @param outputStream the output stream to write the PDF content to
+     * @return a Mono signaling completion
+     */
     @Override
     public Mono<Void> generateReport(ScanResult result, OutputStream outputStream) {
         return Mono.fromRunnable(() -> {
@@ -48,11 +62,8 @@ public class PdfReportGenerator implements ReportGenerator {
                 context.setVariable("scanDate", formatter.format(result.scanStartTime()));
                 context.setVariable("targetUrl", result.targetUrl());
 
-                // Sort Vulnerabilities by RiskLevel (CRITICAL first, INFO last)
-                List<Vulnerability> sortedVulns = result.vulnerabilities().stream()
-                        .sorted(Comparator.comparing(Vulnerability::riskLevel).reversed())
-                        .collect(Collectors.toList());
-                context.setVariable("vulnerabilities", sortedVulns);
+                // Vulnerabilities are already sorted by ScanEngine
+                context.setVariable("vulnerabilities", result.vulnerabilities());
 
                 // Stats
                 long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
@@ -76,10 +87,27 @@ public class PdfReportGenerator implements ReportGenerator {
                 else if (low > 0) grade = "B";
                 context.setVariable("globalGrade", grade);
 
-                // 4. Render HTML
+                // 4. Execution Details (if --include-passed)
+                if (result.attempts() != null && !result.attempts().isEmpty()) {
+                    java.util.LinkedHashMap<String, java.util.List<ch.hug.vulnapi.model.ScanAttempt>> grouped = new java.util.LinkedHashMap<>();
+                    for (ch.hug.vulnapi.model.ScanAttempt a : result.attempts()) {
+                        String key = a.operationMethod() + " " + a.operationUrl();
+                        grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
+                    }
+                    
+                    java.util.List<ch.hug.vulnapi.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
+                    for (java.util.Map.Entry<String, java.util.List<ch.hug.vulnapi.model.ScanAttempt>> entry : grouped.entrySet()) {
+                        long passed = entry.getValue().stream().filter(ch.hug.vulnapi.model.ScanAttempt::passed).count();
+                        long failed = entry.getValue().size() - passed;
+                        attemptGroupsList.add(new ch.hug.vulnapi.model.EndpointAttemptGroup(entry.getKey(), entry.getValue(), passed, failed));
+                    }
+                    context.setVariable("attemptGroups", attemptGroupsList);
+                }
+
+                // 5. Render HTML
                 String html = templateEngine.process("report", context);
 
-                // 5. Generate PDF
+                // 6. Generate PDF
                 PdfRendererBuilder builder = new PdfRendererBuilder();
                 builder.useFastMode();
                 builder.withHtmlContent(html, "");

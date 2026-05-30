@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -64,6 +65,8 @@ public class BflaScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_287,
                                 "Broken Function Level Authorization",
+                                List.of("CAPEC-115"),
+                                9.8,
                                 "Server returned " + response.statusCode() + " OK when sending a DELETE request to a GET endpoint.",
                                 "Ensure function-level access control checks exist for all administrative operations and methods.",
                                 "Sent DELETE request to " + operation.url(),

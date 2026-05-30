@@ -5,7 +5,7 @@ Orthrus VulnAPI is a modern, reactive Dynamic Application Security Testing (DAST
 ## Features
 
 - **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
-- **21 Specialized Scanners**:
+- **22 Specialized Scanners**:
   - `broken-auth`: Missing Authentication for Critical Functions
   - `sqli`: SQL Injection in query parameters
   - `jwt-none-alg`: JWT 'none' algorithm bypass
@@ -28,6 +28,7 @@ Orthrus VulnAPI is a modern, reactive Dynamic Application Security Testing (DAST
   - `content-type-spoofing`: XXE and parser errors via Content-Type manipulation
   - `ssti`: Server-Side Template Injection via mathematical payloads
   - `cleartext-transmission`: Detects unencrypted HTTP APIs
+  - `auth-bruteforce`: Brute force / weak password detection on authentication endpoints (uses SecLists top-100 dictionary)
 - **4 Discovery Modes**:
   - `openapi`: Automatically extracts routes and generates mock payloads from an OpenAPI v3 specification.
   - `blackbox`: Crawls HTML pages and forms up to a configurable depth.
@@ -100,6 +101,12 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.co
 ```
 *(If exactly 2 sets of credentials are provided, they are mapped to the primary and secondary auth schemes for automated Cross-User BOLA testing).*
 
+**Generate a detailed report with all executed tests (passed & failed):**
+```bash
+java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f html -o report.html --include-passed
+```
+*This adds an "Execution Details" section at the end of the report, listing every scanner test against every endpoint, sorted by endpoint → method → scanner → status (failed first).*
+
 ### CLI Options
 - `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
 - `-t, --target`: Target URL or Spec path.
@@ -116,6 +123,7 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.co
 - `--oauth2-creds`: Comma-separated list of `username:password` credentials (for `password` grant).
 - `--include`: Comma-separated list of scanner IDs to run exclusively.
 - `--exclude`: Comma-separated list of scanner IDs to skip.
+- `--include-passed`: Include all executed tests (passed and failed) in the report. Adds an "Execution Details" section to HTML, PDF, JSON, and SARIF reports.
 
 ## Usage (REST API Mode)
 
@@ -194,6 +202,18 @@ curl -X POST http://localhost:8080/api/v1/scans \
   }'
 ```
 
+**Generate a report with full execution details:**
+```bash
+curl -X POST http://localhost:8080/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{
+    "discovererId": "openapi",
+    "target": "https://api.example.com/v3/api-docs",
+    "format": "json",
+    "includePassed": true
+  }'
+```
+
 **List available discoverers:**
 ```bash
 curl http://localhost:8080/api/v1/scans/discoverers
@@ -217,4 +237,13 @@ public class MyCustomScanner implements SecurityScanner {
 
 ## Disclaimer
 
-This tool is designed for educational purposes and authorized security testing only. Do not use it against targets you do not have permission to test.
+> [!WARNING]
+> **Legal and Liability Disclaimer**
+> 
+> This tool (Orthrus) is designed exclusively for educational purposes and authorized security testing. Do **NOT** use it against systems, networks, or applications that you do not own or do not have explicit, documented permission to test.
+>
+> - **Theoretical Scoring**: The CVSS (Common Vulnerability Scoring System) Base Scores provided in the generated reports are purely theoretical and generalized for the type of vulnerability identified. They do not account for your specific environmental metrics, infrastructure mitigations, or temporal factors.
+> - **No Warranty**: The tool relies on automated Dynamic Application Security Testing (DAST) techniques which are not infallible. It may produce false positives or, more importantly, **false negatives** (missing critical vulnerabilities).
+> - **Limitation of Liability**: The authors, contributors, and the tool itself cannot be held liable for any undetected vulnerabilities, subsequent system compromises, data breaches, or any direct/indirect damages arising from the use of this software. 
+> 
+> **By using this tool, you accept full responsibility for your actions and any consequences that may result.**

@@ -1,77 +1,115 @@
 package ch.hug.vulnapi.report;
 
+import ch.hug.vulnapi.model.RiskLevel;
 import ch.hug.vulnapi.model.ScanResult;
 import org.springframework.stereotype.Component;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /**
- * Generates a simple HTML report.
+ * Generates an HTML report using Thymeleaf.
+ * 
+ * This generator uses a pre-defined Thymeleaf template to produce a human-readable 
+ * security report containing vulnerability summaries, details, and optionally, 
+ * full execution logs of every scanner attempt.
  */
 @Component
 public class HtmlReportGenerator implements ReportGenerator {
+
+    private final TemplateEngine templateEngine;
+
+    public HtmlReportGenerator(TemplateEngine templateEngine) {
+        this.templateEngine = templateEngine;
+    }
 
     @Override
     public String getFormat() {
         return "html";
     }
 
+    /**
+     * Generates an HTML report from a ScanResult and writes it to the output stream.
+     *
+     * @param result the scan result containing vulnerabilities and execution attempts
+     * @param output the output stream to write the HTML content to
+     * @return a Mono signaling completion
+     */
     @Override
     public Mono<Void> generateReport(ScanResult result, OutputStream output) {
         return Mono.fromRunnable(() -> {
-            try (PrintWriter writer = new PrintWriter(output, true, StandardCharsets.UTF_8)) {
-                writer.println("<!DOCTYPE html>");
-                writer.println("<html>");
-                writer.println("<head><title>Orthrus VulnAPI Report</title>");
-                writer.println("<style>");
-                writer.println("body { font-family: Arial, sans-serif; margin: 40px; }");
-                writer.println(".critical { color: white; background-color: #d9534f; padding: 3px 6px; border-radius: 3px; }");
-                writer.println(".high { color: white; background-color: #f0ad4e; padding: 3px 6px; border-radius: 3px; }");
-                writer.println(".medium { color: black; background-color: #fcf8e3; padding: 3px 6px; border-radius: 3px; border: 1px solid #faebcc; }");
-                writer.println(".low { color: black; background-color: #d9edf7; padding: 3px 6px; border-radius: 3px; border: 1px solid #bce8f1; }");
-                writer.println(".vuln-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px; }");
-                writer.println("pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }");
-                writer.println("</style>");
-                writer.println("</head><body>");
+            try {
+                // 1. Determine Language
+                String langStr = result.configuration() != null && result.configuration().language() != null
+                        ? result.configuration().language() : "en";
+                Locale locale = Locale.forLanguageTag(langStr);
 
-                writer.println("<h1>Orthrus VulnAPI Scan Report</h1>");
-                writer.println("<p><strong>Target:</strong> " + result.targetUrl() + "</p>");
-                writer.println("<p><strong>Started:</strong> " + result.scanStartTime() + "</p>");
-                writer.println("<p><strong>Vulnerabilities Found:</strong> " + result.vulnerabilities().size() + "</p>");
-                
-                writer.println("<h2>Risk Summary</h2><ul>");
-                result.riskSummary().forEach((level, count) -> {
-                    writer.println("<li><strong>" + level + ":</strong> " + count + "</li>");
-                });
-                writer.println("</ul>");
+                // 2. Prepare Context for Thymeleaf
+                Context context = new Context(locale);
 
-                writer.println("<h2>Details</h2>");
-                if (result.vulnerabilities().isEmpty()) {
-                    writer.println("<p>No vulnerabilities found! 🎉</p>");
-                } else {
-                    result.vulnerabilities().forEach(v -> {
-                        writer.println("<div class='vuln-card'>");
-                        String cssClass = v.riskLevel().name().toLowerCase();
-                        writer.println("<h3><span class='" + cssClass + "'>" + v.riskLevel() + "</span> " + v.name() + "</h3>");
-                        writer.println("<p><strong>Endpoint:</strong> <code>" + v.operationMethod() + " " + v.operationUrl() + "</code></p>");
-                        writer.println("<p><strong>CWE:</strong> " + v.cwe().getCweId() + " - " + v.cwe().getName() + "</p>");
-                        writer.println("<p><strong>Description:</strong> " + v.description() + "</p>");
-                        writer.println("<p><strong>Evidence:</strong> " + v.evidence() + "</p>");
-                        writer.println("<p><strong>Remediation:</strong> " + v.remediation() + "</p>");
-                        writer.println("<details><summary>Request Details</summary><pre>" + v.requestDetails() + "</pre></details>");
-                        if (v.responseDetails() != null) {
-                            writer.println("<details><summary>Response Details</summary><pre>" + v.responseDetails() + "</pre></details>");
-                        }
-                        writer.println("</div>");
-                    });
+                // Date Formatting
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+                context.setVariable("scanDate", formatter.format(result.scanStartTime()));
+                context.setVariable("targetUrl", result.targetUrl());
+
+                // Vulnerabilities are already sorted by ScanEngine
+                context.setVariable("vulnerabilities", result.vulnerabilities());
+
+                // Stats
+                long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
+                long high = result.riskSummary().getOrDefault(RiskLevel.HIGH, 0L);
+                long medium = result.riskSummary().getOrDefault(RiskLevel.MEDIUM, 0L);
+                long low = result.riskSummary().getOrDefault(RiskLevel.LOW, 0L);
+                long info = result.riskSummary().getOrDefault(RiskLevel.INFO, 0L);
+
+                context.setVariable("totalVulns", result.vulnerabilities().size());
+                context.setVariable("countCritical", critical);
+                context.setVariable("countHigh", high);
+                context.setVariable("countMedium", medium);
+                context.setVariable("countLow", low);
+                context.setVariable("countInfo", info);
+
+                // 3. Calculate Global Grade
+                String grade = "A";
+                if (critical > 0) grade = "F";
+                else if (high > 0) grade = "D";
+                else if (medium > 0) grade = "C";
+                else if (low > 0) grade = "B";
+                context.setVariable("globalGrade", grade);
+
+                // 4. Execution Details (if --include-passed)
+                if (result.attempts() != null && !result.attempts().isEmpty()) {
+                    java.util.LinkedHashMap<String, java.util.List<ch.hug.vulnapi.model.ScanAttempt>> grouped = new java.util.LinkedHashMap<>();
+                    for (ch.hug.vulnapi.model.ScanAttempt a : result.attempts()) {
+                        String key = a.operationMethod() + " " + a.operationUrl();
+                        grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
+                    }
+                    
+                    java.util.List<ch.hug.vulnapi.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
+                    for (java.util.Map.Entry<String, java.util.List<ch.hug.vulnapi.model.ScanAttempt>> entry : grouped.entrySet()) {
+                        long passed = entry.getValue().stream().filter(ch.hug.vulnapi.model.ScanAttempt::passed).count();
+                        long failed = entry.getValue().size() - passed;
+                        attemptGroupsList.add(new ch.hug.vulnapi.model.EndpointAttemptGroup(entry.getKey(), entry.getValue(), passed, failed));
+                    }
+                    context.setVariable("attemptGroups", attemptGroupsList);
                 }
 
-                writer.println("</body></html>");
+                // 5. Render HTML
+                String html = templateEngine.process("report", context);
+
+                // 6. Write HTML to output stream
+                output.write(html.getBytes(StandardCharsets.UTF_8));
+                output.flush();
+
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to generate HTML report", e);
             }
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        });
     }
 }

@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -74,6 +75,8 @@ public class CrossUserBolaScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_639,
                                 "Broken Object Level Authorization",
+                                List.of("CAPEC-17"),
+                                7.5,
                                 "Server returned " + response.statusCode() + " OK when requesting User A's resource using User B's authentication token.",
                                 "Verify ownership of the requested resource. Ensure the authenticated user has explicit permission to access this specific object ID.",
                                 "Replayed exact request but swapped Authorization header with secondary user's token.",

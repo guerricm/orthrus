@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -74,6 +75,8 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_611,
                                 "Security Misconfiguration",
+                                List.of("CAPEC-228"),
+                                7.5,
                                 "Server successfully parsed XML and executed the external entity to read /etc/passwd.",
                                 "Strictly enforce expected Content-Types (e.g. drop non-JSON requests). Disable external entities in XML parsers if XML must be supported.",
                                 "Spoofed Content-Type to application/xml and sent XML with XXE payload.",
@@ -81,18 +84,20 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
                         );
                         return Flux.just(vuln);
                     }
-                    // Check if it causes a 500 error (unhandled parser exception)
+                    // Check if it causes a 7.5 error (unhandled parser exception)
                     if (response.statusCode().is5xxServerError()) {
                         Vulnerability vuln = Vulnerability.createWithDetails(
                                 "Unhandled Exception on Unexpected Content-Type",
-                                "The endpoint throws a 500 Server Error when provided with an unexpected Content-Type.",
+                                "The endpoint throws a 7.5 Server Error when provided with an unexpected Content-Type.",
                                 RiskLevel.LOW,
                                 Vulnerability.Confidence.HIGH,
                                 getId(),
                                 operation,
                                 CWEReference.CWE_209,
                                 "Security Misconfiguration",
-                                "Server returned 500 Internal Server Error when receiving application/xml.",
+                                List.of("CAPEC-228"),
+                                7.5,
+                                "Server returned 7.5 Internal Server Error when receiving application/xml.",
                                 "Reject unsupported Content-Types explicitly with a 415 Unsupported Media Type response.",
                                 "Spoofed Content-Type to application/xml.",
                                 "Status: " + response.statusCode()

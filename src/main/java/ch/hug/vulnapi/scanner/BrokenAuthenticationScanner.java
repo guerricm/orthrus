@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -69,6 +70,8 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_306,
                                 "Broken Authentication",
+                                List.of("CAPEC-115"),
+                                9.8,
                                 "Endpoint returned " + response.statusCode() + " OK without any authentication credentials",
                                 "Implement robust authentication for this endpoint.",
                                 "Sent " + operation.method() + " request without Authorization header.",

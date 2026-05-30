@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -78,6 +79,8 @@ public class SqlInjectionScanner implements SecurityScanner {
                             operation,
                             CWEReference.CWE_89,
                             "Injection",
+                                List.of("CAPEC-66"),
+                                9.8,
                             "Response indicates a database error when payload '" + payload + "' was injected.",
                             "Use parameterized queries or prepared statements.",
                             "Injected payload into query param: " + paramName + "=" + payload,

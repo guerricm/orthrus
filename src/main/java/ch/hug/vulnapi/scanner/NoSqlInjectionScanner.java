@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -74,6 +75,8 @@ public class NoSqlInjectionScanner implements SecurityScanner {
                             operation,
                             CWEReference.CWE_943,
                             "Injection",
+                                List.of("CAPEC-66"),
+                                9.8,
                             "Response indicates a NoSQL database error when payload '" + payload + "' was injected.",
                             "Validate and sanitize input. Use safe APIs that parameterize queries rather than concatenating strings or blindly passing JSON structures to the database driver.",
                             "Injected payload into query param: " + paramName + "=" + payload,

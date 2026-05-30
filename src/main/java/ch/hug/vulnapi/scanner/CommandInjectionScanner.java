@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -81,6 +82,8 @@ public class CommandInjectionScanner implements SecurityScanner {
                                         operation,
                                         CWEReference.CWE_78,
                                         "Injection",
+                                List.of("CAPEC-88"),
+                                9.8,
                                         "Response contains the injected marker string '" + ECHO_MARKER + "', indicating the OS command was executed and its output was returned.",
                                         "Avoid invoking OS commands directly. If necessary, use built-in language APIs and strictly sanitize and parameterize all input.",
                                         "Injected payload into query param: " + paramName + "=" + payload,

@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -66,6 +67,8 @@ public class VerboseErrorScanner implements SecurityScanner {
                                 operation,
                                 CWEReference.CWE_209,
                                 "Security Misconfiguration",
+                                List.of("CAPEC-54"),
+                                5.3,
                                 "Response contains stack traces or framework-specific internal errors.",
                                 "Configure your framework to return generic error messages to the client. Log detailed errors internally only.",
                                 "Sent malformed JSON body: " + MALFORMED_JSON,

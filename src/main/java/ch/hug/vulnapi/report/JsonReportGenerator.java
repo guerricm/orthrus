@@ -28,11 +28,23 @@ public class JsonReportGenerator implements ReportGenerator {
         this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
     }
 
+    /**
+     * Gets the format identifier for this generator.
+     *
+     * @return the format string "json"
+     */
     @Override
     public String getFormat() {
         return "json";
     }
 
+    /**
+     * Generates a JSON report from a ScanResult and writes it to the output stream.
+     *
+     * @param result the scan result containing vulnerabilities and execution attempts
+     * @param output the output stream to write the JSON content to
+     * @return a Mono signaling completion
+     */
     @Override
     public Mono<Void> generateReport(ScanResult result, OutputStream output) {
         return Mono.fromRunnable(() -> {

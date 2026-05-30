@@ -1,4 +1,5 @@
 package ch.hug.vulnapi.scanner;
+import java.util.List;
 
 import ch.hug.vulnapi.http.ScanHttpClient;
 import ch.hug.vulnapi.model.CWEReference;
@@ -84,6 +85,8 @@ public class BolaScanner implements SecurityScanner {
                                 testOp, // The modified operation
                                 CWEReference.CWE_639,
                                 "Broken Object Level Authorization",
+                                List.of("CAPEC-17"),
+                                7.5,
                                 "Response status " + response.statusCode() + " when accessing ID " + testId,
                                 "Implement strict authorization checks at the object level. Verify the user requesting the data owns or has roles to access it.",
                                 "Modified URL from " + operation.url() + " to " + newUrl,

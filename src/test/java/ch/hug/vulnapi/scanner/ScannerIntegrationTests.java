@@ -135,7 +135,7 @@ class ScannerIntegrationTests {
 
         SecurityScheme userA = SecurityScheme.bearer("TOKEN_A");
         SecurityScheme userB = SecurityScheme.bearer("TOKEN_B");
-        ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false, "json", userA, userB, "en");
+        ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false, "json", userA, userB, "en", false);
 
         Operation op = new Operation(baseUrl + "/invoices/123", "GET", Map.<String, String>of(), Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);
 

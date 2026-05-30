@@ -5,6 +5,7 @@ import ch.hug.vulnapi.model.Operation;
 import ch.hug.vulnapi.model.RiskLevel;
 import ch.hug.vulnapi.model.ScanConfiguration;
 import ch.hug.vulnapi.model.ScanResult;
+import ch.hug.vulnapi.model.ScanAttempt;
 import ch.hug.vulnapi.model.Vulnerability;
 import ch.hug.vulnapi.scanner.SecurityScanner;
 import org.slf4j.Logger;
@@ -14,12 +15,15 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Core engine that orchestrates the scanning process reactively.
@@ -50,33 +54,45 @@ public class ScanEngine {
 
         // Thread-safe accumulators for stats
         Map<RiskLevel, Long> riskSummary = new ConcurrentHashMap<>();
-        for (RiskLevel level : RiskLevel.values()) {
-            riskSummary.put(level, 0L);
-        }
-        Map<String, Integer> scannerSummary = new ConcurrentHashMap<>();
-        
         return discoverer.discover(targetUrl, overrideHost, config.authScheme())
                 .flatMap(operations -> {
-                    log.info("Discovered {} operations to scan.", operations.size());
-
                     if (operations.isEmpty()) {
+                        log.warn("No operations discovered.");
                         return Mono.just(createEmptyResult(targetUrl, startTime, config));
                     }
 
-                    // Process operations in parallel
-                    Flux<Vulnerability> vulnerabilitiesFlux = Flux.fromIterable(operations)
-                            .flatMap(operation -> scanOperation(operation, activeScanners, config), config.concurrency());
+                    log.info("Discovered {} operations. Starting scan...", operations.size());
 
-                    return vulnerabilitiesFlux
-                            .doOnNext(vuln -> {
-                                log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
-                                riskSummary.compute(vuln.riskLevel(), (k, v) -> v + 1);
-                                scannerSummary.compute(vuln.scannerId(), (k, v) -> (v == null ? 0 : v) + 1);
+                    Map<RiskLevel, Long> riskSummaryAccumulator = new EnumMap<>(RiskLevel.class);
+                    for (RiskLevel level : RiskLevel.values()) {
+                        riskSummaryAccumulator.put(level, 0L);
+                    }
+                    Map<String, Integer> scannerSummary = new HashMap<>();
+
+                    Flux<ScanAttempt> attemptsFlux = Flux.fromIterable(operations)
+                            .flatMap(op -> scanOperation(op, activeScanners, config), config.concurrency());
+
+                    return attemptsFlux
+                            .doOnNext(attempt -> {
+                                for (Vulnerability vuln : attempt.vulnerabilities()) {
+                                    log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
+                                    riskSummaryAccumulator.compute(vuln.riskLevel(), (k, v) -> v + 1);
+                                    scannerSummary.compute(vuln.scannerId(), (k, v) -> (v == null ? 0 : v) + 1);
+                                }
                             })
                             .collectList()
-                            .map(vulns -> {
+                            .map(attempts -> {
                                 Instant endTime = Instant.now();
-                                log.info("Scan completed. Found {} vulnerabilities.", vulns.size());
+                                
+                                List<Vulnerability> allVulns = attempts.stream()
+                                    .flatMap(a -> a.vulnerabilities().stream())
+                                    .collect(Collectors.toList());
+                                
+                                log.info("Scan completed. Found {} vulnerabilities in {} executed tests.", allVulns.size(), attempts.size());
+                                
+                                List<Vulnerability> sortedVulns = new java.util.ArrayList<>(allVulns);
+                                sortedVulns.sort(java.util.Comparator.comparing(Vulnerability::riskLevel).reversed());
+
                                 return new ScanResult(
                                         UUID.randomUUID().toString(),
                                         targetUrl,
@@ -84,22 +100,39 @@ public class ScanEngine {
                                         endTime,
                                         operations.size(),
                                         operations.size(),
-                                        vulns,
-                                        new EnumMap<>(riskSummary),
+                                        sortedVulns,
+                                        new EnumMap<>(riskSummaryAccumulator),
                                         new HashMap<>(scannerSummary),
-                                        config
+                                        config,
+                                        config.includePassed() ? sortAttempts(attempts) : List.of()
                                 );
                             });
                 });
     }
 
-    private Flux<Vulnerability> scanOperation(Operation operation, List<SecurityScanner> scanners, ScanConfiguration config) {
+    private Flux<ScanAttempt> scanOperation(Operation operation, List<SecurityScanner> scanners, ScanConfiguration config) {
         log.debug("Scanning operation: {} {}", operation.method(), operation.url());
         return Flux.fromIterable(scanners)
                 .flatMap(scanner -> scanner.scan(operation, config)
+                        .collectList()
+                        .map(vulns -> new ScanAttempt(
+                                scanner.getId(), 
+                                scanner.getName(), 
+                                operation.method(), 
+                                operation.url(), 
+                                vulns.isEmpty(), 
+                                vulns
+                        ))
                         .onErrorResume(e -> {
                             log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(), e.getMessage());
-                            return Flux.empty();
+                            return Mono.just(new ScanAttempt(
+                                    scanner.getId(), 
+                                    scanner.getName(), 
+                                    operation.method(), 
+                                    operation.url(), 
+                                    false, 
+                                    List.of()
+                            ));
                         })
                 );
     }
@@ -117,9 +150,22 @@ public class ScanEngine {
                 0,
                 0,
                 List.of(),
-                riskSummary,
-                Map.of(),
-                config
+                new EnumMap<>(riskSummary),
+                new HashMap<>(),
+                config,
+                List.of()
         );
+    }
+
+    /**
+     * Sort attempts by endpoint URL, method, scanner name, then status (failed first).
+     */
+    private List<ScanAttempt> sortAttempts(List<ScanAttempt> attempts) {
+        List<ScanAttempt> sorted = new ArrayList<>(attempts);
+        sorted.sort(Comparator.comparing(ScanAttempt::operationUrl)
+                .thenComparing(ScanAttempt::operationMethod)
+                .thenComparing(ScanAttempt::scannerName)
+                .thenComparing(ScanAttempt::passed)); // false (failed) < true (passed)
+        return sorted;
     }
 }

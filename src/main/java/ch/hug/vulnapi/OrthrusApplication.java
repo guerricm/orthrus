@@ -19,8 +19,19 @@ public class OrthrusApplication implements CommandLineRunner {
     }
 
     public static void main(String[] args) {
-        // We use exit code from SpringApplication which will include the picocli exit code
-        System.exit(SpringApplication.run(OrthrusApplication.class, args).getEnvironment().getProperty("spring.boot.exitcode", Integer.class, 0));
+        SpringApplication app = new SpringApplication(OrthrusApplication.class);
+        if (args.length > 0) {
+            System.setProperty("spring.main.web-application-type", "none");
+            app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
+        }
+        
+        org.springframework.context.ApplicationContext context = app.run(args);
+        int exitCode = SpringApplication.exit(context);
+        
+        // If we ran a CLI command, system will have exited in run(). If not, we don't exit here.
+        if (args.length > 0) {
+            System.exit(exitCode);
+        }
     }
 
     @Override

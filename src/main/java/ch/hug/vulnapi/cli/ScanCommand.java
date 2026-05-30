@@ -73,6 +73,9 @@ public class ScanCommand implements Callable<Integer> {
     @Option(names = {"--oauth2-url"}, description = "OAuth2 token endpoint URL")
     String oauth2Url;
 
+    @Option(names = {"--include-passed"}, description = "Include passed tests in the report")
+    boolean includePassed;
+
     @Option(names = {"--oauth2-client-id"}, description = "OAuth2 Client ID")
     String oauth2ClientId;
 
@@ -128,7 +131,8 @@ public class ScanCommand implements Callable<Integer> {
                 format,
                 authScheme,
                 secondaryAuthScheme,
-                language
+                language,
+                includePassed
         );
 
         try {
