@@ -8,7 +8,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
         <div>
             <h3 class="mb-0">Scan Completed</h3>
-            <p class="text-muted mb-0" th:text="${result.targetUrl()}">https://target.url</p>
+            <p class="text-muted mb-0"><span th:text="${result.targetUrl()}">https://target.url</span> &bull; <span th:text="'in ' + ${result.formattedDuration()}">in 5s</span></p>
         </div>
         <div>
             <!-- PDF Download Button -->
@@ -26,6 +26,14 @@
         <div class="col-md-4 text-center">
             <h5 class="text-muted mb-3">Global Grade</h5>
             <div th:class="'grade-badge grade-' + ${globalGrade}" th:text="${globalGrade}">A</div>
+            <div class="mt-4 text-light">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-hdd-network me-1 mb-1 text-primary" viewBox="0 0 16 16">
+                  <path d="M4.5 5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M3 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m2 7a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m-2.5.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
+                  <path d="M2 2a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h5.5v3A1.5 1.5 0 0 0 6 11.5H.5a.5.5 0 0 0 0 1H6A1.5 1.5 0 0 0 7.5 14h1a1.5 1.5 0 0 0 1.5-1.5h5.5a.5.5 0 0 0 0-1H10A1.5 1.5 0 0 0 8.5 10V7H14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 1h12a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1m5.5 10.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+                </svg>
+                <span class="fs-5 fw-bold text-light" th:text="${result.operationsScanned()}">0</span>
+                <span class="text-light opacity-75 ms-1">Endpoints Analyzed</span>
+            </div>
         </div>
         
         <div class="col-md-8">

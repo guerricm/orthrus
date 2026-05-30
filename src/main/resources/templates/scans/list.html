@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus VulnAPI - Scan History')}">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - Scan History')}">
 <body>
 <main>
     <div class="row justify-content-center">
@@ -24,6 +24,7 @@
                         <tr>
                             <th class="bg-transparent border-secondary" style="padding: 1rem;">Date</th>
                             <th class="bg-transparent border-secondary" style="padding: 1rem;">Target</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Duration</th>
                             <th class="bg-transparent border-secondary text-center" style="padding: 1rem;">Vulns</th>
                             <th class="bg-transparent border-secondary text-center" style="padding: 1rem;">Tests</th>
                             <th class="bg-transparent border-secondary text-end" style="padding: 1rem;">Action</th>
@@ -33,6 +34,7 @@
                         <tr th:each="scan : ${history}">
                             <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${#temporals.format(scan.scanStartTime(), 'HH:mm:ss dd/MM/yyyy')}">10:00 01/01/2026</td>
                             <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle; word-break: break-all;" th:text="${scan.targetUrl()}">https://api.example.com</td>
+                            <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${scan.formattedDuration()}">5s</td>
                             <td class="bg-transparent border-secondary text-center" style="padding: 1rem; vertical-align: middle;">
                                 <span class="badge bg-danger rounded-pill px-3 py-2" th:text="${scan.vulnerabilities().size()}">5</span>
                             </td>

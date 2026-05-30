@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus VulnAPI - New Scan')}">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - New Scan')}">
 <body>
 <main>
     <div class="row justify-content-center">
@@ -8,7 +8,7 @@
             <div class="glass-card">
                 <h4 class="mb-4">Scan Configuration</h4>
                 
-                <form hx-post="/web/scans" hx-target="#results-container" hx-indicator="#loading" hx-disabled-elt="#launchBtn">
+                <form hx-post="/web/scans" hx-target="#results-container" hx-indicator="#loading" hx-disabled-elt="#launchBtn" onsubmit="document.getElementById('results-container').innerHTML = '';">
                     <div class="row g-4">
                         
                         <div class="col-md-8">
@@ -100,12 +100,21 @@
                                             <div class="row">
                                                 <div class="col-md-4 mb-2" th:each="scanner : ${scanners}">
                                                     <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="includeScanners" th:value="${scanner}" th:id="'scanner_' + ${scanner}" checked>
-                                                        <label class="form-check-label text-light" th:for="'scanner_' + ${scanner}" th:text="${scanner}"></label>
+                                                        <input class="form-check-input" type="checkbox" name="includeScanners" th:value="${scanner.getId()}" th:id="'scanner_' + ${scanner.getId()}" checked>
+                                                        <label class="form-check-label text-light" th:for="'scanner_' + ${scanner.getId()}" th:text="${scanner.getId()}" th:title="${scanner.getName()}" data-bs-toggle="tooltip" data-bs-placement="top" style="cursor: help; border-bottom: 1px dotted #ccc;"></label>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div class="form-text text-muted mt-2">Uncheck the scanners you want to skip. By default, all scanners are executed.</div>
+                                        </div>
+                                    </div>
+
+                                    <h5 class="mt-4 mb-3 text-primary">Performance</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <label for="concurrency" class="form-label">Scan Concurrency: <span id="concurrencyValue">10</span></label>
+                                            <input type="range" class="form-range" min="1" max="100" step="1" id="concurrency" name="concurrency" value="10" oninput="document.getElementById('concurrencyValue').innerText = this.value">
+                                            <div class="form-text text-muted">Higher values scan faster but generate more traffic on the target server. Reduce this if the API drops requests.</div>
                                         </div>
                                     </div>
                                 </div>

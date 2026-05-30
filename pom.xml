@@ -10,10 +10,10 @@
     </parent>
 
     <groupId>ch.hug.security</groupId>
-    <artifactId>orthrus</artifactId>
+    <artifactId>orthrus-dast</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Orthrus VulnAPI</name>
-    <description>Dynamic Application Security Testing (DAST) for APIs in Java</description>
+    <name>Orthrus DAST</name>
+    <description>Orthrus Dynamic Application Security Testing</description>
 
     <properties>
         <java.version>25</java.version>

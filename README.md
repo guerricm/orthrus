@@ -1,11 +1,11 @@
-# Orthrus VulnAPI
+# Orthrus DAST
 
-Orthrus VulnAPI is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot 4 and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
+Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot 4 and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
 
 ## Features
 
 - **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
-- **22 Specialized Scanners**:
+- **25 Specialized Scanners**:
   - `broken-auth`: Missing Authentication for Critical Functions
   - `sqli`: SQL Injection in query parameters
   - `jwt-none-alg`: JWT 'none' algorithm bypass
@@ -29,8 +29,12 @@ Orthrus VulnAPI is a modern, reactive Dynamic Application Security Testing (DAST
   - `ssti`: Server-Side Template Injection via mathematical payloads
   - `cleartext-transmission`: Detects unencrypted HTTP APIs
   - `auth-bruteforce`: Brute force / weak password detection on authentication endpoints (uses SecLists top-100 dictionary)
-- **4 Discovery Modes**:
+  - `graphql-introspection`: Detects if GraphQL introspection is enabled in production
+  - `graphql-injection`: Injects SQLi, XSS, and CmdInj payloads dynamically into GraphQL JSON variables
+  - `ssl-tls`: Scans SSL/TLS certificates for expiration, weak protocols, self-signed issues, and weak signature algorithms
+- **5 Discovery Modes**:
   - `openapi`: Automatically extracts routes and generates mock payloads from an OpenAPI v3 specification.
+  - `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.
   - `blackbox`: Crawls HTML pages and forms up to a configurable depth.
   - `well-known`: Probes common unprotected paths (`/actuator`, `/.env`, etc.).
   - `curl`: Directly scans a single specified URL.
@@ -55,45 +59,45 @@ This generates the executable JAR in the `target/` directory.
 To run a scan from the command line, pass arguments to the JAR. The command requires a discoverer (`-d`) and a target (`-t`).
 
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 ```
 
 ### Examples
 
 **Generate a professional PDF report in French:**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
 ```
 
 **Scan an OpenAPI specification:**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f console
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f console
 ```
 
 **Crawl a website (Blackbox):**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
 ```
 
 **Scan a single endpoint with a Bearer Token:**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d curl -t "https://api.example.com/v1/users/123" --auth-bearer "eyJhb..."
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d curl -t "https://api.example.com/v1/users/123" --auth-bearer "eyJhb..."
 ```
 
 **Generate a SARIF report for CI/CD:**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d well-known -t https://example.com -f sarif --out vulnapi-results.sarif
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d well-known -t https://example.com -f sarif --out vulnapi-results.sarif
 ```
 
 **Test for Cross-User BOLA (IDOR) with two distinct users:**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs --auth-bearer "TOKEN_USER_A" --auth-bearer-secondary "TOKEN_USER_B"
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs --auth-bearer "TOKEN_USER_A" --auth-bearer-secondary "TOKEN_USER_B"
 ```
 
 **Automated OAuth2 Token Fetching (e.g. Keycloak):**
 Automatically fetch tokens for one or multiple users before scanning (supports `password` or `client_credentials`):
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
   --oauth2-url "https://keycloak.example.com/realms/master/protocol/openid-connect/token" \
   --oauth2-grant "password" \
   --oauth2-client-id "orthrus-client" \
@@ -103,13 +107,19 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.co
 
 **Generate a detailed report with all executed tests (passed & failed):**
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f html -o report.html --include-passed
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f html -o report.html --include-passed
+```
+
+**Optimize performance by increasing concurrency (e.g. 100 threads for massive APIs):**
+```bash
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -c 100
 ```
 *This adds an "Execution Details" section at the end of the report, listing every scanner test against every endpoint, sorted by endpoint → method → scanner → status (failed first).*
 
 ### CLI Options
 - `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
 - `-t, --target`: Target URL or Spec path.
+- `-c, --concurrency`: Number of concurrent threads to use during the scan (default: 10). Increase for massive APIs to speed up execution.
 - `--host`: Override the host URL for the target endpoints.
 - `-f, --format`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
 - `--lang`: Report language when using PDF or HTML format (`en`, `fr`). Default is `en`.
@@ -130,7 +140,7 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.co
 If you run the application without CLI arguments, it starts a Spring WebFlux server exposing a rich Web User Interface on **http://localhost:8080**.
 
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar
 ```
 
 The Web UI provides a user-friendly, responsive experience with the following features:
@@ -148,7 +158,7 @@ The Web UI provides a user-friendly, responsive experience with the following fe
 If you run the application without CLI arguments, it starts a Spring WebFlux server exposing a REST API.
 
 ```bash
-java -jar target/orthrus-0.0.1-SNAPSHOT.jar
+java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar
 ```
 
 **Trigger a basic scan:**
