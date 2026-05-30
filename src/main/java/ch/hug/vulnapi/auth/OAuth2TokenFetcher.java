@@ -23,8 +23,8 @@ public class OAuth2TokenFetcher {
     private static final Logger log = LoggerFactory.getLogger(OAuth2TokenFetcher.class);
     private final WebClient webClient;
 
-    public OAuth2TokenFetcher(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.build();
+    public OAuth2TokenFetcher() {
+        this.webClient = WebClient.create();
     }
 
     /**
