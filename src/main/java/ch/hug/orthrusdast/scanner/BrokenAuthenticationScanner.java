@@ -39,8 +39,9 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
     public Flux<Vulnerability> scan(Operation operation) {
         log.debug("Scanning for Broken Authentication: {}", operation.url());
 
-        // We only care if the endpoint supposedly requires auth, or if we can guess it's sensitive
-        boolean seemsSensitive = operation.url().contains("/admin") || operation.url().contains("/private") || operation.authScheme() != null;
+        // We care if the endpoint supposedly requires auth, if we can guess it's sensitive, or if it modifies state
+        boolean isStateChanging = List.of("POST", "PUT", "PATCH", "DELETE").contains(operation.method().toUpperCase());
+        boolean seemsSensitive = isStateChanging || operation.url().contains("/admin") || operation.url().contains("/private") || operation.authScheme() != null;
         
         if (!seemsSensitive) {
             return Flux.empty();
