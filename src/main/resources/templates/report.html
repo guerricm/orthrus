@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <title th:text="#{report.title}">Vulnerability Report</title>
@@ -11,47 +12,60 @@
             padding: 0;
             line-height: 1.6;
         }
+
         @page {
             size: A4;
             margin: 20mm;
+
             @bottom-center {
                 content: "Page " counter(page) " of " counter(pages);
                 font-size: 10pt;
                 color: #777;
             }
         }
-        h1, h2, h3 {
+
+        h1,
+        h2,
+        h3 {
             color: #2c3e50;
         }
+
         .header {
             text-align: center;
             border-bottom: 2px solid #3498db;
             padding-bottom: 20px;
             margin-bottom: 30px;
         }
+
         .header h1 {
             font-size: 28pt;
             margin: 0;
             text-transform: uppercase;
         }
+
         .meta-info {
             margin-top: 20px;
             font-size: 12pt;
         }
+
         .meta-info table {
             width: 100%;
         }
+
         .meta-info td {
             padding: 5px;
         }
+
         .meta-info td.label {
             font-weight: bold;
             width: 20%;
         }
+
         .section {
             margin-bottom: 40px;
             page-break-inside: avoid;
         }
+
         .section-title {
             background-color: #ecf0f1;
             padding: 10px;
@@ -59,6 +73,7 @@
             margin-bottom: 15px;
             font-size: 18pt;
         }
+
         .score-box {
             text-align: center;
             padding: 20px;
@@ -68,65 +83,110 @@
             min-width: 150px;
             margin-bottom: 20px;
         }
+
         .score-grade {
             font-size: 48pt;
             font-weight: bold;
             margin: 0;
         }
-        .score-A { color: #27ae60; border-color: #27ae60; }
-        .score-B { color: #2ecc71; border-color: #2ecc71; }
-        .score-C { color: #f1c40f; border-color: #f1c40f; }
-        .score-D { color: #e67e22; border-color: #e67e22; }
-        .score-F { color: #e74c3c; border-color: #e74c3c; }
+
+        .score-A {
+            color: #27ae60;
+            border-color: #27ae60;
+        }
+
+        .score-B {
+            color: #2ecc71;
+            border-color: #2ecc71;
+        }
+
+        .score-C {
+            color: #f1c40f;
+            border-color: #f1c40f;
+        }
+
+        .score-D {
+            color: #e67e22;
+            border-color: #e67e22;
+        }
+
+        .score-F {
+            color: #e74c3c;
+            border-color: #e74c3c;
+        }
 
         .summary-stats {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
-        .summary-stats th, .summary-stats td {
+
+        .summary-stats th,
+        .summary-stats td {
             border: 1px solid #bdc3c7;
             padding: 8px;
             text-align: center;
         }
+
         .summary-stats th {
             background-color: #34495e;
             color: white;
         }
+
         .vuln-card {
             border: 1px solid #bdc3c7;
             border-radius: 4px;
             margin-bottom: 20px;
             page-break-inside: avoid;
         }
+
         .vuln-header {
             padding: 10px;
             color: white;
             font-weight: bold;
         }
-        .vuln-header.critical { background-color: #c0392b; }
-        .vuln-header.high { background-color: #e67e22; }
-        .vuln-header.medium { background-color: #f39c12; }
-        .vuln-header.low { background-color: #27ae60; }
-        .vuln-header.info { background-color: #2980b9; }
+
+        .vuln-header.critical {
+            background-color: #c0392b;
+        }
+
+        .vuln-header.high {
+            background-color: #e67e22;
+        }
+
+        .vuln-header.medium {
+            background-color: #f39c12;
+        }
+
+        .vuln-header.low {
+            background-color: #27ae60;
+        }
+
+        .vuln-header.info {
+            background-color: #2980b9;
+        }
 
         .vuln-body {
             padding: 15px;
         }
+
         .vuln-body table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 10px;
         }
+
         .vuln-body td {
             padding: 5px;
             vertical-align: top;
         }
+
         .vuln-label {
             font-weight: bold;
             width: 150px;
             color: #34495e;
         }
+
         .evidence {
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
@@ -136,6 +196,7 @@
             word-wrap: break-word;
             font-size: 9pt;
         }
+
         .capec-tag {
             display: inline-block;
             background-color: #f39c12;
@@ -147,6 +208,7 @@
             margin-right: 5px;
             margin-top: 5px;
         }
+
         .cvss-tag {
             display: inline-block;
             background-color: #8e44ad;
@@ -158,6 +220,19 @@
             margin-right: 5px;
             margin-top: 5px;
         }
+
+        .owasp-tag {
+            display: inline-block;
+            background-color: #2980b9;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-right: 5px;
+            margin-top: 5px;
+        }
+
         .disclaimer-section {
             background-color: #fdf2e9;
             border-left: 4px solid #e67e22;
@@ -167,6 +242,7 @@
             border-radius: 4px;
             page-break-inside: avoid;
         }
+
         .disclaimer-title {
             color: #d35400;
             font-weight: bold;
@@ -176,23 +252,24 @@
         }
     </style>
 </head>
+
 <body>
 
-<div class="header">
-    <h1 th:text="#{report.title}">Vulnerability Report</h1>
-    <div class="meta-info">
-        <table>
-            <tr>
-                <td class="label" th:text="#{report.date}">Date</td>
-                <td th:text="${scanDate}">2026-05-30</td>
-            </tr>
-            <tr>
-                <td class="label" th:text="#{report.target}">Target</td>
-                <td th:text="${targetUrl}">https://api.example.com</td>
-            </tr>
-        </table>
+    <div class="header">
+        <h1 th:text="#{report.title}">Vulnerability Report</h1>
+        <div class="meta-info">
+            <table>
+                <tr>
+                    <td class="label" th:text="#{report.date}">Date</td>
+                    <td th:text="${scanDate}">2026-05-30</td>
+                </tr>
+                <tr>
+                    <td class="label" th:text="#{report.target}">Target</td>
+                    <td th:text="${targetUrl}">https://api.example.com</td>
+                </tr>
+            </table>
+        </div>
     </div>
-</div>
 
     <!-- General Legal & Confidentiality Disclaimer -->
     <div class="disclaimer-section">
@@ -202,133 +279,150 @@
         </p>
     </div>
 
-<div class="section">
-    <h2 class="section-title" th:text="#{report.methodology.title}">Methodology</h2>
-    <p th:text="#{report.methodology.description}">
-        This report presents the findings of an automated Dynamic Application Security Testing (DAST) scan.
-    </p>
-    <div style="margin-top: 15px; font-size: 0.95em; color: #555; background-color: #f8f9fa; padding: 15px; border-radius: 4px; border-left: 3px solid #3498db;" th:utext="#{report.methodology.details}">
-        Orthrus utilizes an advanced taxonomy...
-    </div>
-</div>
-
-<div class="section">
-    <h2 class="section-title" th:text="#{report.summary.title}">Global Summary</h2>
-    
-    <div style="text-align: center;">
-        <div th:class="'score-box score-' + ${globalGrade}">
-            <div style="font-size: 14pt; color: #7f8c8d;" th:text="#{report.summary.grade}">Security Grade</div>
-            <div class="score-grade" th:text="${globalGrade}">A</div>
+    <div class="section">
+        <h2 class="section-title" th:text="#{report.methodology.title}">Methodology</h2>
+        <p th:text="#{report.methodology.description}">
+            This report presents the findings of an automated Dynamic Application Security Testing (DAST) scan.
+        </p>
+        <div style="margin-top: 15px; font-size: 0.95em; color: #555; background-color: #f8f9fa; padding: 15px; border-radius: 4px; border-left: 3px solid #3498db;"
+            th:utext="#{report.methodology.details}">
+            Orthrus utilizes an advanced taxonomy...
         </div>
     </div>
 
-    <table class="summary-stats">
-        <thead>
-            <tr>
-                <th th:text="#{report.summary.total}">Total</th>
-                <th th:text="#{report.summary.critical}">CRITICAL</th>
-                <th th:text="#{report.summary.high}">HIGH</th>
-                <th th:text="#{report.summary.medium}">MEDIUM</th>
-                <th th:text="#{report.summary.low}">LOW</th>
-                <th th:text="#{report.summary.info}">INFO</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td style="font-weight: bold;" th:text="${totalVulns}">0</td>
-                <td style="color: #c0392b; font-weight: bold;" th:text="${countCritical}">0</td>
-                <td style="color: #e67e22; font-weight: bold;" th:text="${countHigh}">0</td>
-                <td style="color: #f39c12; font-weight: bold;" th:text="${countMedium}">0</td>
-                <td style="color: #27ae60; font-weight: bold;" th:text="${countLow}">0</td>
-                <td style="color: #2980b9; font-weight: bold;" th:text="${countInfo}">0</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+    <div class="section">
+        <h2 class="section-title" th:text="#{report.summary.title}">Global Summary</h2>
 
-<div class="section">
-    <h2 class="section-title" th:text="#{report.details.title}">Detailed Findings</h2>
-
-    <div th:if="${vulnerabilities.isEmpty()}">
-        <p th:text="#{report.details.none}">No vulnerabilities were found during this scan.</p>
-    </div>
-
-    <div th:each="vuln, iterStat : ${vulnerabilities}" class="vuln-card">
-        <div th:class="'vuln-header ' + ${vuln.riskLevel.name().toLowerCase()}">
-            <span th:text="${iterStat.count} + '. ' + ${vuln.name}">1. Vulnerability Name</span>
-            <span style="float: right;" th:text="'[' + #{'severity.' + ${vuln.riskLevel.name().toLowerCase()}} + ']'">[HIGH]</span>
-        </div>
-        <div class="vuln-body">
-            <div class="vuln-meta">
-                <strong><span th:text="#{report.owasp}">OWASP</span>:</strong> <span th:text="${vuln.owaspCategory}">APIX:2023</span> |
-                <strong><span th:text="#{report.confidence}">Confidence</span>:</strong> <span th:text="${vuln.confidence}">HIGH</span>
-                
-                <div style="margin-top: 10px;">
-                    <span class="cvss-tag" th:if="${vuln.cvssScore != null}" th:text="#{report.cvss} + ': ' + ${vuln.cvssScore}">CVSS: 9.8</span>
-                    <span class="owasp-tag" th:text="${vuln.cwe.getId()}">CWE-XXX</span>
-                    <span class="capec-tag" th:each="capec : ${vuln.capecs}" th:text="${capec}">CAPEC-XX</span>
-                </div>
+        <div style="text-align: center;">
+            <div th:class="'score-box score-' + ${globalGrade}">
+                <div style="font-size: 14pt; color: #7f8c8d;" th:text="#{report.summary.grade}">Security Grade</div>
+                <div class="score-grade" th:text="${globalGrade}">A</div>
             </div>
-            <table>
+        </div>
+
+        <table class="summary-stats">
+            <thead>
                 <tr>
-                    <td class="vuln-label" th:text="#{vuln.cwe}">CWE</td>
-                    <td th:text="'CWE-' + ${vuln.cwe.id} + ': ' + (${#messages.msgOrNull('cwe.' + vuln.cwe.name())} ?: ${vuln.cwe.name})">CWE-123</td>
+                    <th th:text="#{report.summary.total}">Total</th>
+                    <th th:text="#{report.summary.critical}">CRITICAL</th>
+                    <th th:text="#{report.summary.high}">HIGH</th>
+                    <th th:text="#{report.summary.medium}">MEDIUM</th>
+                    <th th:text="#{report.summary.low}">LOW</th>
+                    <th th:text="#{report.summary.info}">INFO</th>
                 </tr>
+            </thead>
+            <tbody>
                 <tr>
-                    <td class="vuln-label" th:text="#{vuln.endpoint}">Endpoint</td>
-                    <td style="font-family: monospace;" th:text="${vuln.operationMethod} + ' ' + ${vuln.operationUrl}">GET /api/users</td>
+                    <td style="font-weight: bold;" th:text="${totalVulns}">0</td>
+                    <td style="color: #c0392b; font-weight: bold;" th:text="${countCritical}">0</td>
+                    <td style="color: #e67e22; font-weight: bold;" th:text="${countHigh}">0</td>
+                    <td style="color: #f39c12; font-weight: bold;" th:text="${countMedium}">0</td>
+                    <td style="color: #27ae60; font-weight: bold;" th:text="${countLow}">0</td>
+                    <td style="color: #2980b9; font-weight: bold;" th:text="${countInfo}">0</td>
                 </tr>
-                <tr>
-                    <td class="vuln-label" th:text="#{vuln.description}">Description</td>
-                    <td th:text="(${#messages.msgOrNull('desc.' + vuln.cwe.name())} ?: ${vuln.description})">Description here</td>
-                </tr>
-                <tr>
-                    <td class="vuln-label" th:text="#{vuln.remediation}">Remediation</td>
-                    <td th:text="(${#messages.msgOrNull('rem.' + vuln.cwe.name())} ?: ${vuln.remediation})">Remediation here</td>
-                </tr>
-                <tr th:if="${vuln.evidence != null}">
-                    <td class="vuln-label" th:text="#{vuln.evidence}">Evidence</td>
-                    <td>
-                        <div class="evidence" th:text="${vuln.evidence}">Evidence payload here</div>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title" th:text="#{report.details.title}">Detailed Findings</h2>
+
+        <div th:if="${vulnerabilities.isEmpty()}">
+            <p th:text="#{report.details.none}">No vulnerabilities were found during this scan.</p>
+        </div>
+
+        <div th:each="vuln, iterStat : ${vulnerabilities}" class="vuln-card">
+            <div th:class="'vuln-header ' + ${vuln.riskLevel.name().toLowerCase()}">
+                <span th:text="${iterStat.count} + '. ' + ${vuln.name}">1. Vulnerability Name</span>
+                <span style="float: right;"
+                    th:text="'[' + #{'severity.' + ${vuln.riskLevel.name().toLowerCase()}} + ']'">[HIGH]</span>
+            </div>
+            <div class="vuln-body">
+                <div class="vuln-meta">
+                    <strong><span th:text="#{report.owasp}">OWASP</span>:</strong> <span
+                        th:text="${vuln.owaspCategory}">APIX:2023</span> |
+                    <strong><span th:text="#{report.confidence}">Confidence</span>:</strong> <span
+                        th:text="${vuln.confidence}">HIGH</span>
+
+                    <div style="margin-top: 10px;">
+                        <span class="cvss-tag" th:if="${vuln.cvssScore != null}"
+                            th:text="#{report.cvss} + ': ' + ${vuln.cvssScore}">CVSS: 9.8</span>
+                        <span class="owasp-tag" th:text="'CWE-' + ${vuln.cwe.getId()}">CWE-XXX</span>
+                        <span class="capec-tag" th:each="capec : ${vuln.capecs}" th:text="${capec}">CAPEC-XX</span>
+                    </div>
+                </div>
+                <table>
+                    <tr>
+                        <td class="vuln-label" th:text="#{vuln.cwe}">CWE</td>
+                        <td
+                            th:text="'CWE-' + ${vuln.cwe.id} + ': ' + (${#messages.msgOrNull('cwe.' + vuln.cwe.name())} ?: ${vuln.cwe.name})">
+                            CWE-123</td>
+                    </tr>
+                    <tr>
+                        <td class="vuln-label" th:text="#{vuln.endpoint}">Endpoint</td>
+                        <td style="font-family: monospace;"
+                            th:text="${vuln.operationMethod} + ' ' + ${vuln.operationUrl}">GET /api/users</td>
+                    </tr>
+                    <tr>
+                        <td class="vuln-label" th:text="#{vuln.description}">Description</td>
+                        <td th:text="(${#messages.msgOrNull('desc.' + vuln.cwe.name())} ?: ${vuln.description})">
+                            Description here</td>
+                    </tr>
+                    <tr>
+                        <td class="vuln-label" th:text="#{vuln.remediation}">Remediation</td>
+                        <td th:text="(${#messages.msgOrNull('rem.' + vuln.cwe.name())} ?: ${vuln.remediation})">
+                            Remediation here</td>
+                    </tr>
+                    <tr th:if="${vuln.evidence != null}">
+                        <td class="vuln-label" th:text="#{vuln.evidence}">Evidence</td>
+                        <td>
+                            <div class="evidence" th:text="${vuln.evidence}">Evidence payload here</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Execution Details (only if include-passed) -->
+    <div class="section" th:if="${attemptGroups != null and !attemptGroups.isEmpty()}">
+        <h2 class="section-title" th:text="#{report.execution.title}">Execution Details</h2>
+        <p th:text="#{report.execution.description}">
+            The following section lists every test executed during the scan, grouped by endpoint.
+        </p>
+
+        <div th:each="group : ${attemptGroups}"
+            style="margin-bottom: 20px; border: 1px solid #bdc3c7; border-radius: 4px; page-break-inside: avoid;">
+            <!-- Endpoint header -->
+            <div
+                style="background-color: #34495e; color: white; padding: 8px 12px; font-family: monospace; font-size: 11pt; font-weight: bold;">
+                <span th:text="${group.displayName}">GET /api/v3/pet</span>
+                <span style="float: right; font-family: sans-serif; font-size: 9pt; font-weight: normal;">
+                    <span style="color: #2ecc71;" th:text="'✓ ' + ${group.passedCount} + ' '">✓ 18 </span>
+                    <span style="color: #e74c3c;" th:text="'✗ ' + ${group.failedCount}">✗ 4</span>
+                </span>
+            </div>
+            <!-- Scanner results table -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                <tr th:each="attempt : ${group.attempts}" style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 6px 12px; width: 60%;" th:text="${attempt.scannerName}">XSS Scanner</td>
+                    <td th:if="${attempt.passed}"
+                        style="padding: 6px 8px; color: #27ae60; font-weight: bold; text-align: center;">✓</td>
+                    <td th:unless="${attempt.passed}"
+                        style="padding: 6px 8px; color: #c0392b; font-weight: bold; text-align: center;">✗</td>
+                    <td th:if="${attempt.passed}" style="padding: 6px 12px; color: #27ae60; font-size: 0.85em;"
+                        th:text="#{report.execution.passed}">PASSED</td>
+                    <td th:unless="${attempt.passed}" style="padding: 6px 12px; color: #c0392b; font-size: 0.85em;">
+                        <span th:text="#{report.execution.failed}">FAILED</span>
+                        <span style="color: #777; margin-left: 4px;"
+                            th:text="'(' + ${attempt.vulnerabilities.size()} + ')'"> (2)</span>
                     </td>
                 </tr>
             </table>
         </div>
     </div>
 
-</div>
-
-<!-- Execution Details (only if include-passed) -->
-<div class="section" th:if="${attemptGroups != null and !attemptGroups.isEmpty()}">
-    <h2 class="section-title" th:text="#{report.execution.title}">Execution Details</h2>
-    <p th:text="#{report.execution.description}">
-        The following section lists every test executed during the scan, grouped by endpoint.
-    </p>
-
-    <div th:each="group : ${attemptGroups}" style="margin-bottom: 20px; border: 1px solid #bdc3c7; border-radius: 4px; page-break-inside: avoid;">
-        <!-- Endpoint header -->
-        <div style="background-color: #34495e; color: white; padding: 8px 12px; font-family: monospace; font-size: 11pt; font-weight: bold;">
-            <span th:text="${group.displayName}">GET /api/v3/pet</span>
-            <span style="float: right; font-family: sans-serif; font-size: 9pt; font-weight: normal;">
-                <span style="color: #2ecc71;" th:text="'✓ ' + ${group.passedCount} + ' '">✓ 18 </span>
-                <span style="color: #e74c3c;" th:text="'✗ ' + ${group.failedCount}">✗ 4</span>
-            </span>
-        </div>
-        <!-- Scanner results table -->
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-            <tr th:each="attempt : ${group.attempts}" style="border-bottom: 1px solid #ecf0f1;">
-                <td style="padding: 6px 12px; width: 60%;" th:text="${attempt.scannerName}">XSS Scanner</td>
-                <td th:if="${attempt.passed}" style="padding: 6px 8px; color: #27ae60; font-weight: bold; text-align: center;">✓</td>
-                <td th:unless="${attempt.passed}" style="padding: 6px 8px; color: #c0392b; font-weight: bold; text-align: center;">✗</td>
-                <td th:if="${attempt.passed}" style="padding: 6px 12px; color: #27ae60; font-size: 0.85em;" th:text="#{report.execution.passed}">PASSED</td>
-                <td th:unless="${attempt.passed}" style="padding: 6px 12px; color: #c0392b; font-size: 0.85em;">
-                    <span th:text="#{report.execution.failed}">FAILED</span>
-                    <span style="color: #777; margin-left: 4px;" th:text="'(' + ${attempt.vulnerabilities.size()} + ')'"> (2)</span>
-                </td>
-            </tr>
-        </table>
-    </div>
-</div>
-
 </body>
+
 </html>
