@@ -24,12 +24,13 @@ public class OrthrusApplication implements CommandLineRunner {
             System.setProperty("spring.main.web-application-type", "none");
             app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
         }
-        
+
         org.springframework.context.ApplicationContext context = app.run(args);
-        int exitCode = SpringApplication.exit(context);
-        
-        // If we ran a CLI command, system will have exited in run(). If not, we don't exit here.
+
+        // If we ran a CLI command, system will have exited in run(). If not, we don't
+        // exit here.
         if (args.length > 0) {
+            int exitCode = SpringApplication.exit(context);
             System.exit(exitCode);
         }
     }
@@ -39,7 +40,8 @@ public class OrthrusApplication implements CommandLineRunner {
         // If args are provided, we run as CLI. If not, the WebFlux server just starts.
         if (args.length > 0) {
             int exitCode = new CommandLine(scanCommand, factory).execute(args);
-            // Optionally shut down the app after CLI execution if we don't want the server to stay alive
+            // Optionally shut down the app after CLI execution if we don't want the server
+            // to stay alive
             // For now, if we pass args, we assume it's a batch job and exit
             System.exit(exitCode);
         } else {

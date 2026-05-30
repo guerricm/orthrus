@@ -50,6 +50,16 @@ public class ScanService {
      * Get a list of available discoverers.
      */
     public List<String> getAvailableDiscoverers() {
-        return List.copyOf(discoverers.keySet());
+        return discoverers.keySet().stream().sorted().toList();
+    }
+
+    /**
+     * Get a list of available scanner IDs.
+     */
+    public List<String> getAvailableScanners() {
+        return scanEngine.getAllScanners().stream()
+                .map(ch.hug.vulnapi.scanner.SecurityScanner::getId)
+                .sorted()
+                .toList();
     }
 }

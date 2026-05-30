@@ -35,6 +35,12 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
+        <!-- GraphQL Starter for GraphQL support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-graphql</artifactId>
+        </dependency>
+
         <!-- OpenAPI Parser -->
         <dependency>
             <groupId>io.swagger.parser.v3</groupId>

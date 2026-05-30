@@ -125,6 +125,24 @@ java -jar target/orthrus-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.co
 - `--exclude`: Comma-separated list of scanner IDs to skip.
 - `--include-passed`: Include all executed tests (passed and failed) in the report. Adds an "Execution Details" section to HTML, PDF, JSON, and SARIF reports.
 
+## Usage (Web UI Mode)
+
+If you run the application without CLI arguments, it starts a Spring WebFlux server exposing a rich Web User Interface on **http://localhost:8080**.
+
+```bash
+java -jar target/orthrus-0.0.1-SNAPSHOT.jar
+```
+
+The Web UI provides a user-friendly, responsive experience with the following features:
+- **Interactive Dashboard**: View statistics and a history of all executed scans.
+- **Easy Configuration**: A "New Scan" form that lets you easily select discovery modules, target URLs, and authentication methods.
+- **Advanced Options**: Fully integrates the advanced CLI flags through an intuitive UI:
+  - Configure **OAuth2** (URL, Client ID, Secret, Grant Type) for dynamic token fetching.
+  - Provide a **Secondary Bearer Token** for automated Cross-User BOLA testing.
+  - Checkboxes to easily select or deselect which specific scanners to run.
+- **Live Execution & Reporting**: See scan progress in real-time, view detailed findings with their respective risk grades (A to F), and export results directly as a **PDF**.
+- **Integrated User Manual**: A detailed, built-in guide accessible directly from the interface (`/manual`) explaining discovery modes and security grading.
+
 ## Usage (REST API Mode)
 
 If you run the application without CLI arguments, it starts a Spring WebFlux server exposing a REST API.

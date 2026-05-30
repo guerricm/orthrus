@@ -38,6 +38,10 @@ public class ScanEngine {
         this.allScanners = scanners;
     }
 
+    public List<SecurityScanner> getAllScanners() {
+        return allScanners;
+    }
+
     /**
      * Runs a complete scan asynchronously.
      */
