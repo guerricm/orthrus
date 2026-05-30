@@ -9,7 +9,7 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
 ## Features
 
 - **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
-- **26 Specialized Scanners**:
+- **30 Specialized Scanners**:
   - `broken-auth`: Missing Authentication for Critical Functions
   - `sqli`: SQL Injection in query parameters
   - `jwt-none-alg`: JWT 'none' algorithm bypass
@@ -37,6 +37,10 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
   - `graphql-introspection`: Detects if GraphQL introspection is enabled in production
   - `graphql-injection`: Injects SQLi, XSS, and CmdInj payloads dynamically into GraphQL JSON variables
   - `ssl-tls`: Scans SSL/TLS certificates for expiration, weak protocols, self-signed issues, and weak signature algorithms
+  - `insecure-deserialization`: Sends magic byte payloads for Java, Python, and JSON gadgets (CWE-502)
+  - `xxe-injection`: Injects malicious DTDs referencing external files like /etc/passwd (CWE-611)
+  - `file-upload`: Attempts to bypass validation by uploading EICAR signatures and malicious extensions (CWE-434)
+  - `graphql-dos`: Tests GraphQL endpoints for deeply nested queries triggering Resource Consumption DoS (CWE-770)
 - **5 Discovery Modes**:
   - `openapi`: Automatically extracts routes and generates mock payloads from an OpenAPI v3 specification.
   - `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.

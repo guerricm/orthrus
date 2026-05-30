@@ -42,7 +42,8 @@ public enum CWEReference {
     // SSRF
     CWE_918("Server-Side Request Forgery (SSRF)", 918),
 
-    // Broken Access Control / BOLA / BOPLA
+    // Broken Access Control / BOLA / BOPLA / BFLA
+    CWE_285("Improper Authorization", 285),
     CWE_639("Authorization Bypass Through User-Controlled Key", 639),
     CWE_915("Improperly Controlled Modification of Dynamically-Determined Object Attributes ('Mass Assignment')", 915),
 
@@ -63,6 +64,7 @@ public enum CWEReference {
     // Rate Limiting & Resource Consumption
     CWE_307("Improper Restriction of Excessive Authentication Attempts", 307),
     CWE_400("Uncontrolled Resource Consumption", 400),
+    CWE_770("Allocation of Resources Without Limits or Throttling", 770),
     CWE_799("Improper Control of Interaction Frequency", 799),
 
     // Information Exposure & Verbose Errors

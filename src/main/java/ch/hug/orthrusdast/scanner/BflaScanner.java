@@ -63,7 +63,7 @@ public class BflaScanner implements SecurityScanner {
                                 Vulnerability.Confidence.LOW, // Low confidence, depends on context
                                 getId(),
                                 operation,
-                                CWEReference.CWE_287,
+                                CWEReference.CWE_285,
                                 "Broken Function Level Authorization",
                                 List.of("CAPEC-115"),
                                 9.8,
