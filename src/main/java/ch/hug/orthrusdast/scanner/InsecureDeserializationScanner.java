@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -77,14 +78,15 @@ public class InsecureDeserializationScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_502,
-                            "Injection",
                             List.of("CAPEC-586"),
                             9.8,
                             "Server responded with a stack trace indicating deserialization failure.",
                             "Avoid deserializing untrusted data. If necessary, use safe formats like standard JSON, or use strict type whitelisting.",
                             "Injected payload: " + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                    );
+                    ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                     return Flux.just(vuln);
                 }
                 return Flux.empty();

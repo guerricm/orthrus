@@ -77,14 +77,15 @@ public class GraphqlIntrospectionScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_200, // Information Exposure
-                                "Information Disclosure",
                                 List.of("CAPEC-118"),
                                 4.3,
                                 "The server responded with the schema details to an introspection query.",
                                 "Disable GraphQL introspection in production environments.",
                                 "Sent an introspection query requesting __schema.",
                                 "Status: " + response.statusCode() + "\\nBody: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

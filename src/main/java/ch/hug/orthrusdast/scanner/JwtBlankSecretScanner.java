@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -79,14 +80,15 @@ public class JwtBlankSecretScanner implements SecurityScanner {
                                     getId(),
                                     operation,
                                     CWEReference.CWE_287,
-                                    "Broken Authentication",
-                                List.of("CAPEC-115"),
+                                    List.of("CAPEC-115"),
                                 9.8,
                                     "Endpoint returned " + response.statusCode() + " OK when a JWT signed with a blank secret was provided.",
                                     "Ensure your JWT secret is strong, randomly generated, and securely stored. Never use empty or default secrets.",
                                     "Sent JWT signed with empty secret: " + blankSecretToken,
                                     "Status: " + response.statusCode()
-                            );
+                            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                             return Flux.just(vuln);
                         }
                         return Flux.empty();

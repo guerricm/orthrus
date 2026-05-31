@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -122,14 +123,15 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
                                             getId(),
                                             operation,
                                             CWEReference.CWE_521,
-                                            "Broken Authentication",
                                             List.of("CAPEC-112"),
                                             9.8,
                                             "Endpoint returned " + response.statusCode() + " OK when authenticating with the weak password '" + weakPassword + "'.",
                                             "Implement strict password complexity requirements and rate limiting or account lockout mechanisms to prevent brute forcing.",
                                             "Sent POST request with password field replaced by '" + weakPassword + "'.",
                                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                                    );
+                                    ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                                     return Flux.just(vuln);
                                 }
                                 return Flux.empty();

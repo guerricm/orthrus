@@ -5,6 +5,7 @@ import ch.hug.orthrusdast.entity.VulnerabilityEntity;
 import ch.hug.orthrusdast.model.ScanResult;
 import ch.hug.orthrusdast.model.Vulnerability;
 import ch.hug.orthrusdast.model.CWEReference;
+import ch.hug.orthrusdast.model.OwaspReference;
 import ch.hug.orthrusdast.model.Operation;
 import ch.hug.orthrusdast.model.RiskLevel;
 import ch.hug.orthrusdast.repository.ScanResultRepository;
@@ -90,7 +91,9 @@ public class ScanResultService {
                 v.evidence(),
                 v.remediation(),
                 v.requestDetails(),
-                v.responseDetails()
+                v.responseDetails(),
+                v.attackVector(),
+                v.technicalImpact()
         );
     }
 
@@ -118,14 +121,15 @@ public class ScanResultService {
                     ve.operationUrl(),
                     ve.operationMethod(),
                     cwe,
-                    "Unknown Category", // Can be improved
                     Collections.emptyList(), // cves
                     ve.capecIds() != null && !ve.capecIds().isEmpty() ? List.of(ve.capecIds().split(",")) : Collections.emptyList(),
                     ve.cvssBaseScore(),
                     ve.evidence(),
                     ve.recommendation(),
                     ve.requestSummary(),
-                    ve.responseSummary()
+                    ve.responseSummary(),
+                    ve.attackVector(),
+                    ve.technicalImpact()
             );
         }).toList();
 

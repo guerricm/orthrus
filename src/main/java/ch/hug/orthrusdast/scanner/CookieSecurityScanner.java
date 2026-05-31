@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -63,14 +64,15 @@ public class CookieSecurityScanner implements SecurityScanner {
                     getId(),
                     operation,
                     CWEReference.CWE_614,
-                    "Security Misconfiguration",
                     List.of("CAPEC-31"),
                     5.3,
                     "Set-Cookie header found without 'Secure' flag: " + cookie,
                     "Always set the 'Secure' flag for sensitive cookies so they are only transmitted over HTTPS.",
                     "Sent standard " + operation.method() + " request.",
                     "Status: " + response.statusCode() + "\nReceived Set-Cookie header: " + cookie + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-            ));
+            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
         }
 
         if (!lowerCookie.contains("httponly")) {
@@ -82,14 +84,15 @@ public class CookieSecurityScanner implements SecurityScanner {
                     getId(),
                     operation,
                     CWEReference.CWE_1004,
-                    "Security Misconfiguration",
                     List.of("CAPEC-31"),
                     5.3,
                     "Set-Cookie header found without 'HttpOnly' flag: " + cookie,
                     "Always set the 'HttpOnly' flag for session identifiers and sensitive cookies to prevent access from JavaScript.",
                     "Sent standard " + operation.method() + " request.",
                     "Status: " + response.statusCode() + "\nReceived Set-Cookie header: " + cookie + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-            ));
+            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
         }
 
         if (!lowerCookie.contains("samesite")) {
@@ -101,14 +104,15 @@ public class CookieSecurityScanner implements SecurityScanner {
                     getId(),
                     operation,
                     CWEReference.CWE_1275,
-                    "Security Misconfiguration",
                     List.of("CAPEC-62"),
                     4.3,
                     "Set-Cookie header found without 'SameSite' attribute: " + cookie,
                     "Configure the cookie with 'SameSite=Lax' or 'SameSite=Strict' to restrict cross-site sharing.",
                     "Sent standard " + operation.method() + " request.",
                     "Status: " + response.statusCode() + "\nReceived Set-Cookie header: " + cookie + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-            ));
+            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
         }
     }
 }

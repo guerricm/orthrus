@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -74,14 +75,15 @@ public class NoSqlInjectionScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_943,
-                            "Injection",
-                                List.of("CAPEC-66"),
+                            List.of("CAPEC-66"),
                                 9.8,
                             "Response indicates a NoSQL database error when payload '" + payload + "' was injected.",
                             "Validate and sanitize input. Use safe APIs that parameterize queries rather than concatenating strings or blindly passing JSON structures to the database driver.",
                             "Injected payload into query param: " + paramName + "=" + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

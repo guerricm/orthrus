@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -84,14 +85,15 @@ public class BolaScanner implements SecurityScanner {
                                 getId(),
                                 operation, // Pass the original operation to preserve templateUrl
                                 CWEReference.CWE_639,
-                                "Broken Object Level Authorization",
                                 List.of("CAPEC-17"),
                                 7.5,
                                 "Response status " + response.statusCode() + " when accessing ID " + testId,
                                 "Implement strict authorization checks at the object level. Verify the user requesting the data owns or has roles to access it.",
                                 "Modified URL from " + operation.url() + " to " + newUrl,
                                 "Status: " + response.statusCode()
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -69,14 +70,15 @@ public class XxeScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_611,
-                        "Injection",
                         List.of("CAPEC-228"),
                         9.8,
                         "The response contained the contents of /etc/passwd.",
                         "Disable external entity parsing in your XML parser configuration. For Java, configure DocumentBuilderFactory to disallow DOCTYPE declarations.",
                         "Injected XML payload with external entity pointing to file:///etc/passwd",
                         "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                );
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                 return Flux.just(vuln);
             }
             return Flux.empty();

@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
 import ch.hug.orthrusdast.model.RiskLevel;
@@ -104,14 +105,15 @@ public class SslCertificateScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_319,
-                            "Cryptography",
                             List.of("CAPEC-97"),
                             7.4,
                             "The negotiated protocol during handshake was " + protocol + ".",
                             "Disable outdated protocols like TLS 1.0 and TLS 1.1. Enforce TLS 1.2 or TLS 1.3.",
                             "Initiated a TLS handshake with " + hostname,
                             "Negotiated Protocol: " + protocol
-                    ));
+                    ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
                 }
 
                 // 2. Check Certificate
@@ -134,14 +136,15 @@ public class SslCertificateScanner implements SecurityScanner {
                                     getId(),
                                     operation,
                                     CWEReference.CWE_298,
-                                    "Cryptography",
                                     List.of(),
                                     3.1,
                                     "Certificate expires on " + cert.getNotAfter() + ".",
                                     "Renew the certificate before it expires.",
                                     "Analyzed the certificate payload.",
                                     "Not After: " + cert.getNotAfter()
-                            ));
+                            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
                         }
                     } catch (CertificateExpiredException e) {
                         vulnerabilities.add(Vulnerability.createWithDetails(
@@ -152,14 +155,15 @@ public class SslCertificateScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_298,
-                                "Cryptography",
                                 List.of(),
                                 7.5,
                                 "Certificate expired on " + cert.getNotAfter() + ".",
                                 "Renew and deploy a valid SSL certificate.",
                                 "Analyzed the certificate payload.",
                                 "Not After: " + cert.getNotAfter()
-                        ));
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
                     } catch (CertificateNotYetValidException e) {
                         vulnerabilities.add(Vulnerability.createWithDetails(
                                 "SSL Certificate Not Yet Valid",
@@ -169,14 +173,15 @@ public class SslCertificateScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_298,
-                                "Cryptography",
                                 List.of(),
                                 5.3,
                                 "Certificate is only valid from " + cert.getNotBefore() + ".",
                                 "Check the system clock or deploy a valid certificate.",
                                 "Analyzed the certificate payload.",
                                 "Not Before: " + cert.getNotBefore()
-                        ));
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
                     }
 
                     // 2b. Self-Signed
@@ -189,14 +194,15 @@ public class SslCertificateScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_295,
-                                "Cryptography",
                                 List.of("CAPEC-475"),
                                 4.8,
                                 "The issuer and subject of the certificate are identical.",
                                 "Use a certificate signed by a trusted Certificate Authority (CA) for production environments.",
                                 "Analyzed the certificate payload.",
                                 "Issuer: " + cert.getIssuerX500Principal().getName()
-                        ));
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
                     }
 
                     // 2c. Weak Signature Algorithm
@@ -210,14 +216,15 @@ public class SslCertificateScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_327,
-                                "Cryptography",
                                 List.of(),
                                 5.9,
                                 "The certificate was signed using " + sigAlg + ".",
                                 "Re-issue the certificate using a strong hashing algorithm like SHA-256.",
                                 "Analyzed the certificate payload.",
                                 "Signature Algorithm: " + sigAlg
-                        ));
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
                     }
                 }
             }

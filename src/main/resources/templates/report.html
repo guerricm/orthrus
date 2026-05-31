@@ -660,7 +660,13 @@
                         <strong th:text="#{vuln.cwe}">CWE</strong>: <span
                             th:text="${vuln.cwe() != null ? vuln.cwe().name() : 'N/A'}">CWE-89</span><br />
                         <strong th:text="#{report.capec}">CAPEC</strong>: <span
-                            th:text="${vuln.capecs() != null and !vuln.capecs().isEmpty() ? #strings.listJoin(vuln.capecs(), ', ') : 'N/A'}"></span>
+                            th:text="${vuln.capecs() != null and !vuln.capecs().isEmpty() ? #strings.listJoin(vuln.capecs(), ', ') : 'N/A'}"></span><br />
+                        <strong>OWASP</strong>: <span
+                            th:text="${vuln.owaspCategory() != null ? vuln.owaspCategory().getCode() + ' - ' + vuln.owaspCategory().getName() : 'N/A'}">A03:2025 - Injection</span><br />
+                        <strong>Attack Vector</strong>: <span
+                            th:text="${vuln.attackVector() != null ? vuln.attackVector() : 'N/A'}">API Endpoint (Network)</span><br />
+                        <strong>Technical Impact</strong>: <span
+                            th:text="${vuln.technicalImpact() != null ? vuln.technicalImpact() : 'N/A'}">Unauthorized Access / Data Exposure</span>
                     </td>
                 </tr>
                 <tr>

@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -64,14 +65,15 @@ public class BflaScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_285,
-                                "Broken Function Level Authorization",
                                 List.of("CAPEC-115"),
                                 9.8,
                                 "Server returned " + response.statusCode() + " OK when sending a DELETE request to a GET endpoint.",
                                 "Ensure function-level access control checks exist for all administrative operations and methods.",
                                 "Sent DELETE request to " + operation.url(),
                                 "Status: " + response.statusCode()
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

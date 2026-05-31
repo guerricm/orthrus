@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -84,14 +85,15 @@ public class CommandInjectionScanner implements SecurityScanner {
                                         getId(),
                                         operation,
                                         CWEReference.CWE_78,
-                                        "Injection",
                                         List.of("CAPEC-88"),
                                         9.8,
                                         "Response contains the evaluated arithmetic result '" + CALC_RESULT + "' from the injected payload, indicating the OS command was executed.",
                                         "Avoid invoking OS commands directly. If necessary, use built-in language APIs and strictly sanitize and parameterize all input.",
                                         "Injected payload into query param: " + paramName + "=" + payload,
                                         "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                                    );
+                                    ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                                     return Flux.just(vuln);
                                 }
                                 return Flux.empty();

@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -59,14 +60,15 @@ public class SecurityHeadersScanner implements SecurityScanner {
                     getId(),
                     operation,
                     cwe,
-                    "Security Misconfiguration",
                     List.of("CAPEC-310"),
                     4.3,
                     "Header '" + headerName + "' is missing from the response.",
                     "Configure your web server or application framework to include the '" + headerName + "' header in all responses.",
                     "Sent standard " + operation.method() + " request.",
                     "Status: " + response.statusCode() + "\nHeaders received: " + response.headers().toString() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-            ));
+            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
         } else if ("Content-Security-Policy".equalsIgnoreCase(headerName)) {
             String cspValue = response.getHeader(headerName);
             if (cspValue != null && (cspValue.contains("unsafe-inline") || cspValue.contains("unsafe-eval"))) {
@@ -78,14 +80,15 @@ public class SecurityHeadersScanner implements SecurityScanner {
                         getId(),
                         operation,
                         cwe,
-                        "Security Misconfiguration",
                         List.of("CAPEC-63"),
                         5.4,
                         "CSP value contains unsafe directives: " + cspValue,
                         "Remove 'unsafe-inline' and 'unsafe-eval' from your CSP and use nonces or hashes instead.",
                         "Sent standard " + operation.method() + " request.",
                         "Status: " + response.statusCode() + "\nCSP Header: " + cspValue + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                ));
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
             }
         }
     }
@@ -108,14 +111,15 @@ public class SecurityHeadersScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_200,
-                        "Information Exposure",
                         List.of("CAPEC-118"),
                         3.7,
                         "Header '" + header + "' reveals: " + value,
                         "Configure your web server to remove or mask the '" + header + "' header.",
                         "Sent standard " + operation.method() + " request.",
                         "Status: " + response.statusCode() + "\n" + header + ": " + value + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                ));
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure"));
             }
         }
     }

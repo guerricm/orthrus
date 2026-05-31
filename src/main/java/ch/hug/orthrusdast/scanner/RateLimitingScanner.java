@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -56,14 +57,15 @@ public class RateLimitingScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_799,
-                                "Lack of Resources & Rate Limiting",
                                 List.of("CAPEC-115"),
                                 5.3,
                                 "After " + REQUEST_COUNT + " requests, the server returned status " + lastResponse.statusCode().value() + " instead of 429.",
                                 "Implement rate limiting using a gateway, WAF, or application logic (e.g. token bucket algorithm).",
                                 "Sent " + REQUEST_COUNT + " identical requests in rapid succession.",
                                 "Status: " + lastResponse.statusCode() + "\nBody snippet: " + (lastResponse.body() != null && lastResponse.body().length() > 200 ? lastResponse.body().substring(0, 200) + "..." : String.valueOf(lastResponse.body()))
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

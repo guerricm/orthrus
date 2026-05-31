@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -160,14 +161,15 @@ public class SchemaValidationScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_20,
-                        "Validation",
                         List.of("CAPEC-3"),
                         5.3,
                         "The server responded with " + response.statusCode() + " instead of enforcing the schema constraint (should be 400).",
                         "Ensure that all incoming data is strictly validated against the defined OpenAPI schema constraints (types, lengths, required fields) using a validation middleware before processing.",
                         "Sent payload violating schema constraint on property: " + propName + "\nPayload: " + payloadJson,
                         "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                );
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                 return Flux.just(vuln);
             }
             return Flux.empty();

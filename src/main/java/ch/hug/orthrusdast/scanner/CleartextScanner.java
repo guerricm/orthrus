@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -45,14 +46,15 @@ public class CleartextScanner implements SecurityScanner {
                     getId(),
                     operation,
                     CWEReference.CWE_319,
-                    "Cryptographic Failures",
-                                List.of("CAPEC-94"),
+                    List.of("CAPEC-94"),
                                 7.4,
                     "Endpoint uses 'http://' scheme.",
                     "Ensure all API endpoints are exclusively accessible via HTTPS. Implement HSTS (HTTP Strict Transport Security).",
                     "Observed URL scheme: " + operation.url(),
                     isLocal ? "Flagged as INFO because target appears to be local/development." : "Vulnerable endpoint."
-            );
+            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
             return Flux.just(vuln);
         }
         return Flux.empty();

@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -81,14 +82,15 @@ public class MassAssignmentScanner implements SecurityScanner {
                                     getId(),
                                     operation,
                                     CWEReference.CWE_915,
-                                    "Broken Object Property Level Authorization",
-                                List.of("CAPEC-17"),
+                                    List.of("CAPEC-17"),
                                 6.5,
                                     "Server returned " + response.statusCode() + " OK after injecting privilege escalation fields into the JSON payload.",
                                     "Use DTOs (Data Transfer Objects) to explicitly map accepted fields. Avoid binding HTTP requests directly to domain models or database entities.",
                                     "Injected fields into JSON body: " + modifiedBody,
                                     "Status: " + response.statusCode()
-                            );
+                            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                             return Flux.just(vuln);
                         }
                         return Flux.empty();

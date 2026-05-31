@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -87,14 +88,15 @@ public class SqlInjectionScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_89,
-                            "Injection",
-                                List.of("CAPEC-66"),
+                            List.of("CAPEC-66"),
                                 9.8,
                             "Response indicates a database error when payload '" + payload + "' was injected.",
                             "Use parameterized queries or prepared statements.",
                             "Injected payload into query param: " + paramName + "=" + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -74,14 +75,15 @@ public class CrossUserBolaScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_639,
-                                "Broken Object Level Authorization",
                                 List.of("CAPEC-17"),
                                 7.5,
                                 "Server returned " + response.statusCode() + " OK when requesting User A's resource using User B's authentication token.",
                                 "Verify ownership of the requested resource. Ensure the authenticated user has explicit permission to access this specific object ID.",
                                 "Replayed exact request but swapped Authorization header with secondary user's token.",
                                 "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

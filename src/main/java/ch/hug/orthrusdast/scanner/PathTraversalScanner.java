@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -78,14 +79,15 @@ public class PathTraversalScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_22,
-                            "Broken Access Control",
-                                List.of("CAPEC-126"),
+                            List.of("CAPEC-126"),
                                 7.5,
                             "Response contains contents of a sensitive OS file when payload '" + payload + "' was injected.",
                             "Validate input against an allowlist. Avoid passing raw user input to filesystem APIs. Use path canonicalization and verify the target path is within the expected directory.",
                             "Injected payload into query param: " + paramName + "=" + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -78,14 +79,15 @@ public class SstiScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_1336,
-                            "Injection",
-                                List.of("CAPEC-137"),
+                            List.of("CAPEC-137"),
                                 9.8,
                             "Response contains the evaluated result ('" + EXPECTED_RESULT + "') of the injected template expression '" + payload + "'.",
                             "Do not concatenate user input directly into templates. Use logic-less templates or securely pass input as context variables instead of template strings.",
                             "Injected template payload into query param: " + paramName + "=" + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

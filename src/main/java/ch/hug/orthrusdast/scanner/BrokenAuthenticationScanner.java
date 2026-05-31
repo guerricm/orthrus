@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -70,14 +71,15 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_306,
-                                "Broken Authentication",
                                 List.of("CAPEC-115"),
                                 9.8,
                                 "Endpoint returned " + response.statusCode() + " OK without any authentication credentials",
                                 "Implement robust authentication for this endpoint.",
                                 "Sent " + operation.method() + " request without Authorization header.",
                                 "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -80,14 +81,15 @@ public class CodeInjectionScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_94,
-                            "Injection",
                             List.of("CAPEC-35", "CAPEC-242"),
                             9.8,
                             "The payload was evaluated and the result '999999' was found in the response.",
                             "Never pass untrusted data directly to eval() or similar dynamic execution functions. Use safe parsers and avoid dynamic code execution entirely.",
                             "Injected payload: " + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                    );
+                    ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                     return Flux.just(vuln);
                 }
                 return Flux.empty();

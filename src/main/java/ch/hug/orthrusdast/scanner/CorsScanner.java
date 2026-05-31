@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -69,14 +70,15 @@ public class CorsScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_942,
-                        "Security Misconfiguration",
-                                List.of("CAPEC-63"),
+                        List.of("CAPEC-63"),
                                 5.3,
                         evidence,
                         "Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly.",
                         "OPTIONS request sent with Origin: " + MALICIOUS_ORIGIN,
                         "Status: " + response.statusCode() + "\nAccess-Control-Allow-Origin: " + acao + "\nAccess-Control-Allow-Credentials: " + acac + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                );
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                 return Flux.just(vuln);
             }
 

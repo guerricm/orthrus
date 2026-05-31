@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -66,14 +67,15 @@ public class CsrfScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_352,
-                        "Broken Access Control",
                         List.of("CAPEC-62"),
                         6.5,
                         "Server accepted the request with Origin: https://malicious-website.com and no CSRF tokens.",
                         "Implement Anti-CSRF tokens (Synchronizer Token Pattern) for all state-changing endpoints if using Cookie authentication. Ensure cookies have the SameSite=Lax or Strict attribute.",
                         "Sent " + operation.method() + " request stripped of CSRF headers and injected Origin: https://malicious-website.com.",
                         "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                );
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                 return Flux.just(vuln);
             }
             return Flux.empty();

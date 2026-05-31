@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -74,14 +75,15 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_611,
-                                "Security Misconfiguration",
                                 List.of("CAPEC-228"),
                                 7.5,
                                 "Server successfully parsed XML and executed the external entity to read /etc/passwd.",
                                 "Strictly enforce expected Content-Types (e.g. drop non-JSON requests). Disable external entities in XML parsers if XML must be supported.",
                                 "Spoofed Content-Type to application/xml and sent XML with XXE payload.",
                                 "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     // Check if it causes a 7.5 error (unhandled parser exception)
@@ -94,14 +96,15 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_209,
-                                "Security Misconfiguration",
                                 List.of("CAPEC-228"),
                                 7.5,
                                 "Server returned 7.5 Internal Server Error when receiving application/xml.",
                                 "Reject unsupported Content-Types explicitly with a 415 Unsupported Media Type response.",
                                 "Spoofed Content-Type to application/xml.",
                                 "Status: " + response.statusCode()
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

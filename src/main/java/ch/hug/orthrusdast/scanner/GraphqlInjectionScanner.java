@@ -128,7 +128,6 @@ public class GraphqlInjectionScanner implements SecurityScanner {
                                     getId(),
                                     operation,
                                     payloadDef.cwe,
-                                    "Injection",
                                     payloadDef.capec,
                                     payloadDef.cvss,
                                     "Response indicates a potential injection vulnerability when payload '"
@@ -136,7 +135,9 @@ public class GraphqlInjectionScanner implements SecurityScanner {
                                     "Validate and sanitize all GraphQL variable inputs. Use parameterized queries for databases.",
                                     "Injected payload into GraphQL variable: " + varName,
                                     "Status: " + response.statusCode() + "\nBody snippet: "
-                                            + truncate(response.body()));
+                                            + truncate(response.body()),
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                             return Flux.just(vuln);
                         }
                         return Flux.empty();

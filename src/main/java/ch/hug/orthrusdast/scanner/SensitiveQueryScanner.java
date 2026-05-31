@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -55,14 +56,15 @@ public class SensitiveQueryScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_598,
-                            "Security Misconfiguration",
                             List.of("CAPEC-87"),
                             6.5,
                             "Parameter '" + paramName + "' found in GET request.",
                             "Move sensitive data from the query string to HTTP Headers (e.g., Authorization header) or the request body (e.g., POST request).",
                             "URL requested: " + operation.url() + " with parameter " + paramName,
                             "Status: Static Analysis (No request sent)\nBody snippet: Not applicable. This vulnerability is detected statically from the API schema/specification."
-                    );
+                    ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                     return Flux.just(vuln);
                 }
             }

@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -66,14 +67,15 @@ public class VerboseErrorScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_209,
-                                "Security Misconfiguration",
                                 List.of("CAPEC-54"),
                                 5.3,
                                 "Response contains stack traces or framework-specific internal errors.",
                                 "Configure your framework to return generic error messages to the client. Log detailed errors internally only.",
                                 "Sent malformed JSON body: " + MALFORMED_JSON,
                                 "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

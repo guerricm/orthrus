@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -78,14 +79,15 @@ public class SsrfScanner implements SecurityScanner {
                             getId(),
                             operation,
                             CWEReference.CWE_918,
-                            "SSRF",
-                                List.of("CAPEC-664"),
+                            List.of("CAPEC-664"),
                                 8.6,
                             "Response contains AWS metadata elements when parameter '" + paramName + "' was set to " + PAYLOAD,
                             "Validate and sanitize all user-supplied URLs. Use an allowlist of permitted domains.",
                             "Injected SSRF payload into query param: " + paramName + "=" + PAYLOAD,
                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -80,14 +81,15 @@ public class OpenRedirectScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_601,
-                                "Broken Access Control",
                                 List.of("CAPEC-116"),
                                 6.1,
                                 "Server responded with a redirect to the injected malicious URL.",
                                 "Do not allow users to specify redirect destinations directly. If necessary, use an allowlist or an indirect reference (like an ID mapped to a URL on the server).",
                                 "Injected payload into query param: " + paramName + "=" + MALICIOUS_URL,
                                 "Status: " + response.statusCode() + "\nLocation Header: " + locationHeader
-                            );
+                            ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                             return Flux.just(vuln);
                         }
                     }

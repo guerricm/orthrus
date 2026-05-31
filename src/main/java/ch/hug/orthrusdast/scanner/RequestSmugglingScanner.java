@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -65,14 +66,15 @@ public class RequestSmugglingScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_444,
-                        "Security Misconfiguration",
                         List.of("CAPEC-33", "CAPEC-272"),
                         7.5,
                         "Server responded with " + response.statusCode() + " instead of 400 when sending a malformed Transfer-Encoding header.",
                         "Ensure the frontend proxy and backend server interpret the Transfer-Encoding and Content-Length headers consistently. Reject requests with ambiguous or duplicated headers. Prefer using HTTP/2.",
                         "Injected header: Transfer-Encoding: chunked, cow",
                         "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
-                );
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                 return Flux.just(vuln);
             }
             return Flux.empty();

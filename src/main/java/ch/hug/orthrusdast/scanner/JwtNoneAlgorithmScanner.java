@@ -1,4 +1,5 @@
 package ch.hug.orthrusdast.scanner;
+
 import java.util.List;
 
 import ch.hug.orthrusdast.http.ScanHttpClient;
@@ -69,14 +70,15 @@ public class JwtNoneAlgorithmScanner implements SecurityScanner {
                                 getId(),
                                 operation,
                                 CWEReference.CWE_287,
-                                "Broken Authentication",
                                 List.of("CAPEC-115"),
                                 9.8,
                                 "Endpoint returned " + response.statusCode() + " OK when a JWT with 'alg: none' was provided.",
                                 "Configure your JWT library to explicitly reject the 'none' algorithm and enforce expected algorithms.",
                                 "Sent JWT: " + noneAlgToken,
                                 "Status: " + response.statusCode()
-                        );
+                        ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);
                     }
                     return Flux.empty();

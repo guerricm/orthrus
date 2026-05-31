@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS vulnerabilities (
     recommendation TEXT,
     request_summary TEXT,
     response_summary TEXT,
+    attack_vector VARCHAR(255),
+    technical_impact VARCHAR(255),
     FOREIGN KEY (scan_result_id) REFERENCES scan_results(id) ON DELETE CASCADE
 );
 

@@ -1,5 +1,6 @@
 package ch.hug.orthrusdast.scanner;
 
+
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.CWEReference;
 import ch.hug.orthrusdast.model.Operation;
@@ -76,14 +77,15 @@ public class GraphqlDosScanner implements SecurityScanner {
                         getId(),
                         operation,
                         CWEReference.CWE_770,
-                        "Unrestricted Resource Consumption",
                         List.of("CAPEC-130"),
                         7.5,
                         "Server took " + duration + "ms or returned " + response.statusCode() + " when processing a highly nested query.",
                         "Implement GraphQL query depth limiting and cost analysis to prevent expensive queries from consuming server resources.",
                         "Injected a deeply nested GraphQL query: " + NESTED_QUERY,
                         "Response time: " + duration + "ms. Status: " + response.statusCode()
-                );
+                ,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
                 return Flux.just(vuln);
             }
             return Flux.empty();
