@@ -10,8 +10,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.web.reactive.function.client.WebClient;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -49,9 +54,63 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
                 crawl(target, targetHost, 0, visitedUrls, discoveredEndpoints, authScheme);
             }
             
-            log.info("Discovered {} endpoints via black-box crawling", discoveredEndpoints.size());
+            log.info("Discovered {} endpoints via HTML crawling", discoveredEndpoints.size());
             return discoveredEndpoints;
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(crawledEndpoints -> {
+            log.info("Starting API Dictionary Fuzzing on {}", target);
+            List<String> dictionary = new ArrayList<>();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(new ClassPathResource("api-wordlist.txt").getInputStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (!line.trim().isEmpty()) {
+                        dictionary.add(line.trim());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not load api-wordlist.txt: {}", e.getMessage());
+            }
+
+            if (dictionary.isEmpty()) {
+                return Mono.just(crawledEndpoints);
+            }
+
+            String baseUrl = target.endsWith("/") ? target : target + "/";
+            WebClient client = WebClient.builder().baseUrl(baseUrl).build();
+
+            return Flux.fromIterable(dictionary)
+                    .flatMap(path -> {
+                        String cleanPath = path.startsWith("/") ? path.substring(1) : path;
+                        return client.head().uri(cleanPath).exchangeToMono(response -> {
+                            if (response.statusCode().value() != 404) return Mono.just(Operation.simple(baseUrl + cleanPath, "GET").withAuth(authScheme));
+                            return Mono.<Operation>empty();
+                        }).onErrorResume(e -> Mono.empty())
+                        .switchIfEmpty(
+                            client.get().uri(cleanPath).exchangeToMono(response -> {
+                                if (response.statusCode().value() != 404) return Mono.just(Operation.simple(baseUrl + cleanPath, "GET").withAuth(authScheme));
+                                return Mono.<Operation>empty();
+                            }).onErrorResume(e -> Mono.empty())
+                        ).switchIfEmpty(
+                            client.post().uri(cleanPath).exchangeToMono(response -> {
+                                if (response.statusCode().value() != 404) return Mono.just(Operation.simple(baseUrl + cleanPath, "POST").withAuth(authScheme));
+                                return Mono.<Operation>empty();
+                            }).onErrorResume(e -> Mono.empty())
+                        );
+                    }, 20) // concurrency of 20
+                    .collectList()
+                    .map(fuzzedEndpoints -> {
+                        Set<String> urls = new HashSet<>();
+                        List<Operation> combined = new ArrayList<>();
+                        for (Operation op : crawledEndpoints) {
+                            if (urls.add(op.url())) combined.add(op);
+                        }
+                        for (Operation op : fuzzedEndpoints) {
+                            if (urls.add(op.url())) combined.add(op);
+                        }
+                        log.info("Discovered {} total endpoints after fuzzing", combined.size());
+                        return combined;
+                    });
+        });
     }
 
     private String extractHost(String url) {
@@ -85,7 +144,11 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 
         try {
             // Using Jsoup for HTML parsing. 
-            Document doc = Jsoup.connect(url).timeout(timeoutMs).get();
+            Document doc = Jsoup.connect(url)
+                    .timeout(timeoutMs)
+                    .ignoreHttpErrors(true)
+                    .ignoreContentType(true)
+                    .get();
             
             // Register this page as an endpoint
             discoveredEndpoints.add(Operation.simple(url, "GET").withAuth(authScheme));
