@@ -61,7 +61,7 @@ public class SensitiveQueryScanner implements SecurityScanner {
                             "Parameter '" + paramName + "' found in GET request.",
                             "Move sensitive data from the query string to HTTP Headers (e.g., Authorization header) or the request body (e.g., POST request).",
                             "URL requested: " + operation.url() + " with parameter " + paramName,
-                            "N/A"
+                            "Status: Static Analysis (No request sent)\nBody snippet: Not applicable. This vulnerability is detected statically from the API schema/specification."
                     );
                     return Flux.just(vuln);
                 }

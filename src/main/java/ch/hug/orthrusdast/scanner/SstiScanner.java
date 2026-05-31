@@ -20,10 +20,11 @@ public class SstiScanner implements SecurityScanner {
 
     private final ScanHttpClient httpClient;
     
-    // Testing mathematical evaluation which is standard for SSTI
-    private static final String PAYLOAD_1 = "{{7*7}}";
-    private static final String PAYLOAD_2 = "${7*7}";
-    private static final String EXPECTED_RESULT = "49";
+    // Testing mathematical evaluation which is standard for SSTI.
+    // Using a large, unique product to avoid false positives on naturally occurring numbers in IDs/Hashes.
+    private static final String PAYLOAD_1 = "{{7384*8931}}";
+    private static final String PAYLOAD_2 = "${7384*8931}";
+    private static final String EXPECTED_RESULT = "65946504";
 
     public SstiScanner(ScanHttpClient httpClient) {
         this.httpClient = httpClient;
@@ -80,7 +81,7 @@ public class SstiScanner implements SecurityScanner {
                             "Injection",
                                 List.of("CAPEC-137"),
                                 9.8,
-                            "Response contains the evaluated result ('49') of the injected template expression '" + payload + "'.",
+                            "Response contains the evaluated result ('" + EXPECTED_RESULT + "') of the injected template expression '" + payload + "'.",
                             "Do not concatenate user input directly into templates. Use logic-less templates or securely pass input as context variables instead of template strings.",
                             "Injected template payload into query param: " + paramName + "=" + payload,
                             "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())

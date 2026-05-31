@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title th:text="#{report.title}">Vulnerability Report</title>
+    <title th:text="#{report.title}">Orthrus DAST - Penetration Testing Report</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -11,81 +11,148 @@
             margin: 0;
             padding: 0;
             line-height: 1.6;
+            font-size: 10pt;
+            background-color: transparent;
+            word-wrap: break-word;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
         }
 
+        /* Paged Media Setup */
         @page {
             size: A4;
-            margin: 20mm;
+            margin: 15mm;
 
             @bottom-center {
                 content: "Page " counter(page) " of " counter(pages);
-                font-size: 10pt;
+                font-size: 8pt;
                 color: #777;
+            }
+        }
+
+        @page :first {
+            background-color: #2c3e50;
+            margin: 15mm;
+            @bottom-center {
+                content: "";
             }
         }
 
         h1,
         h2,
-        h3 {
+        h3,
+        h4,
+        h5 {
             color: #2c3e50;
+            margin-top: 1.2em;
+            margin-bottom: 0.5em;
         }
 
-        .header {
+        /* Cover Page */
+        .cover-page {
+            height: 260mm; /* 297mm A4 - 15mm top - 15mm bottom - buffer */
+            width: 100%;
+            background-color: transparent;
+            color: #ffffff;
             text-align: center;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            position: relative;
+            page-break-after: always;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
-        .header h1 {
-            font-size: 28pt;
+        .cover-content {
+            padding-top: 100mm;
+        }
+
+        .cover-title {
+            font-size: 32pt;
+            font-weight: bold;
             margin: 0;
             text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #3498db;
         }
 
-        .meta-info {
-            margin-top: 20px;
+        .cover-subtitle {
+            font-size: 16pt;
+            margin-top: 10px;
+            color: #bdc3c7;
+        }
+
+        .cover-target {
+            max-width: 100%;
+            overflow: hidden;
+            word-wrap: break-word;
+            margin-top: 40px;
             font-size: 12pt;
         }
 
-        .meta-info table {
-            width: 100%;
-        }
-
-        .meta-info td {
-            padding: 5px;
-        }
-
-        .meta-info td.label {
+        .cover-target .url {
+            word-break: break-all;
+            word-wrap: break-word;
+            white-space: normal;
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            color: #3498db;
             font-weight: bold;
-            width: 20%;
+            font-family: monospace;
         }
 
-        .section {
-            margin-bottom: 40px;
+        .cover-footer {
+            position: absolute;
+            bottom: 40mm;
+            width: 100%;
+            text-align: center;
+            font-size: 9pt;
+            color: #bdc3c7;
+        }
+
+        /* Utility Classes */
+        .page-break {
+            page-break-before: always;
+        }
+
+        .no-break {
             page-break-inside: avoid;
         }
 
         .section-title {
             background-color: #ecf0f1;
-            padding: 10px;
+            padding: 8px;
             border-left: 5px solid #3498db;
-            margin-bottom: 15px;
-            font-size: 18pt;
+            margin-bottom: 12px;
+            font-size: 16pt;
+            color: #2c3e50;
+        }
+
+        /* Executive Summary */
+        .exec-grid {
+            width: 100%;
+            margin-bottom: 25px;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .exec-grid td {
+            vertical-align: top;
+            padding: 8px;
+            word-wrap: break-word;
         }
 
         .score-box {
             text-align: center;
-            padding: 20px;
+            padding: 15px;
             border: 2px solid #ddd;
-            border-radius: 8px;
-            display: inline-block;
-            min-width: 150px;
-            margin-bottom: 20px;
+            border-radius: 6px;
+            background-color: #f8f9fa;
         }
 
         .score-grade {
-            font-size: 48pt;
+            font-size: 40pt;
             font-weight: bold;
             margin: 0;
         }
@@ -111,314 +178,577 @@
         }
 
         .score-F {
-            color: #e74c3c;
-            border-color: #e74c3c;
+            color: #c0392b;
+            border-color: #c0392b;
         }
 
-        .summary-stats {
+        .risk-matrix {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-top: 10px;
+            table-layout: fixed;
         }
 
-        .summary-stats th,
-        .summary-stats td {
-            border: 1px solid #bdc3c7;
-            padding: 8px;
+        .risk-matrix th,
+        .risk-matrix td {
+            padding: 6px;
             text-align: center;
+            border: 1px solid #ddd;
+            word-wrap: break-word;
         }
 
-        .summary-stats th {
-            background-color: #34495e;
-            color: white;
+        .risk-matrix th {
+            background-color: #ecf0f1;
+            color: #333;
+            font-size: 9pt;
+            text-transform: uppercase;
         }
 
-        .vuln-card {
-            border: 1px solid #bdc3c7;
+        .risk-val {
+            font-weight: bold;
+            font-size: 12pt;
+        }
+
+        .risk-CRITICAL {
+            color: #c0392b;
+        }
+
+        .risk-HIGH {
+            color: #e67e22;
+        }
+
+        .risk-MEDIUM {
+            color: #f1c40f;
+        }
+
+        .risk-LOW {
+            color: #27ae60;
+        }
+
+        .risk-INFO {
+            color: #3498db;
+        }
+
+        /* Findings Summary Table */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            font-size: 9pt;
+            table-layout: fixed;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+            word-wrap: break-word;
+        }
+
+        .summary-table th {
+            background-color: #ecf0f1;
+            color: #333;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 6px;
             border-radius: 4px;
-            margin-bottom: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 8pt;
+            text-align: center;
+            min-width: 60px;
+        }
+
+        .badge-CRITICAL {
+            background-color: #d9534f;
+        }
+
+        .badge-HIGH {
+            background-color: #f0ad4e;
+        }
+
+        .badge-MEDIUM {
+            background-color: #f0ad4e;
+        }
+
+        .badge-LOW {
+            background-color: #5cb85c;
+        }
+
+        .badge-INFO {
+            background-color: #5bc0de;
+        }
+
+        /* Technical Details */
+        .vuln-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            background-color: #ffffff;
             page-break-inside: avoid;
         }
 
         .vuln-header {
+            background-color: #f9f9f9;
             padding: 10px;
-            color: white;
-            font-weight: bold;
+            border-bottom: 1px solid #ddd;
         }
 
-        .vuln-header.critical {
-            background-color: #c0392b;
+        .vuln-title {
+            margin: 0 0 8px 0;
+            font-size: 12pt;
+            color: #2c3e50;
         }
 
-        .vuln-header.high {
-            background-color: #e67e22;
+        .vuln-meta {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
 
-        .vuln-header.medium {
-            background-color: #f39c12;
-        }
-
-        .vuln-header.low {
-            background-color: #27ae60;
-        }
-
-        .vuln-header.info {
-            background-color: #2980b9;
+        .vuln-meta td {
+            padding: 2px 0;
+            font-size: 9pt;
+            vertical-align: top;
+            word-wrap: break-word;
         }
 
         .vuln-body {
-            padding: 15px;
+            padding: 10px;
         }
 
-        .vuln-body table {
+        .vuln-section-title {
+            font-size: 10pt;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 3px;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        /* CODE BLOCKS - Aggressive wrap */
+        .code-container {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 10px;
+            table-layout: fixed;
+            margin: 8px 0;
         }
 
-        .vuln-body td {
-            padding: 5px;
-            vertical-align: top;
-        }
-
-        .vuln-label {
-            font-weight: bold;
-            width: 150px;
-            color: #34495e;
-        }
-
-        .evidence {
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            padding: 10px;
-            font-family: monospace;
-            white-space: pre-wrap;
+        .code-container td {
+            background-color: #f4f4f4;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 4px;
             word-wrap: break-word;
-            font-size: 9pt;
         }
 
-        .capec-tag {
-            display: inline-block;
-            background-color: #f39c12;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85em;
+        .code-text {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 8pt;
+            color: #333;
+            white-space: normal;
+            word-wrap: break-word;
+            margin: 0;
+        }
+
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f4f4f4;
+            color: #c0392b;
+            padding: 1px 3px;
+            border-radius: 2px;
+            word-wrap: break-word;
+            font-size: 8pt;
+        }
+
+        /* Attempts Table */
+        .attempt-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            margin-bottom: 15px;
+            table-layout: fixed;
+        }
+
+        .attempt-table th,
+        .attempt-table td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+
+        .attempt-table th {
+            background-color: #f9f9f9;
+        }
+
+        .attempt-pass {
+            color: #5cb85c;
             font-weight: bold;
-            margin-right: 5px;
-            margin-top: 5px;
         }
 
-        .cvss-tag {
-            display: inline-block;
-            background-color: #8e44ad;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85em;
+        .attempt-fail {
+            color: #d9534f;
             font-weight: bold;
-            margin-right: 5px;
-            margin-top: 5px;
-        }
-
-        .owasp-tag {
-            display: inline-block;
-            background-color: #2980b9;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85em;
-            font-weight: bold;
-            margin-right: 5px;
-            margin-top: 5px;
-        }
-
-        .disclaimer-section {
-            background-color: #fdf2e9;
-            border-left: 4px solid #e67e22;
-            padding: 15px;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-            page-break-inside: avoid;
-        }
-
-        .disclaimer-title {
-            color: #d35400;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 10px;
-            margin-top: 0;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="header">
-        <h1 th:text="#{report.title}">Vulnerability Report</h1>
-        <div class="meta-info">
-            <table>
-                <tr>
-                    <td class="label" th:text="#{report.date}">Date</td>
-                    <td th:text="${scanDate}">2026-05-30</td>
-                </tr>
-                <tr>
-                    <td class="label" th:text="#{report.target}">Target</td>
-                    <td th:text="${targetUrl}">https://api.example.com</td>
-                </tr>
-            </table>
-        </div>
-    </div>
-
-    <!-- General Legal & Confidentiality Disclaimer -->
-    <div class="disclaimer-section">
-        <h3 class="disclaimer-title" th:text="#{report.disclaimer.title}">Disclaimer</h3>
-        <p style="margin: 0; font-size: 0.9em; color: #555;" th:text="#{report.disclaimer.text}">
-            This report is generated by an automated security testing tool...
-        </p>
-    </div>
-
-    <div class="section">
-        <h2 class="section-title" th:text="#{report.methodology.title}">Methodology</h2>
-        <p th:text="#{report.methodology.description}">
-            This report presents the findings of an automated Dynamic Application Security Testing (DAST) scan.
-        </p>
-        <div style="margin-top: 15px; font-size: 0.95em; color: #555; background-color: #f8f9fa; padding: 15px; border-radius: 4px; border-left: 3px solid #3498db;"
-            th:utext="#{report.methodology.details}">
-            Orthrus utilizes an advanced taxonomy...
-        </div>
-    </div>
-
-    <div class="section">
-        <h2 class="section-title" th:text="#{report.summary.title}">Global Summary</h2>
-
-        <div style="text-align: center;">
-            <div th:class="'score-box score-' + ${globalGrade}">
-                <div style="font-size: 14pt; color: #7f8c8d;" th:text="#{report.summary.grade}">Security Grade</div>
-                <div class="score-grade" th:text="${globalGrade}">A</div>
+    <!-- Cover Page -->
+    <div class="cover-page">
+        <div class="cover-content">
+            <h1 class="cover-title" th:text="#{report.title}">Orthrus DAST</h1>
+            <div class="cover-subtitle" th:text="#{report.subtitle}">API Penetration Testing Report</div>
+            <div class="cover-target">
+                <span th:text="#{report.target}">Target</span>: <br />
+                <span class="url" th:text="${targetUrl}">https://example.com</span>
             </div>
         </div>
+        <div class="cover-footer">
+            <p><span th:text="#{report.date}">Generated on</span>: <span th:text="${scanDate}">2026-05-30</span></p>
+        </div>
+    </div>
 
-        <table class="summary-stats">
+    <!-- Legal & Methodology -->
+    <div class="page-break"></div>
+    <div class="section-title" th:text="#{report.disclaimer.title}">Legal &amp; Confidentiality Disclaimer</div>
+    <p th:text="#{report.disclaimer.text}">
+        This report contains confidential information regarding the security posture of the target application.
+        The findings detailed herein are intended solely for the authorized personnel of the organization.
+        Unauthorized distribution, disclosure, or copying of this document is strictly prohibited.
+    </p>
+
+    <div class="section-title" style="margin-top: 30px;" th:text="#{report.methodology.title}">Methodology &amp; Scoring
+        Criteria</div>
+    <p th:text="#{report.methodology.description}">
+        The assessment was conducted using Dynamic Application Security Testing (DAST) techniques.
+        Vulnerabilities are classified based on their potential impact and likelihood of exploitation, aligned with
+        standard CVSS (Common Vulnerability Scoring System) principles.
+    </p>
+
+    <h3 style="margin-top: 20px; font-size: 12pt; color: #2c3e50;" th:text="#{report.standards.title}">Methodology and Standards</h3>
+    <div style="margin-top: 15px; font-size: 9pt;">
+        <table class="attempt-table" style="width: 100%;">
             <thead>
                 <tr>
-                    <th th:text="#{report.summary.total}">Total</th>
-                    <th th:text="#{report.summary.critical}">CRITICAL</th>
-                    <th th:text="#{report.summary.high}">HIGH</th>
-                    <th th:text="#{report.summary.medium}">MEDIUM</th>
-                    <th th:text="#{report.summary.low}">LOW</th>
-                    <th th:text="#{report.summary.info}">INFO</th>
+                    <th style="width: 35%;" th:text="#{report.standards.header.standard}">Standard</th>
+                    <th style="width: 65%;" th:text="#{report.standards.header.application}">Application</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td style="font-weight: bold;" th:text="${totalVulns}">0</td>
-                    <td style="color: #c0392b; font-weight: bold;" th:text="${countCritical}">0</td>
-                    <td style="color: #e67e22; font-weight: bold;" th:text="${countHigh}">0</td>
-                    <td style="color: #f39c12; font-weight: bold;" th:text="${countMedium}">0</td>
-                    <td style="color: #27ae60; font-weight: bold;" th:text="${countLow}">0</td>
-                    <td style="color: #2980b9; font-weight: bold;" th:text="${countInfo}">0</td>
+                    <td><strong>OWASP API Security Top 10</strong></td>
+                    <td th:text="#{report.standards.owasp_api.desc}">API-specific vulnerability classification & testing guidelines</td>
+                </tr>
+                <tr>
+                    <td><strong>OWASP Top 10 (2021)</strong></td>
+                    <td th:text="#{report.standards.owasp_web.desc}">Primary web vulnerability classification framework</td>
+                </tr>
+                <tr>
+                    <td><strong>CVSS v3.1</strong></td>
+                    <td th:text="#{report.standards.cvss.desc}">Common Vulnerability Scoring System for objective severity rating</td>
+                </tr>
+                <tr>
+                    <td><strong>CWE / CAPEC</strong></td>
+                    <td th:text="#{report.standards.cwe.desc}">Common Weakness Enumeration and Attack Pattern tracking</td>
+                </tr>
+                <tr>
+                    <td th:text="#{report.standards.dast}"><strong>Automated DAST Assessment</strong></td>
+                    <td th:text="#{report.standards.dast.desc}">Dynamic payload injection, fuzzing, and unauthenticated/authenticated state evaluation</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-    <div class="section">
-        <h2 class="section-title" th:text="#{report.details.title}">Detailed Findings</h2>
 
-        <div th:if="${vulnerabilities.isEmpty()}">
-            <p th:text="#{report.details.none}">No vulnerabilities were found during this scan.</p>
+    <h3 style="margin-top: 30px; font-size: 12pt; color: #2c3e50;" th:text="#{grade.title}">Security Grade Definition</h3>
+    <div style="margin-top: 15px; font-size: 9pt;">
+        <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
+            <tr>
+                <td style="width: 40px;"><div class="score-grade score-A" style="font-size: 14pt; width: 30px; height: 30px; line-height: 30px; border-radius: 15px;">A</div></td>
+                <td style="padding-left: 15px;"><span th:text="#{grade.a.desc}">Excellent security posture. No high or critical vulnerabilities detected.</span></td>
+            </tr>
+            <tr>
+                <td style="width: 40px;"><div class="score-grade score-B" style="font-size: 14pt; width: 30px; height: 30px; line-height: 30px; border-radius: 15px;">B</div></td>
+                <td style="padding-left: 15px;"><span th:text="#{grade.b.desc}">Good security posture. Minor vulnerabilities present, but no immediate critical threats.</span></td>
+            </tr>
+            <tr>
+                <td style="width: 40px;"><div class="score-grade score-C" style="font-size: 14pt; width: 30px; height: 30px; line-height: 30px; border-radius: 15px;">C</div></td>
+                <td style="padding-left: 15px;"><span th:text="#{grade.c.desc}">Fair security posture. Several medium vulnerabilities or a single high vulnerability require attention.</span></td>
+            </tr>
+            <tr>
+                <td style="width: 40px;"><div class="score-grade score-D" style="font-size: 14pt; width: 30px; height: 30px; line-height: 30px; border-radius: 15px;">D</div></td>
+                <td style="padding-left: 15px;"><span th:text="#{grade.d.desc}">Poor security posture. Multiple high vulnerabilities detected. Urgent remediation needed.</span></td>
+            </tr>
+            <tr>
+                <td style="width: 40px;"><div class="score-grade score-F" style="font-size: 14pt; width: 30px; height: 30px; line-height: 30px; border-radius: 15px;">F</div></td>
+                <td style="padding-left: 15px;"><span th:text="#{grade.f.desc}">Critical failure. One or more critical vulnerabilities detected, exposing the application to immediate and severe risks.</span></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="page-break"></div>
+    <div class="section-title">1. <span th:text="#{report.summary.title}">Global Summary</span></div>
+
+    <table style="width: 100%; margin-bottom: 30px; border-collapse: separate; border-spacing: 20px 0;">
+        <tr>
+            <!-- Overall Risk Rating -->
+            <td style="width: 40%; vertical-align: top; background-color: #f8f9fa; padding: 25px; border-radius: 8px; border-top: 5px solid #3498db; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <div style="font-size: 11pt; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; font-weight: bold;" th:text="#{report.summary.rating}">Overall Risk Rating</div>
+                <div th:class="'score-grade score-' + ${globalGrade}" th:text="${globalGrade}" style="font-size: 56pt; width: 120px; height: 120px; line-height: 120px; border-radius: 60px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">A</div>
+                <p style="font-size: 11pt; color: #2c3e50; margin-top: 25px; font-weight: 500;" th:text="${executiveSummaryText}">
+                    The application demonstrates a strong security posture.
+                </p>
+            </td>
+            
+            <!-- Key Statistics -->
+            <td style="width: 60%; vertical-align: top;">
+                <div style="font-size: 11pt; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: bold;" th:text="#{report.summary.keystats}">Key Statistics</div>
+                
+                <table style="width: 100%; border-collapse: separate; border-spacing: 10px;">
+                    <tr>
+                        <td style="background-color: #f8f9fa; text-align: center; padding: 20px 10px; border-radius: 6px; border-bottom: 4px solid #95a5a6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 28pt; font-weight: bold; color: #2c3e50; line-height: 1;" th:text="${totalVulns}">13</div>
+                            <div style="font-size: 8pt; color: #7f8c8d; text-transform: uppercase; margin-top: 5px;" th:text="#{report.summary.total}">Total Findings</div>
+                        </td>
+                        <td style="background-color: #fdf2f2; text-align: center; padding: 20px 10px; border-radius: 6px; border-bottom: 4px solid #c0392b; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 28pt; font-weight: bold; color: #c0392b; line-height: 1;" th:text="${countCritical}">2</div>
+                            <div style="font-size: 8pt; color: #c0392b; text-transform: uppercase; margin-top: 5px;" th:text="#{report.critical}">Critical</div>
+                        </td>
+                        <td style="background-color: #fdf8e3; text-align: center; padding: 20px 10px; border-radius: 6px; border-bottom: 4px solid #e67e22; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 28pt; font-weight: bold; color: #e67e22; line-height: 1;" th:text="${countHigh}">3</div>
+                            <div style="font-size: 8pt; color: #e67e22; text-transform: uppercase; margin-top: 5px;" th:text="#{report.high}">High</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #fcf8e3; text-align: center; padding: 20px 10px; border-radius: 6px; border-bottom: 4px solid #f1c40f; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 28pt; font-weight: bold; color: #f1c40f; line-height: 1;" th:text="${countMedium}">5</div>
+                            <div style="font-size: 8pt; color: #f1c40f; text-transform: uppercase; margin-top: 5px;" th:text="#{report.medium}">Medium</div>
+                        </td>
+                        <td style="background-color: #e8f5e9; text-align: center; padding: 20px 10px; border-radius: 6px; border-bottom: 4px solid #27ae60; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 28pt; font-weight: bold; color: #27ae60; line-height: 1;" th:text="${countLow}">2</div>
+                            <div style="font-size: 8pt; color: #27ae60; text-transform: uppercase; margin-top: 5px;" th:text="#{report.low}">Low</div>
+                        </td>
+                        <td style="background-color: #ebf5fb; text-align: center; padding: 20px 10px; border-radius: 6px; border-bottom: 4px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <div style="font-size: 28pt; font-weight: bold; color: #3498db; line-height: 1;" th:text="${countInfo}">1</div>
+                            <div style="font-size: 8pt; color: #3498db; text-transform: uppercase; margin-top: 5px;" th:text="#{report.info}">Info</div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 25px; font-size: 9pt;">
+        <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+            <tr>
+                <td style="width: 5px; background-color: #c0392b;"></td>
+                <td style="padding: 4px 10px;"><strong style="color: #c0392b;" th:text="#{severity.critical}">CRITICAL</strong>: <span th:text="#{severity.desc.critical}">Immediate threat.</span></td>
+            </tr>
+            <tr><td colspan="2" style="height: 6px;"></td></tr>
+            <tr>
+                <td style="width: 5px; background-color: #e67e22;"></td>
+                <td style="padding: 4px 10px;"><strong style="color: #e67e22;" th:text="#{severity.high}">HIGH</strong>: <span th:text="#{severity.desc.high}">Significant threat.</span></td>
+            </tr>
+            <tr><td colspan="2" style="height: 6px;"></td></tr>
+            <tr>
+                <td style="width: 5px; background-color: #f1c40f;"></td>
+                <td style="padding: 4px 10px;"><strong style="color: #f1c40f;" th:text="#{severity.medium}">MEDIUM</strong>: <span th:text="#{severity.desc.medium}">Moderate threat.</span></td>
+            </tr>
+            <tr><td colspan="2" style="height: 6px;"></td></tr>
+            <tr>
+                <td style="width: 5px; background-color: #27ae60;"></td>
+                <td style="padding: 4px 10px;"><strong style="color: #27ae60;" th:text="#{severity.low}">LOW</strong>: <span th:text="#{severity.desc.low}">Minimal impact.</span></td>
+            </tr>
+            <tr><td colspan="2" style="height: 6px;"></td></tr>
+            <tr>
+                <td style="width: 5px; background-color: #3498db;"></td>
+                <td style="padding: 4px 10px;"><strong style="color: #3498db;" th:text="#{severity.info}">INFO</strong>: <span th:text="#{severity.desc.info}">Informational.</span></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Findings Summary Table -->
+    <div class="page-break" th:if="${countCritical > 0 or countHigh > 0 or countMedium > 0 or countLow > 0 or countInfo > 0}"></div>
+    <div class="section-title" th:if="${countCritical > 0 or countHigh > 0 or countMedium > 0 or countLow > 0 or countInfo > 0}">2. <span
+            th:text="#{report.summary}">Findings Summary</span></div>
+
+    <p th:if="${countCritical > 0 or countHigh > 0 or countMedium > 0 or countLow > 0 or countInfo > 0}" th:text="#{report.summary.cvss.desc}" style="font-size: 9pt; color: #555; margin-bottom: 20px;">
+        Each finding is scored under both CVSS v3.1...
+    </p>
+
+    <h3 th:if="${countCritical > 0 or countHigh > 0 or countMedium > 0 or countLow > 0 or countInfo > 0}" style="margin-top: 20px; font-size: 12pt; color: #2c3e50;" th:text="#{report.summary.distribution.title}">Severity Distribution</h3>
+    
+    <table class="attempt-table" style="width: 100%;" th:if="${countCritical > 0 or countHigh > 0 or countMedium > 0 or countLow > 0 or countInfo > 0}">
+        <thead>
+            <tr>
+                <th th:text="#{vuln.severity}">Severity</th>
+                <th th:text="#{report.summary.count}">Count</th>
+                <th th:text="#{report.summary.cvss.range}">CVSS Range (v3.1 / v4.0)</th>
+                <th th:text="#{report.summary.remediation}">Remediation Priority</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong style="color: #c0392b;" th:text="#{report.critical}">Critical</strong></td>
+                <td th:text="${countCritical}">2</td>
+                <td>9.0 to 10.0</td>
+                <td th:text="#{report.remediation.critical}">Immediate (before next release)</td>
+            </tr>
+            <tr>
+                <td><strong style="color: #e67e22;" th:text="#{report.high}">High</strong></td>
+                <td th:text="${countHigh}">3</td>
+                <td>7.0 to 8.9</td>
+                <td th:text="#{report.remediation.high}">Within 1 sprint cycle</td>
+            </tr>
+            <tr>
+                <td><strong style="color: #f1c40f;" th:text="#{report.medium}">Medium</strong></td>
+                <td th:text="${countMedium}">5</td>
+                <td>4.0 to 6.9</td>
+                <td th:text="#{report.remediation.medium}">Within 2 sprint cycles</td>
+            </tr>
+            <tr>
+                <td><strong style="color: #27ae60;" th:text="#{report.low}">Low</strong></td>
+                <td th:text="${countLow}">2</td>
+                <td>0.1 to 3.9</td>
+                <td th:text="#{report.remediation.low}">Next quarterly review</td>
+            </tr>
+            <tr>
+                <td><strong style="color: #3498db;" th:text="#{report.info}">Info</strong></td>
+                <td th:text="${countInfo}">1</td>
+                <td>0.0</td>
+                <td th:text="#{report.remediation.info}">Best practice recommendation</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div th:if="${#lists.isEmpty(vulnerabilities)}">
+        <p style="text-align: center; color: #5cb85c; font-size: 12pt; font-weight: bold; margin-top: 40px;"
+            th:text="#{report.details.none}">
+            No vulnerabilities were detected during this scan.
+        </p>
+    </div>
+
+    <!-- Technical Details -->
+    <div class="page-break" th:if="${not #lists.isEmpty(vulnerabilities)}"></div>
+    <div class="section-title" th:if="${not #lists.isEmpty(vulnerabilities)}">3. <span
+            th:text="#{report.details.title}">Detailed Findings</span></div>
+
+    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break">
+        <div class="vuln-header">
+            <h3 class="vuln-title" th:text="${vuln.name()}">Vulnerability Title</h3>
+            <table class="vuln-meta">
+                <tr>
+                    <td style="width: 20%;">
+                        <strong th:text="#{vuln.severity}">Severity</strong>: <br />
+                        <span th:class="'badge badge-' + ${vuln.riskLevel()}"
+                            th:text="#{severity.__${#strings.toLowerCase(vuln.riskLevel().name())}__}">HIGH</span>
+                    </td>
+                    <td style="width: 20%;">
+                        <strong th:text="#{report.cvss}">CVSS Score</strong>: <br />
+                        <span th:text="${vuln.cvssScore() != null ? vuln.cvssScore() : 'N/A'}">9.8</span>
+                    </td>
+                    <td style="width: 60%;">
+                        <strong th:text="#{vuln.cwe}">CWE</strong>: <span
+                            th:text="${vuln.cwe() != null ? vuln.cwe().name() : 'N/A'}">CWE-89</span><br />
+                        <strong th:text="#{report.capec}">CAPEC</strong>: <span
+                            th:text="${vuln.capecs() != null and !vuln.capecs().isEmpty() ? #strings.listJoin(vuln.capecs(), ', ') : 'N/A'}"></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="padding-top: 5px;">
+                        <strong th:text="#{vuln.endpoint}">Endpoint</strong>: <code
+                            th:text="${(vuln.operationMethod() != null ? vuln.operationMethod() + ' ' : '') + vuln.operationUrl()}">GET /api/endpoint</code>
+                    </td>
+                </tr>
+            </table>
         </div>
 
-        <div th:each="vuln, iterStat : ${vulnerabilities}" class="vuln-card">
-            <div th:class="'vuln-header ' + ${vuln.riskLevel.name().toLowerCase()}">
-                <span th:text="${iterStat.count} + '. ' + ${vuln.name}">1. Vulnerability Name</span>
-                <span style="float: right;"
-                    th:text="'[' + #{'severity.' + ${vuln.riskLevel.name().toLowerCase()}} + ']'">[HIGH]</span>
-            </div>
-            <div class="vuln-body">
-                <div class="vuln-meta">
-                    <strong><span th:text="#{report.owasp}">OWASP</span>:</strong> <span
-                        th:text="${vuln.owaspCategory}">APIX:2023</span> |
-                    <strong><span th:text="#{report.confidence}">Confidence</span>:</strong> <span
-                        th:text="${vuln.confidence}">HIGH</span>
+        <div class="vuln-body">
+            <div class="vuln-section-title" th:text="#{vuln.description}">Description</div>
+            <p th:text="${vuln.description()}">Description goes here.</p>
 
-                    <div style="margin-top: 10px;">
-                        <span class="cvss-tag" th:if="${vuln.cvssScore != null}"
-                            th:text="#{report.cvss} + ': ' + ${vuln.cvssScore}">CVSS: 9.8</span>
-                        <span class="owasp-tag" th:text="'CWE-' + ${vuln.cwe.getId()}">CWE-XXX</span>
-                        <span class="capec-tag" th:each="capec : ${vuln.capecs}" th:text="${capec}">CAPEC-XX</span>
-                    </div>
-                </div>
-                <table>
+            <div class="vuln-section-title" th:if="${vuln.evidence() != null and !vuln.evidence().isEmpty()}"
+                th:text="#{vuln.evidence}">Evidence / Proof of Concept</div>
+            <p th:if="${vuln.evidence() != null and !vuln.evidence().isEmpty()}" th:text="${vuln.evidence()}">
+                Observation</p>
+
+            <div th:if="${vuln.requestDetails() != null and !vuln.requestDetails().isEmpty()}">
+                <strong th:text="#{report.request}">Request:</strong>
+                <table class="code-container">
                     <tr>
-                        <td class="vuln-label" th:text="#{vuln.cwe}">CWE</td>
-                        <td
-                            th:text="'CWE-' + ${vuln.cwe.id} + ': ' + (${#messages.msgOrNull('cwe.' + vuln.cwe.name())} ?: ${vuln.cwe.name})">
-                            CWE-123</td>
-                    </tr>
-                    <tr>
-                        <td class="vuln-label" th:text="#{vuln.endpoint}">Endpoint</td>
-                        <td style="font-family: monospace;"
-                            th:text="${vuln.operationMethod} + ' ' + ${vuln.operationUrl}">GET /api/users</td>
-                    </tr>
-                    <tr>
-                        <td class="vuln-label" th:text="#{vuln.description}">Description</td>
-                        <td th:text="(${#messages.msgOrNull('desc.' + vuln.cwe.name())} ?: ${vuln.description})">
-                            Description here</td>
-                    </tr>
-                    <tr>
-                        <td class="vuln-label" th:text="#{vuln.remediation}">Remediation</td>
-                        <td th:text="(${#messages.msgOrNull('rem.' + vuln.cwe.name())} ?: ${vuln.remediation})">
-                            Remediation here</td>
-                    </tr>
-                    <tr th:if="${vuln.evidence != null}">
-                        <td class="vuln-label" th:text="#{vuln.evidence}">Evidence</td>
                         <td>
-                            <div class="evidence" th:text="${vuln.evidence}">Evidence payload here</div>
+                            <div class="code-text" th:utext="${formatter.nl2br(vuln.requestDetails())}"></div>
                         </td>
                     </tr>
                 </table>
             </div>
-        </div>
+            <div th:if="${vuln.responseDetails() != null and !vuln.responseDetails().isEmpty()}">
+                <strong th:text="#{report.response}">Response:</strong>
+                <table class="code-container">
+                    <tr>
+                        <td>
+                            <div class="code-text" th:utext="${formatter.nl2br(vuln.responseDetails())}"></div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
 
+            <div class="vuln-section-title" th:text="#{vuln.remediation}">Remediation</div>
+            <p th:text="${vuln.remediation()}">How to fix it.</p>
+        </div>
     </div>
 
-    <!-- Execution Details (only if include-passed) -->
-    <div class="section" th:if="${attemptGroups != null and !attemptGroups.isEmpty()}">
-        <h2 class="section-title" th:text="#{report.execution.title}">Execution Details</h2>
-        <p th:text="#{report.execution.description}">
-            The following section lists every test executed during the scan, grouped by endpoint.
-        </p>
+    <!-- Execution Details / Attempts -->
+    <div th:if="${attemptGroups != null and !attemptGroups.isEmpty()}">
+        <div class="page-break"></div>
+        <div class="section-title">4. <span th:text="#{report.execution.title}">Execution Details</span></div>
+        <p th:text="#{report.execution.description}">The following table lists the detailed requests executed by Orthrus
+            DAST during the assessment.</p>
 
-        <div th:each="group : ${attemptGroups}"
-            style="margin-bottom: 20px; border: 1px solid #bdc3c7; border-radius: 4px; page-break-inside: avoid;">
-            <!-- Endpoint header -->
-            <div
-                style="background-color: #34495e; color: white; padding: 8px 12px; font-family: monospace; font-size: 11pt; font-weight: bold;">
-                <span th:text="${group.displayName}">GET /api/v3/pet</span>
-                <span style="float: right; font-family: sans-serif; font-size: 9pt; font-weight: normal;">
-                    <span style="color: #2ecc71;" th:text="'✓ ' + ${group.passedCount} + ' '">✓ 18 </span>
-                    <span style="color: #e74c3c;" th:text="'✗ ' + ${group.failedCount}">✗ 4</span>
-                </span>
-            </div>
-            <!-- Scanner results table -->
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
-                <tr th:each="attempt : ${group.attempts}" style="border-bottom: 1px solid #ecf0f1;">
-                    <td style="padding: 6px 12px; width: 60%;" th:text="${attempt.scannerName}">XSS Scanner</td>
-                    <td th:if="${attempt.passed}"
-                        style="padding: 6px 8px; color: #27ae60; font-weight: bold; text-align: center;">✓</td>
-                    <td th:unless="${attempt.passed}"
-                        style="padding: 6px 8px; color: #c0392b; font-weight: bold; text-align: center;">✗</td>
-                    <td th:if="${attempt.passed}" style="padding: 6px 12px; color: #27ae60; font-size: 0.85em;"
-                        th:text="#{report.execution.passed}">PASSED</td>
-                    <td th:unless="${attempt.passed}" style="padding: 6px 12px; color: #c0392b; font-size: 0.85em;">
-                        <span th:text="#{report.execution.failed}">FAILED</span>
-                        <span style="color: #777; margin-left: 4px;"
-                            th:text="'(' + ${attempt.vulnerabilities.size()} + ')'"> (2)</span>
-                    </td>
-                </tr>
+        <div th:each="group : ${attemptGroups}" class="no-break" style="margin-bottom: 25px;">
+            <h3 style="margin-bottom: 5px; word-break: break-all;">
+                <code th:text="${group.endpoint()}">GET /api/test</code>
+            </h3>
+            <p style="margin-top: 0; font-size: 9pt; color: #777;">
+                <span th:text="#{report.tests.executed}">Tests Executed:</span> <span th:text="${group.passed() + group.failed()}"></span>
+                | <span class="attempt-pass"><span th:text="#{report.execution.passed}">Passed</span>: <span
+                        th:text="${group.passed()}"></span></span>
+                | <span class="attempt-fail"><span th:text="#{report.execution.failed}">Failed</span>: <span
+                        th:text="${group.failed()}"></span></span>
+            </p>
+
+            <table class="attempt-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;" th:text="#{report.execution.scanner}">Scanner</th>
+                        <th style="width: 70%;" th:text="#{report.payload.description}">Payload / Test Description</th>
+                        <th style="width: 15%;" th:text="#{report.execution.status}">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="attempt : ${group.attempts()}">
+                        <td th:text="${attempt.scannerId()}">sqli</td>
+                        <td>
+                            <code th:text="${attempt.payload() != null ? attempt.payload() : 'N/A'}"
+                                style="background-color: transparent; color: #333;"></code>
+                        </td>
+                        <td>
+                            <span th:if="${attempt.passed()}" class="attempt-pass"
+                                th:text="#{report.execution.passed}">PASSED</span>
+                            <span th:if="${!attempt.passed()}" class="attempt-fail"
+                                th:text="#{report.execution.failed}">FAILED</span>
+                        </td>
+                    </tr>
+                </tbody>
             </table>
         </div>
     </div>

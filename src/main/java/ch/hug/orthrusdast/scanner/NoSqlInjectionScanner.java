@@ -64,8 +64,8 @@ public class NoSqlInjectionScanner implements SecurityScanner {
         
         return httpClient.send(testOp)
                 .flatMapMany(response -> {
-                    // Check for typical NoSQL error messages or unexpected success changes
-                    if (response.statusCode().is5xxServerError() || response.bodyContainsExact("MongoError") || response.bodyContainsExact("MongoServerError") || response.bodyContainsExact("Cast to ObjectId failed")) {
+                    // Check for typical NoSQL error messages to avoid false positives on generic 500 errors
+                    if (response.bodyContainsExact("MongoError") || response.bodyContainsExact("MongoServerError") || response.bodyContainsExact("Cast to ObjectId failed")) {
                          Vulnerability vuln = Vulnerability.createWithDetails(
                             "Potential NoSQL Injection",
                             "The endpoint might be vulnerable to NoSQL Injection (e.g., MongoDB).",

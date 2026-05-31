@@ -83,7 +83,7 @@ public class InsecureDeserializationScanner implements SecurityScanner {
                             "Server responded with a stack trace indicating deserialization failure.",
                             "Avoid deserializing untrusted data. If necessary, use safe formats like standard JSON, or use strict type whitelisting.",
                             "Injected payload: " + payload,
-                            "Response snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) : response.body())
+                            "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                     );
                     return Flux.just(vuln);
                 }

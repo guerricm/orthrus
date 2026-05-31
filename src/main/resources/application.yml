@@ -22,6 +22,15 @@ server:
 
 spring:
   messages:
+    basename: messages
     fallback-to-system-locale: false
+  r2dbc:
+    url: r2dbc:h2:file:///./orthrus_db/data;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
   main:
     web-application-type: reactive

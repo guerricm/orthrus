@@ -28,19 +28,25 @@ import reactor.core.publisher.Mono;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
 
+import ch.hug.orthrusdast.engine.ScanResultService;
+import ch.hug.orthrusdast.engine.StatisticsService;
+
 @Controller
 public class FrontendController {
 
     private final ScanService scanService;
-    private final ScanResultRepository scanResultRepository;
+    private final ScanResultService scanResultService;
     private final PdfReportGenerator pdfReportGenerator;
     private final OAuth2TokenFetcher tokenFetcher;
 
-    public FrontendController(ScanService scanService, ScanResultRepository scanResultRepository, PdfReportGenerator pdfReportGenerator, OAuth2TokenFetcher tokenFetcher) {
+    private final StatisticsService statisticsService;
+
+    public FrontendController(ScanService scanService, ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator, OAuth2TokenFetcher tokenFetcher, StatisticsService statisticsService) {
         this.scanService = scanService;
-        this.scanResultRepository = scanResultRepository;
+        this.scanResultService = scanResultService;
         this.pdfReportGenerator = pdfReportGenerator;
         this.tokenFetcher = tokenFetcher;
+        this.statisticsService = statisticsService;
     }
 
     @GetMapping("/manual")
@@ -48,8 +54,20 @@ public class FrontendController {
         return "manual";
     }
 
+    @GetMapping("/stats")
+    public Mono<String> stats(Model model) {
+        return Mono.zip(
+                statisticsService.getEvolutionByTargetAndEndpoint(),
+                statisticsService.getGlobalStatistics()
+        ).map(tuple -> {
+            model.addAttribute("endpointStats", tuple.getT1());
+            model.addAttribute("globalStats", tuple.getT2());
+            return "stats";
+        });
+    }
+
     @GetMapping("/")
-    public String home(Model model) {
+    public Mono<String> index(Model model) {
         java.util.Map<String, String> discovererDescriptions = new java.util.HashMap<>();
         for (String discoverer : scanService.getAvailableDiscoverers()) {
             switch (discoverer) {
@@ -75,15 +93,16 @@ public class FrontendController {
         model.addAttribute("discoverers", discovererDescriptions);
         
         
-        List<ScanResult> history = scanResultRepository.findAll();
-        int totalScans = history.size();
-        long totalVulns = history.stream()
-                .mapToLong(scan -> scan.vulnerabilities().size())
-                .sum();
-                
-        model.addAttribute("totalScans", totalScans);
-        model.addAttribute("totalVulns", totalVulns);
-        return "home";
+        return scanResultService.findAll().collectList().map(history -> {
+            int totalScans = history.size();
+            long totalVulns = history.stream()
+                    .mapToLong(scan -> scan.vulnerabilities().size())
+                    .sum();
+                    
+            model.addAttribute("totalScans", totalScans);
+            model.addAttribute("totalVulns", totalVulns);
+            return "home";
+        });
     }
 
     @GetMapping("/scans/new")
@@ -94,9 +113,22 @@ public class FrontendController {
     }
 
     @GetMapping("/scans")
-    public String listScans(Model model) {
-        model.addAttribute("history", scanResultRepository.findAll());
-        return "scans/list";
+    public Mono<String> listScans(Model model) {
+        return scanResultService.getHistory(0, 10).collectList().map(history -> {
+            model.addAttribute("history", history);
+            return "scans/list";
+        });
+    }
+
+    @GetMapping("/api/scans")
+    public Mono<String> getScansFragment(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
+            Model model) {
+        return scanResultService.getHistory(page, size).collectList().map(history -> {
+            model.addAttribute("history", history);
+            return "fragments/scan-items :: items";
+        });
     }
 
     @PostMapping(value = "/web/scans")
@@ -159,7 +191,7 @@ public class FrontendController {
 
                         return scanService.executeScan(discovererId, target, null, config);
                     })
-                    .doOnNext(result -> scanResultRepository.save(result))
+                    .flatMap(result -> scanResultService.save(result))
                     .map(result -> {
                         model.addAttribute("result", result);
                         // Calculate Grade for Thymeleaf
@@ -183,7 +215,7 @@ public class FrontendController {
 
     @GetMapping("/web/scans/{id}/pdf")
     public Mono<ResponseEntity<org.springframework.core.io.Resource>> downloadPdf(@PathVariable String id) {
-        return Mono.justOrEmpty(scanResultRepository.findById(id))
+        return scanResultService.findById(id)
                 .flatMap(result -> {
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
                     return pdfReportGenerator.generateReport(result, out)

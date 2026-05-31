@@ -84,7 +84,7 @@ public class FileUploadScanner implements SecurityScanner {
                         "Server responded with " + response.statusCode() + " OK after uploading an EICAR test file.",
                         "Implement strict file type validation (using magic bytes, not just extensions). Use an antivirus scanner on all uploaded files. Store files outside the web root.",
                         "Uploaded a multipart/form-data file named eicar.com containing the EICAR test string.",
-                        "Response status: " + response.statusCode()
+                        "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 );
                 return Flux.just(vuln);
             }

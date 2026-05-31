@@ -16,8 +16,9 @@ import java.util.Locale;
 /**
  * Generates an HTML report using Thymeleaf.
  * 
- * This generator uses a pre-defined Thymeleaf template to produce a human-readable 
- * security report containing vulnerability summaries, details, and optionally, 
+ * This generator uses a pre-defined Thymeleaf template to produce a
+ * human-readable
+ * security report containing vulnerability summaries, details, and optionally,
  * full execution logs of every scanner attempt.
  */
 @Component
@@ -35,9 +36,11 @@ public class HtmlReportGenerator implements ReportGenerator {
     }
 
     /**
-     * Generates an HTML report from a ScanResult and writes it to the output stream.
+     * Generates an HTML report from a ScanResult and writes it to the output
+     * stream.
      *
-     * @param result the scan result containing vulnerabilities and execution attempts
+     * @param result the scan result containing vulnerabilities and execution
+     *               attempts
      * @param output the output stream to write the HTML content to
      * @return a Mono signaling completion
      */
@@ -47,14 +50,16 @@ public class HtmlReportGenerator implements ReportGenerator {
             try {
                 // 1. Determine Language
                 String langStr = result.configuration() != null && result.configuration().language() != null
-                        ? result.configuration().language() : "en";
+                        ? result.configuration().language()
+                        : "en";
                 Locale locale = Locale.forLanguageTag(langStr);
 
                 // 2. Prepare Context for Thymeleaf
                 Context context = new Context(locale);
 
                 // Date Formatting
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                        .withZone(ZoneId.systemDefault());
                 context.setVariable("scanDate", formatter.format(result.scanStartTime()));
                 context.setVariable("targetUrl", result.targetUrl());
 
@@ -77,10 +82,14 @@ public class HtmlReportGenerator implements ReportGenerator {
 
                 // 3. Calculate Global Grade
                 String grade = "A";
-                if (critical > 0) grade = "F";
-                else if (high > 0) grade = "D";
-                else if (medium > 0) grade = "C";
-                else if (low > 0) grade = "B";
+                if (critical > 0)
+                    grade = "F";
+                else if (high > 0)
+                    grade = "D";
+                else if (medium > 0)
+                    grade = "C";
+                else if (low > 0)
+                    grade = "B";
                 context.setVariable("globalGrade", grade);
 
                 // 4. Execution Details (if --include-passed)
@@ -90,15 +99,20 @@ public class HtmlReportGenerator implements ReportGenerator {
                         String key = a.operationMethod() + " " + a.operationUrl();
                         grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
                     }
-                    
+
                     java.util.List<ch.hug.orthrusdast.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
-                    for (java.util.Map.Entry<String, java.util.List<ch.hug.orthrusdast.model.ScanAttempt>> entry : grouped.entrySet()) {
-                        long passed = entry.getValue().stream().filter(ch.hug.orthrusdast.model.ScanAttempt::passed).count();
+                    for (java.util.Map.Entry<String, java.util.List<ch.hug.orthrusdast.model.ScanAttempt>> entry : grouped
+                            .entrySet()) {
+                        long passed = entry.getValue().stream().filter(ch.hug.orthrusdast.model.ScanAttempt::passed)
+                                .count();
                         long failed = entry.getValue().size() - passed;
-                        attemptGroupsList.add(new ch.hug.orthrusdast.model.EndpointAttemptGroup(entry.getKey(), entry.getValue(), passed, failed));
+                        attemptGroupsList.add(new ch.hug.orthrusdast.model.EndpointAttemptGroup(entry.getKey(),
+                                entry.getValue(), passed, failed));
                     }
                     context.setVariable("attemptGroups", attemptGroupsList);
                 }
+
+                context.setVariable("formatter", new PdfReportGenerator.ReportFormatter());
 
                 // 5. Render HTML
                 String html = templateEngine.process("report", context);

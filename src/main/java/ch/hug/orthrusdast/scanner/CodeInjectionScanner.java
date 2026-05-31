@@ -20,11 +20,12 @@ public class CodeInjectionScanner implements SecurityScanner {
     private final ScanHttpClient httpClient;
     
     // Payloads designed to trigger a specific mathematical or string operation if evaluated as code.
-    // We expect the result (e.g. "999999") to appear in the response.
+    // We expect the evaluated result ("999999") to appear in the response.
+    // The exact string "999999" is excluded from the payloads to prevent false positives from simple input reflection.
     private static final Map<String, String> PAYLOADS = Map.of(
             "PHP Eval", "echo 999900+99;",
-            "Node.js Eval", "require('child_process').execSync('echo 999999').toString()",
-            "Python Exec", "__import__('os').popen('echo 999999').read()"
+            "Node.js Eval", "require('child_process').execSync('expr 999900 + 99').toString()",
+            "Python Exec", "__import__('os').popen('expr 999900 + 99').read()"
     );
 
     public CodeInjectionScanner(ScanHttpClient httpClient) {
@@ -85,7 +86,7 @@ public class CodeInjectionScanner implements SecurityScanner {
                             "The payload was evaluated and the result '999999' was found in the response.",
                             "Never pass untrusted data directly to eval() or similar dynamic execution functions. Use safe parsers and avoid dynamic code execution entirely.",
                             "Injected payload: " + payload,
-                            "Response contained the evaluated string '999999'."
+                            "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                     );
                     return Flux.just(vuln);
                 }

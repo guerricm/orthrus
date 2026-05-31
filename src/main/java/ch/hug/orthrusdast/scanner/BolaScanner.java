@@ -82,7 +82,7 @@ public class BolaScanner implements SecurityScanner {
                                 RiskLevel.MEDIUM,
                                 Vulnerability.Confidence.LOW, // Low confidence due to potential false positives (e.g. public resources)
                                 getId(),
-                                testOp, // The modified operation
+                                operation, // Pass the original operation to preserve templateUrl
                                 CWEReference.CWE_639,
                                 "Broken Object Level Authorization",
                                 List.of("CAPEC-17"),

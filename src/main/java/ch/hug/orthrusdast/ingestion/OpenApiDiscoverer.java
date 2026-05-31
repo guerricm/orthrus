@@ -125,7 +125,9 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
                 mockPayload,
                 securityRequirements,
                 expectedContentTypes,
-                authScheme
+                authScheme,
+                baseUrl + path,
+                operation
         );
     }
     

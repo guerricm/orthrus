@@ -16,15 +16,21 @@ public record Operation(
         String body,
         List<String> securityRequirements,
         List<String> expectedContentTypes,
-        SecurityScheme authScheme
+        SecurityScheme authScheme,
+        String templateUrl,
+        Object sourceNode
 ) {
+
+    public Operation(String url, String method, Map<String, String> headers, Map<String, String> queryParams, String body, List<String> securityRequirements, List<String> expectedContentTypes, SecurityScheme authScheme) {
+        this(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, authScheme, url, null);
+    }
 
     /**
      * Create a simple operation with just URL and method (for blackbox discovery).
      */
     public static Operation simple(String url, String method) {
         return new Operation(url, method, Collections.emptyMap(), Collections.emptyMap(),
-                null, Collections.emptyList(), Collections.emptyList(), null);
+                null, Collections.emptyList(), Collections.emptyList(), null, url, null);
     }
 
     /**
@@ -32,13 +38,13 @@ public record Operation(
      */
     public static Operation withHeaders(String url, String method, Map<String, String> headers, String body) {
         return new Operation(url, method, headers != null ? headers : Collections.emptyMap(),
-                Collections.emptyMap(), body, Collections.emptyList(), Collections.emptyList(), null);
+                Collections.emptyMap(), body, Collections.emptyList(), Collections.emptyList(), null, url, null);
     }
 
     /**
      * Return a copy of this operation with the given auth scheme applied.
      */
     public Operation withAuth(SecurityScheme scheme) {
-        return new Operation(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, scheme);
+        return new Operation(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, scheme, templateUrl, sourceNode);
     }
 }

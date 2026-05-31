@@ -22,6 +22,7 @@ public class OrthrusDastApplication implements CommandLineRunner {
         SpringApplication app = new SpringApplication(OrthrusDastApplication.class);
         if (args.length > 0) {
             System.setProperty("spring.main.web-application-type", "none");
+            System.setProperty("spring.r2dbc.url", "r2dbc:h2:mem:///cli_db");
             app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
         }
 

@@ -75,7 +75,7 @@ public class XxeScanner implements SecurityScanner {
                         "The response contained the contents of /etc/passwd.",
                         "Disable external entity parsing in your XML parser configuration. For Java, configure DocumentBuilderFactory to disallow DOCTYPE declarations.",
                         "Injected XML payload with external entity pointing to file:///etc/passwd",
-                        "Response contained: " + response.body().substring(0, Math.min(response.body().length(), 200))
+                        "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 );
                 return Flux.just(vuln);
             }

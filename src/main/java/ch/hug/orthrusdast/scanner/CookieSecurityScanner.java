@@ -42,7 +42,7 @@ public class CookieSecurityScanner implements SecurityScanner {
             List<String> cookies = response.headers().get(HttpHeaders.SET_COOKIE);
             if (cookies != null && !cookies.isEmpty()) {
                 for (String cookie : cookies) {
-                    checkCookie(cookie, operation, vulns);
+                    checkCookie(cookie, operation, vulns, response);
                 }
             }
 
@@ -50,7 +50,7 @@ public class CookieSecurityScanner implements SecurityScanner {
         });
     }
 
-    private void checkCookie(String cookie, Operation operation, List<Vulnerability> vulns) {
+    private void checkCookie(String cookie, Operation operation, List<Vulnerability> vulns, ch.hug.orthrusdast.http.ScanHttpResponse response) {
         String lowerCookie = cookie.toLowerCase();
         String cookieName = cookie.split("=")[0].trim();
 
@@ -69,7 +69,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     "Set-Cookie header found without 'Secure' flag: " + cookie,
                     "Always set the 'Secure' flag for sensitive cookies so they are only transmitted over HTTPS.",
                     "Sent standard " + operation.method() + " request.",
-                    "Received Set-Cookie header: " + cookie
+                    "Status: " + response.statusCode() + "\nReceived Set-Cookie header: " + cookie + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
             ));
         }
 
@@ -88,7 +88,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     "Set-Cookie header found without 'HttpOnly' flag: " + cookie,
                     "Always set the 'HttpOnly' flag for session identifiers and sensitive cookies to prevent access from JavaScript.",
                     "Sent standard " + operation.method() + " request.",
-                    "Received Set-Cookie header: " + cookie
+                    "Status: " + response.statusCode() + "\nReceived Set-Cookie header: " + cookie + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
             ));
         }
 
@@ -107,7 +107,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     "Set-Cookie header found without 'SameSite' attribute: " + cookie,
                     "Configure the cookie with 'SameSite=Lax' or 'SameSite=Strict' to restrict cross-site sharing.",
                     "Sent standard " + operation.method() + " request.",
-                    "Received Set-Cookie header: " + cookie
+                    "Status: " + response.statusCode() + "\nReceived Set-Cookie header: " + cookie + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
             ));
         }
     }

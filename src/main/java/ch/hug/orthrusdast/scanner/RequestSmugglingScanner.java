@@ -71,7 +71,7 @@ public class RequestSmugglingScanner implements SecurityScanner {
                         "Server responded with " + response.statusCode() + " instead of 400 when sending a malformed Transfer-Encoding header.",
                         "Ensure the frontend proxy and backend server interpret the Transfer-Encoding and Content-Length headers consistently. Reject requests with ambiguous or duplicated headers. Prefer using HTTP/2.",
                         "Injected header: Transfer-Encoding: chunked, cow",
-                        "Response status: " + response.statusCode()
+                        "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 );
                 return Flux.just(vuln);
             }

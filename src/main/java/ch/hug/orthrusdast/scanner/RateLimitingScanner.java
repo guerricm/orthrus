@@ -62,7 +62,7 @@ public class RateLimitingScanner implements SecurityScanner {
                                 "After " + REQUEST_COUNT + " requests, the server returned status " + lastResponse.statusCode().value() + " instead of 429.",
                                 "Implement rate limiting using a gateway, WAF, or application logic (e.g. token bucket algorithm).",
                                 "Sent " + REQUEST_COUNT + " identical requests in rapid succession.",
-                                "Last response status: " + lastResponse.statusCode()
+                                "Status: " + lastResponse.statusCode() + "\nBody snippet: " + (lastResponse.body() != null && lastResponse.body().length() > 200 ? lastResponse.body().substring(0, 200) + "..." : String.valueOf(lastResponse.body()))
                         );
                         return Flux.just(vuln);
                     }

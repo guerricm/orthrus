@@ -20,14 +20,17 @@ public class CommandInjectionScanner implements SecurityScanner {
 
     private final ScanHttpClient httpClient;
     
-    // Using a payload that echoes a specific string, which is highly unlikely to appear randomly
-    private static final String ECHO_MARKER = "VULNAPI_CMD_INJECT_SUCCESS";
+    // Using an arithmetic evaluation payload to prevent false positives from simple string reflection.
+    // If the application simply echoes the input, the response will contain "$((837492+561837))".
+    // If the application is truly vulnerable, the shell will evaluate the arithmetic and output "1399329".
+    private static final String CALC_PAYLOAD_CONTENT = "$((837492+561837))";
+    private static final String CALC_RESULT = "1399329";
     private static final String[] PAYLOADS = {
-        "; echo " + ECHO_MARKER,
-        "| echo " + ECHO_MARKER,
-        "& echo " + ECHO_MARKER,
-        "$(echo " + ECHO_MARKER + ")",
-        "`echo " + ECHO_MARKER + "`"
+        "; echo " + CALC_PAYLOAD_CONTENT,
+        "| echo " + CALC_PAYLOAD_CONTENT,
+        "& echo " + CALC_PAYLOAD_CONTENT,
+        "$(echo " + CALC_PAYLOAD_CONTENT + ")",
+        "`echo " + CALC_PAYLOAD_CONTENT + "`"
     };
 
     public CommandInjectionScanner(ScanHttpClient httpClient) {
@@ -72,7 +75,7 @@ public class CommandInjectionScanner implements SecurityScanner {
                     
                     return httpClient.send(testOp)
                             .flatMapMany(response -> {
-                                if (response.bodyContainsExact(ECHO_MARKER)) {
+                                if (response.bodyContainsExact(CALC_RESULT) && !response.bodyContainsExact(CALC_PAYLOAD_CONTENT)) {
                                      Vulnerability vuln = Vulnerability.createWithDetails(
                                         "OS Command Injection",
                                         "The endpoint appears vulnerable to OS Command Injection in parameter '" + paramName + "'.",
@@ -82,9 +85,9 @@ public class CommandInjectionScanner implements SecurityScanner {
                                         operation,
                                         CWEReference.CWE_78,
                                         "Injection",
-                                List.of("CAPEC-88"),
-                                9.8,
-                                        "Response contains the injected marker string '" + ECHO_MARKER + "', indicating the OS command was executed and its output was returned.",
+                                        List.of("CAPEC-88"),
+                                        9.8,
+                                        "Response contains the evaluated arithmetic result '" + CALC_RESULT + "' from the injected payload, indicating the OS command was executed.",
                                         "Avoid invoking OS commands directly. If necessary, use built-in language APIs and strictly sanitize and parameterize all input.",
                                         "Injected payload into query param: " + paramName + "=" + payload,
                                         "Status: " + response.statusCode() + "\nBody snippet: " + truncate(response.body())

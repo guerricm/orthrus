@@ -75,7 +75,7 @@ public class CorsScanner implements SecurityScanner {
                         evidence,
                         "Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly.",
                         "OPTIONS request sent with Origin: " + MALICIOUS_ORIGIN,
-                        "Access-Control-Allow-Origin: " + acao + "\nAccess-Control-Allow-Credentials: " + acac
+                        "Status: " + response.statusCode() + "\nAccess-Control-Allow-Origin: " + acao + "\nAccess-Control-Allow-Credentials: " + acac + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 );
                 return Flux.just(vuln);
             }

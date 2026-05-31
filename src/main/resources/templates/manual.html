@@ -1,211 +1,274 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - User Manual')}">
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+    th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - User Manual')}">
+
 <body>
-<main>
-    <div class="row mb-5 mt-4">
-        <div class="col-12 text-center">
-            <h1 class="display-4 fw-bold" style="color: var(--primary-color);">User Manual</h1>
-            <p class="lead text-muted mt-3">Comprehensive Guide to Orthrus DAST</p>
+    <main>
+        <div class="row mb-5 mt-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 fw-bold" style="color: var(--primary-color);">User Manual</h1>
+                <p class="lead text-muted mt-3">Comprehensive Guide to Orthrus DAST</p>
+            </div>
         </div>
-    </div>
 
-    <div class="row">
-        <!-- Section: Introduction -->
-        <div class="col-12 mb-4">
-            <div class="glass-card">
-                <h3 class="mb-4 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-info-circle me-2 mb-1" viewBox="0 0 16 16">
-                      <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-                      <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
-                    </svg>
-                    1. Introduction to Orthrus DAST
-                </h3>
-                <p>
-                    <strong>Orthrus DAST</strong> is an advanced Dynamic Application Security Testing (DAST) engine specifically engineered for modern Web APIs. Unlike static code analyzers, Orthrus interacts with your running application by simulating real-world attacker behaviors to discover vulnerabilities such as injection flaws, broken access control, and missing security headers.
-                </p>
-                <p>
-                    The architecture is split into two phases:
+        <div class="row">
+            <!-- Section: Introduction -->
+            <div class="col-12 mb-4">
+                <div class="glass-card">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-info-circle me-2 mb-1" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0" />
+                        </svg>
+                        1. Introduction to Orthrus DAST
+                    </h3>
+                    <p>
+                        <strong>Orthrus DAST</strong> is an advanced Dynamic Application Security Testing (DAST) engine
+                        specifically engineered for modern Web APIs. Unlike static code analyzers, Orthrus interacts
+                        with your running application by simulating real-world attacker behaviors to discover
+                        vulnerabilities such as injection flaws, broken access control, and missing security headers.
+                    </p>
+                    <p>
+                        The architecture is split into two phases:
                     <ol>
-                        <li><strong>Discovery Phase:</strong> The engine maps your API using specific "Discoverer" modules to identify all available endpoints, HTTP methods, parameters, and authentication requirements.</li>
-                        <li><strong>Scanning Phase:</strong> A suite of specialized security scanners is launched against the discovered attack surface.</li>
+                        <li><strong>Discovery Phase:</strong> The engine maps your API using specific "Discoverer"
+                            modules to identify all available endpoints, HTTP methods, parameters, and authentication
+                            requirements.</li>
+                        <li><strong>Scanning Phase:</strong> A suite of specialized security scanners is launched
+                            against the discovered attack surface.</li>
                     </ol>
-                </p>
-            </div>
-        </div>
-
-        <!-- Section: Discovery Modules -->
-        <div class="col-12 mb-4">
-            <div class="glass-card">
-                <h3 class="mb-4 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-radar me-2 mb-1" viewBox="0 0 16 16">
-                      <path d="M6.634 1.135A7 7 0 0 1 15 8a.5.5 0 0 1-1 0 6 6 0 1 0-6.5 5.98v-1.005A5 5 0 1 1 13 8a.5.5 0 0 1-1 0 4 4 0 1 0-4.5 3.969v-1.011A2.999 2.999 0 1 1 11 8a.5.5 0 0 1-1 0 2 2 0 1 0-2.5 1.936v-1.07a1 1 0 1 1 1 0V15.5a.5.5 0 0 1-1 0v-.518a7 7 0 0 1-1.366-14.36l.462.883q.094-.047.19-.088l-.152-.288z"/>
-                    </svg>
-                    2. Discovery Modules
-                </h3>
-                <p>Before testing, Orthrus must understand what to test. Select the module that best fits your API:</p>
-                
-                <div class="table-responsive mt-3">
-                    <table class="table table-dark table-hover table-bordered" style="--bs-table-bg: transparent;">
-                        <thead>
-                            <tr>
-                                <th>Discoverer ID</th>
-                                <th>Target URL Format</th>
-                                <th>Description & Use Case</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><code>openapi</code></td>
-                                <td><code>https://api.example.com/v3/openapi.json</code></td>
-                                <td>
-                                    <strong>Use Case:</strong> You have a Swagger/OpenAPI definition.<br/>
-                                    Parses the JSON/YAML specification to perfectly map endpoints, required parameters, payloads, and authentication schemes. This is the most accurate discovery mode.
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><code>graphql</code></td>
-                                <td><code>https://api.example.com/graphql</code></td>
-                                <td>
-                                    <strong>Use Case:</strong> You have a GraphQL endpoint.<br/>
-                                    Utilizes the GraphQL introspection query to dump the entire schema, extracting all queries, mutations, object types, and input fields.
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><code>well-known</code></td>
-                                <td><code>https://api.example.com</code></td>
-                                <td>
-                                    <strong>Use Case:</strong> You want to find hidden files.<br/>
-                                    Scans the base URL for predictable paths like <code>/.well-known/</code>, <code>/swagger-ui.html</code>, <code>/.git/</code>, and administrative panels to uncover forgotten resources.
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><code>curl</code></td>
-                                <td><code>curl -X GET "https://api..."</code></td>
-                                <td>
-                                    <strong>Use Case:</strong> You want to test a single specific request.<br/>
-                                    Paste a raw cURL command copied from your browser's Developer Tools. Orthrus will parse the URL, method, headers, and body to test that exact endpoint.
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><code>blackbox</code></td>
-                                <td><code>https://api.example.com</code></td>
-                                <td>
-                                    <strong>Use Case:</strong> You have zero documentation.<br/>
-                                    Performs aggressive directory brute-forcing and parameter fuzzing to blindly map an undocumented API surface.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    </p>
                 </div>
             </div>
-        </div>
 
-        <!-- Section: How to Launch a Scan -->
-        <div class="col-12 mb-4">
-            <div class="glass-card">
-                <h3 class="mb-4 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-play-circle me-2 mb-1" viewBox="0 0 16 16">
-                      <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-                      <path d="M6.271 5.055a.5.5 0 0 1 .52.038l3.5 2.5a.5.5 0 0 1 0 .814l-3.5 2.5A.5.5 0 0 1 6 10.5v-5a.5.5 0 0 1 .271-.445"/>
-                    </svg>
-                    3. Launching a New Scan
-                </h3>
-                <p>Navigate to the <strong>New Scan</strong> page from the sidebar to start a security assessment.</p>
-                <ul class="list-group list-group-flush bg-transparent">
-                    <li class="list-group-item bg-transparent text-light border-secondary">
-                        <strong>Target URL:</strong> Provide the base URL or specification link depending on your chosen Discoverer (see table above).
-                    </li>
-                    <li class="list-group-item bg-transparent text-light border-secondary">
-                        <strong>Discovery Mode:</strong> Select the method Orthrus will use to map the API.
-                    </li>
+            <!-- Section: Discovery Modules -->
+            <div class="col-12 mb-4">
+                <div class="glass-card">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-radar me-2 mb-1" viewBox="0 0 16 16">
+                            <path
+                                d="M6.634 1.135A7 7 0 0 1 15 8a.5.5 0 0 1-1 0 6 6 0 1 0-6.5 5.98v-1.005A5 5 0 1 1 13 8a.5.5 0 0 1-1 0 4 4 0 1 0-4.5 3.969v-1.011A2.999 2.999 0 1 1 11 8a.5.5 0 0 1-1 0 2 2 0 1 0-2.5 1.936v-1.07a1 1 0 1 1 1 0V15.5a.5.5 0 0 1-1 0v-.518a7 7 0 0 1-1.366-14.36l.462.883q.094-.047.19-.088l-.152-.288z" />
+                        </svg>
+                        2. Discovery Modules
+                    </h3>
+                    <p>Before testing, Orthrus must understand what to test. Select the module that best fits your API:
+                    </p>
 
-                    <li class="list-group-item bg-transparent text-light border-secondary">
-                        <strong>Include Passed Tests:</strong> Check this box if you want the final report to include details about the security tests that were executed but did not result in a vulnerability. Highly recommended for compliance auditing.
-                    </li>
-                </ul>
-                
-                <h5 class="mt-4 text-light">Advanced Options</h5>
-                <p>The "Advanced Options" toggle reveals a set of powerful configuration settings for complex testing scenarios:</p>
-                <ul class="list-group list-group-flush bg-transparent">
-                    <li class="list-group-item bg-transparent text-light border-secondary">
-                        <strong>Authentication - Option A (Manual Tokens):</strong> Provide a `Primary Bearer Token` to inject into all standard requests. Optionally, provide a `Secondary Bearer Token` belonging to a different user profile: Orthrus will automatically perform Cross-User Broken Object Level Authorization (BOLA) tests by trying to access User A's resources using User B's token.
-                    </li>
-                    <li class="list-group-item bg-transparent text-light border-secondary">
-                        <strong>Authentication - Option B (Dynamic OAuth2):</strong> Instead of manually pasting tokens, you can configure the OAuth2 Token endpoint (`OAuth2 Token URL`), `Client ID`, `Client Secret`, and `Grant Type`. By providing a comma-separated list of `username:password` credentials, Orthrus will dynamically fetch tokens before starting the scan. <strong>Note:</strong> If Option B is configured successfully, it overrides the manual tokens from Option A.
-                    </li>
-                    <li class="list-group-item bg-transparent text-light border-secondary">
-                        <strong>Scanner Selection:</strong> You can explicitly check or uncheck which specific security scanners should run (e.g., skip XSS and Rate Limiting tests but keep SQLi). By default, all available scanners are checked and will be executed.
-                    </li>
-                </ul>
-
-                <div class="alert alert-warning mt-3 border-warning" style="background: rgba(255,193,7,0.1); color: #ffc107;">
-                    <strong>Warning:</strong> By default, all security scanners are executed (SQLi, XSS, Rate Limiting, Missing Headers, GraphQL Injection, SSL/TLS checks, etc.). This can generate a significant amount of traffic. Do not scan production environments without authorization.
-                </div>
-            </div>
-        </div>
-
-        <!-- Section: Results and Reporting -->
-        <div class="col-12 mb-4">
-            <div class="glass-card">
-                <h3 class="mb-4 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-file-earmark-pdf me-2 mb-1" viewBox="0 0 16 16">
-                      <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
-                      <path d="M4.603 14.087a.8.8 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.198-.307.526-.568.897-.787a7.7 7.7 0 0 1 1.482-.645 20 20 0 0 0 1.062-2.227 7.3 7.3 0 0 1-.43-1.295c-.086-.4-.119-.796-.046-1.136.075-.354.274-.672.65-.823.192-.077.4-.12.602-.077a.7.7 0 0 1 .477.365c.088.164.12.356.127.538.007.188-.012.396-.047.614-.084.51-.27 1.134-.52 1.794a11 11 0 0 0 .98 1.686 5.8 5.8 0 0 1 1.334.05c.364.066.734.195.96.465.12.144.193.32.2.518.007.192-.047.382-.138.563a1.04 1.04 0 0 1-.354.416.86.86 0 0 1-.51.138c-.331-.014-.654-.196-.933-.417a5.7 5.7 0 0 1-.911-.95 11.6 11.6 0 0 0-1.997.406 11.3 11.3 0 0 1-1.02 1.51c-.292.35-.609.656-.927.787a.8.8 0 0 1-.58.029m1.379-1.901q-.25.115-.459.246c-.328.205-.543.411-.597.59-.017.056-.02.11-.005.157.014.045.04.087.085.122a.5.5 0 0 0 .31.1c.15-.01.32-.083.52-.224.2-.14.4-.337.58-.57.17-.22.33-.46.46-.723zM8.22 8.441a10 10 0 0 1-1.08-1.942 5 5 0 0 0-.218-1.018c-.03-.13-.06-.26-.06-.39a.5.5 0 0 1 .1-.336.5.5 0 0 1 .24-.162c.11-.035.21-.01.29.04.09.06.14.15.17.26.04.16.03.35-.01.56a8 8 0 0 1-.51 1.989m2.28 1.594a6.5 6.5 0 0 0-.913-.092 6.5 6.5 0 0 0-.913.092c.31.31.62.61.91.91.29-.3.6-.6.91-.91m1.39 1.488c.08-.06.15-.12.21-.19.06-.07.1-.14.12-.22a.3.3 0 0 0-.02-.22.3.3 0 0 0-.14-.14c-.11-.05-.25-.03-.4.02-.15.05-.31.13-.48.24q.36.26.71.51"/>
-                    </svg>
-                    4. Results and Reporting
-                </h3>
-                <p>When a scan completes, the results are displayed in a comprehensive dashboard and saved to the in-memory database.</p>
-                <div class="row">
-                    <div class="col-md-6">
-                        <h5 class="text-light">The Grading System</h5>
-                        <p>Your API is automatically assigned a security grade based on the highest severity vulnerability found:</p>
-                        <ul>
-                            <li><span class="text-danger fw-bold">Grade F:</span> At least one CRITICAL vulnerability (e.g., SQLi, SSTI, Command Injection).</li>
-                            <li><span class="text-warning fw-bold" style="color: var(--grade-d) !important;">Grade D:</span> At least one HIGH vulnerability (e.g., Subdomain Takeover).</li>
-                            <li><span class="text-warning fw-bold">Grade C:</span> At least one MEDIUM vulnerability (e.g., Missing Rate Limiting).</li>
-                            <li><span class="text-info fw-bold" style="color: var(--grade-b) !important;">Grade B:</span> At least one LOW vulnerability (e.g., Missing Security Headers).</li>
-                            <li><span class="text-success fw-bold">Grade A:</span> No vulnerabilities found!</li>
-                        </ul>
+                    <div class="table-responsive mt-3">
+                        <table class="table table-dark table-hover table-bordered" style="--bs-table-bg: transparent;">
+                            <thead>
+                                <tr>
+                                    <th>Discoverer ID</th>
+                                    <th>Target URL Format</th>
+                                    <th>Description & Use Case</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>openapi</code></td>
+                                    <td><code>https://api.example.com/v3/openapi.json</code></td>
+                                    <td>
+                                        <strong>Use Case:</strong> You have a Swagger/OpenAPI definition.<br />
+                                        Parses the JSON/YAML specification to perfectly map endpoints, required
+                                        parameters, payloads, and authentication schemes. This is the most accurate
+                                        discovery mode.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>graphql</code></td>
+                                    <td><code>https://api.example.com/graphql</code></td>
+                                    <td>
+                                        <strong>Use Case:</strong> You have a GraphQL endpoint.<br />
+                                        Utilizes the GraphQL introspection query to dump the entire schema, extracting
+                                        all queries, mutations, object types, and input fields.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>well-known</code></td>
+                                    <td><code>https://api.example.com</code></td>
+                                    <td>
+                                        <strong>Use Case:</strong> You want to find hidden files.<br />
+                                        Scans the base URL for predictable paths like <code>/.well-known/</code>,
+                                        <code>/swagger-ui.html</code>, <code>/.git/</code>, and administrative panels to
+                                        uncover forgotten resources.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>curl</code></td>
+                                    <td><code>curl -X GET "https://api..."</code></td>
+                                    <td>
+                                        <strong>Use Case:</strong> You want to test a single specific request.<br />
+                                        Paste a raw cURL command copied from your browser's Developer Tools. Orthrus
+                                        will parse the URL, method, headers, and body to test that exact endpoint.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>blackbox</code></td>
+                                    <td><code>https://api.example.com</code></td>
+                                    <td>
+                                        <strong>Use Case:</strong> You have zero documentation.<br />
+                                        Performs aggressive directory brute-forcing and parameter fuzzing to blindly map
+                                        an undocumented API surface.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="col-md-6">
-                        <h5 class="text-light">PDF Export</h5>
-                        <p>
-                            From the <strong>Scan History</strong> page, you can export any scan result as a perfectly formatted PDF document.
-                        </p>
-                        <div class="alert alert-danger border-danger" style="background: rgba(220,53,69,0.1); color: #ff6b6b;">
-                            <strong>Confidentiality Notice:</strong> The generated PDF report contains sensitive information about your API vulnerabilities, including exact reproduction steps and endpoints. Its distribution is strictly restricted to authorized security personnel.
+                </div>
+            </div>
+
+            <!-- Section: How to Launch a Scan -->
+            <div class="col-12 mb-4">
+                <div class="glass-card">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-play-circle me-2 mb-1" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M6.271 5.055a.5.5 0 0 1 .52.038l3.5 2.5a.5.5 0 0 1 0 .814l-3.5 2.5A.5.5 0 0 1 6 10.5v-5a.5.5 0 0 1 .271-.445" />
+                        </svg>
+                        3. Launching a New Scan
+                    </h3>
+                    <p>Navigate to the <strong>New Scan</strong> page from the sidebar to start a security assessment.
+                    </p>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Target URL:</strong> Provide the base URL or specification link depending on your
+                            chosen Discoverer (see table above).
+                        </li>
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Discovery Mode:</strong> Select the method Orthrus will use to map the API.
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Include Passed Tests:</strong> Check this box if you want the final report to
+                            include details about the security tests that were executed but did not result in a
+                            vulnerability. Highly recommended for compliance auditing.
+                        </li>
+                    </ul>
+
+                    <h5 class="mt-4 text-light">Advanced Options</h5>
+                    <p>The "Advanced Options" toggle reveals a set of powerful configuration settings for complex
+                        testing scenarios:</p>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Authentication - Option A (Manual Tokens):</strong> Provide a `Primary Bearer Token`
+                            to inject into all standard requests. Optionally, provide a `Secondary Bearer Token`
+                            belonging to a different user profile: Orthrus will automatically perform Cross-User Broken
+                            Object Level Authorization (BOLA) tests by trying to access User A's resources using User
+                            B's token.
+                        </li>
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Authentication - Option B (Dynamic OAuth2):</strong> Instead of manually pasting
+                            tokens, you can configure the OAuth2 Token endpoint (`OAuth2 Token URL`), `Client ID`,
+                            `Client Secret`, and `Grant Type`. By providing a comma-separated list of
+                            `username:password` credentials, Orthrus will dynamically fetch tokens before starting the
+                            scan. <strong>Note:</strong> If Option B is configured successfully, it overrides the manual
+                            tokens from Option A.
+                        </li>
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Scanner Selection:</strong> You can explicitly check or uncheck which specific
+                            security scanners should run (e.g., skip XSS and Rate Limiting tests but keep SQLi). By
+                            default, all available scanners are checked and will be executed.
+                        </li>
+                    </ul>
+
+                    <div class="alert alert-warning mt-3 border-warning"
+                        style="background: rgba(255,193,7,0.1); color: #ffc107;">
+                        <strong>Warning:</strong> By default, all security scanners are executed (SQLi, XSS, Rate
+                        Limiting, Missing Headers, GraphQL Injection, SSL/TLS checks, etc.). This can generate a
+                        significant amount of traffic. Do not scan production environments without authorization.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: Results and Reporting -->
+            <div class="col-12 mb-4">
+                <div class="glass-card">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-file-earmark-pdf me-2 mb-1" viewBox="0 0 16 16">
+                            <path
+                                d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z" />
+                            <path
+                                d="M4.603 14.087a.8.8 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.198-.307.526-.568.897-.787a7.7 7.7 0 0 1 1.482-.645 20 20 0 0 0 1.062-2.227 7.3 7.3 0 0 1-.43-1.295c-.086-.4-.119-.796-.046-1.136.075-.354.274-.672.65-.823.192-.077.4-.12.602-.077a.7.7 0 0 1 .477.365c.088.164.12.356.127.538.007.188-.012.396-.047.614-.084.51-.27 1.134-.52 1.794a11 11 0 0 0 .98 1.686 5.8 5.8 0 0 1 1.334.05c.364.066.734.195.96.465.12.144.193.32.2.518.007.192-.047.382-.138.563a1.04 1.04 0 0 1-.354.416.86.86 0 0 1-.51.138c-.331-.014-.654-.196-.933-.417a5.7 5.7 0 0 1-.911-.95 11.6 11.6 0 0 0-1.997.406 11.3 11.3 0 0 1-1.02 1.51c-.292.35-.609.656-.927.787a.8.8 0 0 1-.58.029m1.379-1.901q-.25.115-.459.246c-.328.205-.543.411-.597.59-.017.056-.02.11-.005.157.014.045.04.087.085.122a.5.5 0 0 0 .31.1c.15-.01.32-.083.52-.224.2-.14.4-.337.58-.57.17-.22.33-.46.46-.723zM8.22 8.441a10 10 0 0 1-1.08-1.942 5 5 0 0 0-.218-1.018c-.03-.13-.06-.26-.06-.39a.5.5 0 0 1 .1-.336.5.5 0 0 1 .24-.162c.11-.035.21-.01.29.04.09.06.14.15.17.26.04.16.03.35-.01.56a8 8 0 0 1-.51 1.989m2.28 1.594a6.5 6.5 0 0 0-.913-.092 6.5 6.5 0 0 0-.913.092c.31.31.62.61.91.91.29-.3.6-.6.91-.91m1.39 1.488c.08-.06.15-.12.21-.19.06-.07.1-.14.12-.22a.3.3 0 0 0-.02-.22.3.3 0 0 0-.14-.14c-.11-.05-.25-.03-.4.02-.15.05-.31.13-.48.24q.36.26.71.51" />
+                        </svg>
+                        4. Results and Reporting
+                    </h3>
+                    <p>When a scan completes, the results are displayed in a comprehensive dashboard and saved to the
+                        in-memory database.</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="text-light">The Grading System</h5>
+                            <p>Your API is automatically assigned a security grade based on the highest severity
+                                vulnerability found:</p>
+                            <ul>
+                                <li><span class="text-danger fw-bold">Grade F:</span> At least one CRITICAL
+                                    vulnerability (e.g., SQLi, SSTI, Command Injection).</li>
+                                <li><span class="text-warning fw-bold" style="color: var(--grade-d) !important;">Grade
+                                        D:</span> At least one HIGH vulnerability (e.g., Subdomain Takeover).</li>
+                                <li><span class="text-warning fw-bold">Grade C:</span> At least one MEDIUM vulnerability
+                                    (e.g., Missing Rate Limiting).</li>
+                                <li><span class="text-info fw-bold" style="color: var(--grade-b) !important;">Grade
+                                        B:</span> At least one LOW vulnerability (e.g., Missing Security Headers).</li>
+                                <li><span class="text-success fw-bold">Grade A:</span> No vulnerabilities found!</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="text-light">PDF Export</h5>
+                            <p>
+                                From the <strong>Scan History</strong> page, you can export any scan result as a
+                                perfectly formatted PDF document.
+                            </p>
+                            <div class="alert alert-danger border-danger"
+                                style="background: rgba(220,53,69,0.1); color: #ff6b6b;">
+                                <strong>Confidentiality Notice:</strong> The generated PDF report contains sensitive
+                                information about your API vulnerabilities, including exact reproduction steps and
+                                endpoints. Its distribution is strictly restricted to authorized security personnel.
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Section: Why Orthrus? -->
-        <div class="col-12 mb-4">
-            <div class="glass-card border-primary" style="box-shadow: 0 0 15px rgba(110, 86, 207, 0.2);">
-                <h3 class="mb-4 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-book me-2 mb-1" viewBox="0 0 16 16">
-                      <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
-                    </svg>
-                    5. Why Orthrus?
-                </h3>
-                <p>
-                    In Greek mythology, <strong>Orthrus</strong> is a two-headed dog, brother to the famous three-headed Cerberus. While Cerberus guarded the underworld, Orthrus guarded the red cattle of Geryon.
-                </p>
-                <p>
-                    Like its mythological namesake, <strong>Orthrus DAST</strong> is a guardian with multiple capabilities—symbolized by its two distinct operational "heads":
-                </p>
-                <ul>
-                    <li><strong class="text-primary">Head 1: Discovery</strong> – Systematically mapping the API surface, understanding schemas, and finding hidden endpoints.</li>
-                    <li><strong class="text-danger">Head 2: Exploitation</strong> – Aggressively testing those discovered endpoints with our 34 specialized security scanners to uncover vulnerabilities before attackers do.</li>
-                </ul>
-                <p class="mb-0 text-muted fst-italic">
-                    "Two heads are better than one when it comes to API security."
-                </p>
-            </div>
-        </div>
 
-    </div>
-</main>
+            <!-- Section: Why Orthrus? -->
+            <div class="col-12 mb-4">
+                <div class="glass-card border-primary" style="box-shadow: 0 0 15px rgba(110, 86, 207, 0.2);">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-book me-2 mb-1" viewBox="0 0 16 16">
+                            <path
+                                d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783" />
+                        </svg>
+                        5. Why Orthrus?
+                    </h3>
+                    <p>
+                        In Greek mythology, <strong>Orthrus</strong> is a two-headed dog, brother to the famous
+                        three-headed Cerberus. While Cerberus guarded the underworld, Orthrus guarded the red cattle of
+                        Geryon.
+                    </p>
+                    <p>
+                        Like its mythological namesake, <strong>Orthrus DAST</strong> is a guardian with multiple
+                        capabilities—symbolized by its two distinct operational "heads":
+                    </p>
+                    <ul>
+                        <li><strong class="text-primary">Head 1: Discovery</strong> – Systematically mapping the API
+                            surface, understanding schemas, and finding hidden endpoints.</li>
+                        <li><strong class="text-danger">Head 2: Exploitation</strong> – Aggressively testing those
+                            discovered endpoints with our 35 specialized security scanners to uncover vulnerabilities
+                            before attackers do.</li>
+                    </ul>
+                    <p class="mb-0 text-muted fst-italic">
+                        "Two heads are better than one when it comes to API security."
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </main>
 </body>
+
 </html>

@@ -72,7 +72,7 @@ public class CsrfScanner implements SecurityScanner {
                         "Server accepted the request with Origin: https://malicious-website.com and no CSRF tokens.",
                         "Implement Anti-CSRF tokens (Synchronizer Token Pattern) for all state-changing endpoints if using Cookie authentication. Ensure cookies have the SameSite=Lax or Strict attribute.",
                         "Sent " + operation.method() + " request stripped of CSRF headers and injected Origin: https://malicious-website.com.",
-                        "Response status: " + response.statusCode()
+                        "Status: " + response.statusCode() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 );
                 return Flux.just(vuln);
             }

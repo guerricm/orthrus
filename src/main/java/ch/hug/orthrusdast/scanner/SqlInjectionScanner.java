@@ -68,8 +68,17 @@ public class SqlInjectionScanner implements SecurityScanner {
         
         return httpClient.send(testOp)
                 .flatMapMany(response -> {
-                    // Very simplistic detection based on common SQL error strings
-                    if (response.statusCode().is5xxServerError() || response.bodyContains("syntax error") || response.bodyContains("mysql_fetch")) {
+                    // Detection based on common SQL error strings to avoid false positives on generic 500 errors
+                    String bodyLower = response.body() != null ? response.body().toLowerCase() : "";
+                    boolean hasSqlError = bodyLower.contains("syntax error") ||
+                                          bodyLower.contains("mysql_fetch") ||
+                                          bodyLower.contains("you have an error in your sql syntax") ||
+                                          bodyLower.contains("ora-") ||
+                                          bodyLower.contains("postgresql") ||
+                                          bodyLower.contains("java.sql.sqlexception") ||
+                                          bodyLower.contains("sqlite/m");
+
+                    if (hasSqlError) {
                          Vulnerability vuln = Vulnerability.createWithDetails(
                             "Potential SQL Injection",
                             "The endpoint might be vulnerable to SQL Injection in parameter '" + paramName + "'.",

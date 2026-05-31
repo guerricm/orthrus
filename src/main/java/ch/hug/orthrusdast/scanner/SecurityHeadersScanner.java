@@ -65,7 +65,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                     "Header '" + headerName + "' is missing from the response.",
                     "Configure your web server or application framework to include the '" + headerName + "' header in all responses.",
                     "Sent standard " + operation.method() + " request.",
-                    "Headers received: " + response.headers().toString()
+                    "Status: " + response.statusCode() + "\nHeaders received: " + response.headers().toString() + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
             ));
         } else if ("Content-Security-Policy".equalsIgnoreCase(headerName)) {
             String cspValue = response.getHeader(headerName);
@@ -84,7 +84,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                         "CSP value contains unsafe directives: " + cspValue,
                         "Remove 'unsafe-inline' and 'unsafe-eval' from your CSP and use nonces or hashes instead.",
                         "Sent standard " + operation.method() + " request.",
-                        "CSP Header: " + cspValue
+                        "Status: " + response.statusCode() + "\nCSP Header: " + cspValue + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 ));
             }
         }
@@ -114,7 +114,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                         "Header '" + header + "' reveals: " + value,
                         "Configure your web server to remove or mask the '" + header + "' header.",
                         "Sent standard " + operation.method() + " request.",
-                        header + ": " + value
+                        "Status: " + response.statusCode() + "\n" + header + ": " + value + "\nBody snippet: " + (response.body() != null && response.body().length() > 200 ? response.body().substring(0, 200) + "..." : String.valueOf(response.body()))
                 ));
             }
         }

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - Endpoint Statistics')}">
+<body>
+<main>
+    <div class="row mb-4 mt-3">
+        <div class="col-12 text-center">
+            <h1 class="display-5 fw-bold" style="color: var(--primary-color);">Global Statistics Dashboard</h1>
+            <p class="lead text-muted">Comprehensive metrics across your scans and targets</p>
+        </div>
+    </div>
+
+    <!-- Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <div th:if="${endpointStats == null or endpointStats.isEmpty() or globalStats == null or globalStats.isEmpty()}" class="glass-card mb-4">
+        <div class="alert alert-info bg-transparent border-info text-light mb-0">
+            No scan history available to generate statistics.
+        </div>
+    </div>
+
+    <div th:if="${globalStats != null and !globalStats.isEmpty()}">
+        
+        <!-- Global Filters -->
+        <div class="glass-card mb-4">
+            <h5 class="mb-3">Global Filters</h5>
+            <div class="row align-items-center">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <label for="globalTargetSelect" class="form-label text-light">Select Target URL:</label>
+                    <select id="globalTargetSelect" class="form-select bg-dark text-light border-secondary">
+                        <option value="ALL">-- All Targets --</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check form-switch mt-md-4">
+                        <input class="form-check-input" type="checkbox" role="switch" id="allScansToggle">
+                        <label class="form-check-label text-light ms-2" for="allScansToggle">Include Historical Scans (Default: Only Last Scan)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Metrics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <div class="glass-card h-100 text-center d-flex flex-column justify-content-center">
+                    <h5 class="text-light">Total Scans Included</h5>
+                    <h2 class="display-4 fw-bold" style="color: var(--primary-color);" id="totalScansStat">-</h2>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="glass-card h-100 text-center d-flex flex-column justify-content-center">
+                    <h5 class="text-light">Total Vulnerabilities</h5>
+                    <h2 class="display-4 fw-bold text-danger" id="totalVulnsStat">-</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Charts -->
+        <div class="row mb-4">
+            <div class="col-md-5 mb-4 mb-md-0">
+                <div class="glass-card h-100">
+                    <h5 class="mb-3 text-center">Severity Distribution</h5>
+                    <div style="position: relative; height: 300px; width: 100%; display: flex; justify-content: center;">
+                        <canvas id="severityPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="glass-card h-100">
+                    <h5 class="mb-3 text-center">Top 10 CWEs</h5>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="cweBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evolution Chart (Endpoint Stats) -->
+        <div class="glass-card mb-4" id="evolutionCard">
+            <h5 class="mb-4">Vulnerability Evolution (Per Endpoint)</h5>
+            
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label for="evolutionTargetSelect" class="form-label text-light">Select Target URL for Evolution:</label>
+                    <select id="evolutionTargetSelect" class="form-select bg-dark text-light border-secondary">
+                        <option value="" disabled selected>-- Select a Target --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <label for="endpointSelect" class="form-label text-light">Select Endpoint for Evolution:</label>
+                    <select id="endpointSelect" class="form-select bg-dark text-light border-secondary">
+                        <option value="ALL">-- All Endpoints (Aggregated) --</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="chartContainer">
+                <canvas id="evolutionChart" width="400" height="150"></canvas>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+            /*<![CDATA[*/
+            const globalStats = /*[[${globalStats}]]*/ [];
+            const endpointStats = /*[[${endpointStats}]]*/ {};
+            
+            // UI Elements
+            const globalTargetSelect = document.getElementById('globalTargetSelect');
+            const allScansToggle = document.getElementById('allScansToggle');
+            const totalScansStat = document.getElementById('totalScansStat');
+            const totalVulnsStat = document.getElementById('totalVulnsStat');
+            const endpointSelect = document.getElementById('endpointSelect');
+            const evolutionCard = document.getElementById('evolutionCard');
+            
+            let pieChart = null;
+            let barChart = null;
+            let lineChart = null;
+
+            // Risk Colors
+            const riskColors = {
+                'CRITICAL': '#dc3545', // Red
+                'HIGH': '#fd7e14',     // Orange
+                'MEDIUM': '#ffc107',   // Yellow
+                'LOW': '#198754',      // Green
+                'INFO': '#0dcaf0'      // Cyan
+            };
+
+            // Pre-process Data: Populate Target Select
+            const uniqueTargets = [...new Set(globalStats.map(s => s.targetUrl))].sort();
+            uniqueTargets.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                globalTargetSelect.appendChild(opt);
+            });
+
+            function updateDashboard() {
+                const selectedTarget = globalTargetSelect.value;
+                const isAllScans = allScansToggle.checked;
+
+                // 1. Filter globalStats
+                let filteredScans = globalStats;
+                if (selectedTarget !== 'ALL') {
+                    filteredScans = filteredScans.filter(s => s.targetUrl === selectedTarget);
+                }
+
+                if (!isAllScans) {
+                    // Only keep the most recent scan for each target
+                    const latestScans = {};
+                    filteredScans.forEach(s => {
+                        if (!latestScans[s.targetUrl] || s.startTime > latestScans[s.targetUrl].startTime) {
+                            latestScans[s.targetUrl] = s;
+                        }
+                    });
+                    filteredScans = Object.values(latestScans);
+                }
+
+                // 2. Aggregate metrics
+                let totalScans = filteredScans.length;
+                let totalVulns = 0;
+                let riskCounts = { 'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0 };
+                let cweCounts = {};
+
+                filteredScans.forEach(s => {
+                    totalVulns += s.totalVulns;
+                    
+                    if (s.vulnsByRisk) {
+                        for (const [risk, count] of Object.entries(s.vulnsByRisk)) {
+                            if (riskCounts[risk] !== undefined) {
+                                riskCounts[risk] += count;
+                            } else {
+                                riskCounts[risk] = count;
+                            }
+                        }
+                    }
+
+                    if (s.vulnsByCwe) {
+                        for (const [cwe, count] of Object.entries(s.vulnsByCwe)) {
+                            cweCounts[cwe] = (cweCounts[cwe] || 0) + count;
+                        }
+                    }
+                });
+
+                totalScansStat.textContent = totalScans;
+                totalVulnsStat.textContent = totalVulns;
+
+                // 3. Draw Pie Chart
+                drawPieChart(riskCounts);
+
+                // 4. Draw Bar Chart
+                drawBarChart(cweCounts);
+
+            }
+
+            function drawPieChart(riskCounts) {
+                const labels = Object.keys(riskCounts);
+                const data = Object.values(riskCounts);
+                const bgColors = labels.map(l => riskColors[l] || '#6c757d');
+
+                const ctx = document.getElementById('severityPieChart').getContext('2d');
+                if (pieChart) pieChart.destroy();
+
+                // Do not draw empty chart if no data
+                if (data.every(v => v === 0)) {
+                    return;
+                }
+
+                pieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#e0e0e0' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function drawBarChart(cweCounts) {
+                // Sort by count descending, take top 10
+                const sortedCwe = Object.entries(cweCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10);
+
+                const labels = sortedCwe.map(item => item[0]);
+                const data = sortedCwe.map(item => item[1]);
+
+                const ctx = document.getElementById('cweBarChart').getContext('2d');
+                if (barChart) barChart.destroy();
+
+                barChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Vulnerabilities',
+                            data: data,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y', // Horizontal bar chart
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1, color: '#e0e0e0' },
+                                grid: { color: 'rgba(255,255,255,0.1)' }
+                            },
+                            y: {
+                                ticks: { color: '#e0e0e0' },
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            let currentEvolutionTarget = null;
+            function updateEvolutionDropdown(targetUrl) {
+                if (currentEvolutionTarget === targetUrl) return;
+                currentEvolutionTarget = targetUrl;
+
+                endpointSelect.innerHTML = '';
+                const optAll = document.createElement('option');
+                optAll.value = 'ALL';
+                optAll.textContent = '-- All Endpoints (Aggregated) --';
+                endpointSelect.appendChild(optAll);
+
+                if (endpointStats[targetUrl]) {
+                    const endpoints = Object.keys(endpointStats[targetUrl]).sort();
+                    endpoints.forEach(ep => {
+                        const opt = document.createElement('option');
+                        opt.value = ep;
+                        opt.textContent = ep;
+                        endpointSelect.appendChild(opt);
+                    });
+                }
+                endpointSelect.value = 'ALL';
+            }
+
+            function drawEvolutionChart(targetUrl, endpoint) {
+                if (!endpointStats[targetUrl]) return;
+                
+                // Extract scan IDs for this target
+                const allScanIdsSet = new Set();
+                for (const scanData of Object.values(endpointStats[targetUrl])) {
+                    for (const scanId of Object.keys(scanData)) {
+                        allScanIdsSet.add(scanId);
+                    }
+                }
+                const allScanIds = Array.from(allScanIdsSet).sort(); 
+                const chartLabels = allScanIds.map(id => id.substring(0, 8) + '...');
+                
+                const dataPoints = [];
+                
+                if (endpoint === 'ALL') {
+                    for (const scanId of allScanIds) {
+                        let sum = 0;
+                        for (const endpointData of Object.values(endpointStats[targetUrl])) {
+                            sum += (endpointData[scanId] || 0);
+                        }
+                        dataPoints.push(sum);
+                    }
+                } else {
+                    const scanData = endpointStats[targetUrl][endpoint];
+                    for (const scanId of allScanIds) {
+                        dataPoints.push(scanData[scanId] || 0);
+                    }
+                }
+
+                const ctx = document.getElementById('evolutionChart').getContext('2d');
+                if (lineChart) lineChart.destroy();
+
+                lineChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: endpoint === 'ALL' ? 'All Endpoints Evolution' : endpoint,
+                            data: dataPoints,
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#e0e0e0' }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1, color: '#e0e0e0' },
+                                grid: { color: 'rgba(255,255,255,0.1)' }
+                            },
+                            x: {
+                                ticks: { color: '#e0e0e0' },
+                                grid: { color: 'rgba(255,255,255,0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Event Listeners
+            globalTargetSelect.addEventListener('change', updateDashboard);
+            allScansToggle.addEventListener('change', updateDashboard);
+
+
+            
+            const evolutionTargetSelect = document.getElementById('evolutionTargetSelect');
+
+            uniqueTargets.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                evolutionTargetSelect.appendChild(opt);
+            });
+
+            evolutionTargetSelect.addEventListener('change', function(e) {
+                const targetUrl = e.target.value;
+                if (!targetUrl) return;
+                
+                endpointSelect.innerHTML = '';
+                const optAll = document.createElement('option');
+                optAll.value = 'ALL';
+                optAll.textContent = '-- All Endpoints (Aggregated) --';
+                endpointSelect.appendChild(optAll);
+
+                if (endpointStats[targetUrl]) {
+                    const endpoints = Object.keys(endpointStats[targetUrl]).sort();
+                    endpoints.forEach(ep => {
+                        const opt = document.createElement('option');
+                        opt.value = ep;
+                        opt.textContent = ep;
+                        endpointSelect.appendChild(opt);
+                    });
+                }
+                endpointSelect.value = 'ALL';
+                drawEvolutionChart(targetUrl, 'ALL');
+            });
+
+            endpointSelect.addEventListener('change', () => {
+                drawEvolutionChart(evolutionTargetSelect.value, endpointSelect.value);
+            });
+
+            // Initial render
+            updateDashboard();
+
+            /*]]>*/
+        </script>
+    </div>
+</main>
+</body>
+</html>
