@@ -82,9 +82,9 @@ public class OAuth2TokenFetcher {
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
                 .body(BodyInserters.fromFormData(formData))
                 .retrieve()
-                .bodyToMono(JsonNode.class)
+                .bodyToMono(java.util.Map.class)
                 .map(json -> {
-                    String token = json.path("access_token").asText();
+                    String token = (String) json.get("access_token");
                     if (token == null || token.isEmpty() || "null".equals(token)) {
                         throw new RuntimeException("No access_token found in response");
                     }

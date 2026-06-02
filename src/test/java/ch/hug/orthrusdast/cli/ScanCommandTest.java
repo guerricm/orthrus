@@ -1,0 +1,40 @@
+package ch.hug.orthrusdast.cli;
+
+import ch.hug.orthrusdast.auth.OAuth2TokenFetcher;
+import ch.hug.orthrusdast.engine.ScanService;
+import ch.hug.orthrusdast.report.ReportGenerator;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import reactor.core.publisher.Flux;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+class ScanCommandTest {
+
+    @Test
+    void testCallWithValidParameters() throws Exception {
+        ScanService scanService = Mockito.mock(ScanService.class);
+        when(scanService.executeScan(anyString(), any(), any(), any()))
+                .thenReturn(reactor.core.publisher.Mono.just(new ch.hug.orthrusdast.model.ScanResult("target", "openapi", java.time.Instant.now(), java.time.Instant.now(), 0, 0, List.of(), java.util.Map.of(), java.util.Map.of(), null, List.of())));
+
+        ReportGenerator mockGenerator = Mockito.mock(ReportGenerator.class);
+        when(mockGenerator.getFormat()).thenReturn("json");
+        when(mockGenerator.generateReport(any(), any())).thenReturn(reactor.core.publisher.Mono.empty());
+
+        OAuth2TokenFetcher mockFetcher = Mockito.mock(OAuth2TokenFetcher.class);
+
+        ScanCommand command = new ScanCommand(scanService, List.of(mockGenerator), mockFetcher);
+        
+        command.discovererId = "openapi";
+        command.target = "http://localhost:8080/v3/api-docs";
+        command.format = "json";
+        
+        Integer result = command.call();
+        assertEquals(0, result);
+    }
+}

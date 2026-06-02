@@ -113,10 +113,10 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
         String url = target.endsWith("/") ? target + "api/http/routers" : target + "/api/http/routers";
         return client.get().uri(url)
                 .retrieve()
-                .bodyToFlux(JsonNode.class)
+                .bodyToFlux(java.util.Map.class)
                 .map(node -> {
-                    String rule = node.path("rule").asText("");
-                    return extractPathFromTraefikRule(rule);
+                    String rule = (String) node.get("rule");
+                    return rule != null ? extractPathFromTraefikRule(rule) : "";
                 })
                 .filter(s -> !s.isEmpty())
                 .collectList();
@@ -140,8 +140,11 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
         String url = target.endsWith("/") ? target + "actuator/gateway/routes" : target + "/actuator/gateway/routes";
         return client.get().uri(url)
                 .retrieve()
-                .bodyToFlux(JsonNode.class)
-                .map(node -> node.path("predicate").asText(""))
+                .bodyToFlux(java.util.Map.class)
+                .map(node -> {
+                    Object predicateObj = node.get("predicate");
+                    return predicateObj != null ? predicateObj.toString() : "";
+                })
                 .map(predicate -> {
                     // E.g. Paths: [/api/**], match trailing slash: true
                     if (predicate.contains("Paths: [")) {
@@ -159,15 +162,17 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
         String url = target.endsWith("/") ? target + "routes" : target + "/routes";
         return client.get().uri(url)
                 .retrieve()
-                .bodyToMono(JsonNode.class)
+                .bodyToMono(java.util.Map.class)
                 .map(root -> {
                     List<String> paths = new ArrayList<>();
-                    JsonNode data = root.path("data");
-                    if (data.isArray()) {
-                        for (JsonNode route : data) {
-                            JsonNode pNode = route.path("paths");
-                            if (pNode.isArray() && pNode.size() > 0) {
-                                paths.add(pNode.get(0).asText());
+                    Object dataObj = root.get("data");
+                    if (dataObj instanceof List) {
+                        for (Object routeObj : (List<?>) dataObj) {
+                            if (routeObj instanceof java.util.Map) {
+                                Object pObj = ((java.util.Map<?, ?>) routeObj).get("paths");
+                                if (pObj instanceof List && !((List<?>) pObj).isEmpty()) {
+                                    paths.add(((List<?>) pObj).get(0).toString());
+                                }
                             }
                         }
                     }
@@ -188,19 +193,34 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
         return client.get().uri(url)
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
-                .bodyToMono(JsonNode.class)
+                .bodyToMono(java.util.Map.class)
                 .map(root -> {
                     List<String> paths = new ArrayList<>();
-                    JsonNode items = root.path("items");
-                    if (items.isArray()) {
-                        for (JsonNode item : items) {
-                            JsonNode rules = item.path("spec").path("rules");
-                            if (rules.isArray()) {
-                                for (JsonNode rule : rules) {
-                                    JsonNode httpPaths = rule.path("http").path("paths");
-                                    if (httpPaths.isArray()) {
-                                        for (JsonNode pathDef : httpPaths) {
-                                            paths.add(pathDef.path("path").asText(""));
+                    Object itemsObj = root.get("items");
+                    if (itemsObj instanceof List) {
+                        for (Object itemObj : (List<?>) itemsObj) {
+                            if (itemObj instanceof java.util.Map) {
+                                Object specObj = ((java.util.Map<?, ?>) itemObj).get("spec");
+                                if (specObj instanceof java.util.Map) {
+                                    Object rulesObj = ((java.util.Map<?, ?>) specObj).get("rules");
+                                    if (rulesObj instanceof List) {
+                                        for (Object ruleObj : (List<?>) rulesObj) {
+                                            if (ruleObj instanceof java.util.Map) {
+                                                Object httpObj = ((java.util.Map<?, ?>) ruleObj).get("http");
+                                                if (httpObj instanceof java.util.Map) {
+                                                    Object pathsObj = ((java.util.Map<?, ?>) httpObj).get("paths");
+                                                    if (pathsObj instanceof List) {
+                                                        for (Object pathItemObj : (List<?>) pathsObj) {
+                                                            if (pathItemObj instanceof java.util.Map) {
+                                                                Object p = ((java.util.Map<?, ?>) pathItemObj).get("path");
+                                                                if (p != null) {
+                                                                    paths.add(p.toString());
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

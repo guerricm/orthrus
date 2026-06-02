@@ -9,43 +9,46 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
 ## Features
 
 - **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
-- **35 Specialized Scanners**:
-  - `broken-auth`: Missing Authentication for Critical Functions
-  - `sqli`: SQL Injection in query parameters
-  - `jwt-none-alg`: JWT 'none' algorithm bypass
-  - `jwt-blank-secret`: JWT blank secret bypass
-  - `cors`: Overly permissive CORS origins
-  - `security-headers`: Missing critical security headers (HSTS, CSP, etc.)
-  - `cookie-security`: Missing Secure, HttpOnly, and SameSite attributes in cookies
-  - `rate-limiting`: Lack of rate limiting on sensitive endpoints
-  - `ssrf`: Server-Side Request Forgery via AWS metadata endpoints
-  - `xss`: Reflected Cross-Site Scripting via query params, JSON bodies, and headers
-  - `bola`: Broken Object Level Authorization (IDOR) via ID manipulation
-  - `cross-user-bola`: Advanced BOLA testing using a secondary user's token
-  - `method-tampering`: Exposure of unsafe HTTP methods like TRACE
-  - `path-traversal`: Directory Traversal for arbitrary file reads
-  - `cmd-injection`: OS Command Injection
-  - `open-redirect`: Unvalidated redirects
-  - `mass-assignment`: Broken Object Property Level Auth (Mass Assignment) via JSON payloads
-  - `nosql-injection`: MongoDB operator injection
-  - `verbose-error`: Leaks of stack traces or sensitive errors
-  - `bfla`: Broken Function Level Authorization via HTTP method replacement
-  - `content-type-spoofing`: XXE and parser errors via Content-Type manipulation
-  - `ssti`: Server-Side Template Injection via mathematical payloads
-  - `cleartext-transmission`: Detects unencrypted HTTP APIs
-  - `auth-bruteforce`: Brute force / weak password detection on authentication endpoints (uses SecLists top-100 dictionary)
-  - `graphql-introspection`: Detects if GraphQL introspection is enabled in production
-  - `graphql-injection`: Injects SQLi, XSS, and CmdInj payloads dynamically into GraphQL JSON variables
-  - `ssl-tls`: Scans SSL/TLS certificates for expiration, weak protocols, self-signed issues, and weak signature algorithms
-  - `insecure-deserialization`: Sends magic byte payloads for Java, Python, and JSON gadgets (CWE-502)
-  - `xxe-injection`: Injects malicious DTDs referencing external files like /etc/passwd (CWE-611)
-  - `file-upload`: Attempts to bypass validation by uploading EICAR signatures and malicious extensions (CWE-434)
-  - `graphql-dos`: Tests GraphQL endpoints for deeply nested queries triggering Resource Consumption DoS (CWE-770)
-  - `sensitive-query-params`: Detects sensitive information (passwords, tokens) exposed in URL query strings (CWE-598)
-  - `csrf-protection`: Checks state-changing endpoints for missing Anti-CSRF tokens (CWE-352)
-  - `request-smuggling`: Detects HTTP Request Smuggling vulnerabilities using malformed Transfer-Encoding headers (CWE-444)
-  - `code-injection`: Injects eval/code payloads (PHP, Python, Node.js) to detect arbitrary code execution (CWE-94)
-  - `schema-validation`: Enforces OpenAPI schema constraints (maxLength, required properties, data types) to detect Improper Input Validation (CWE-20)
+- **36 Specialized Scanners**:
+
+| Scanner ID | Description | CWE Associé |
+| --- | --- | --- |
+| `auth-bruteforce` | Brute force / weak password detection on authentication endpoints (uses SecLists top-100) | CWE-307 (Improper Restriction of Excessive Authentication Attempts) |
+| `bfla` | Broken Function Level Authorization via HTTP method replacement | CWE-285 (Improper Authorization) |
+| `bola` | Broken Object Level Authorization (IDOR) via ID manipulation | CWE-639 (Authorization Bypass Through User-Controlled Key) |
+| `broken-auth` | Missing Authentication for Critical Functions | CWE-306 (Missing Authentication for Critical Function) |
+| `cleartext-transmission` | Detects unencrypted HTTP APIs | CWE-319 (Cleartext Transmission of Sensitive Information) |
+| `cmd-injection` | OS Command Injection | CWE-78 (Improper Neutralization of Special Elements used in an OS Command) |
+| `code-injection` | Injects eval/code payloads (PHP, Python, Node.js) to detect arbitrary code execution | CWE-94 (Improper Control of Generation of Code ('Code Injection')) |
+| `content-type-spoofing` | XXE and parser errors via Content-Type manipulation | CWE-436 (Interpretation Conflict) / CWE-611 |
+| `cookie-security` | Missing Secure, HttpOnly, and SameSite attributes in cookies | CWE-614 (Sensitive Cookie in HTTPS Session Without 'Secure' Attribute) |
+| `cors` | Overly permissive CORS origins | CWE-942 (Permissive Cross-domain Policy with Untrusted Domains) |
+| `cross-user-bola` | Advanced BOLA testing using a secondary user's token | CWE-639 (Authorization Bypass Through User-Controlled Key) |
+| `csrf-protection` | Checks state-changing endpoints for missing Anti-CSRF tokens | CWE-352 (Cross-Site Request Forgery (CSRF)) |
+| `file-upload` | Attempts to bypass validation by uploading EICAR signatures and malicious extensions | CWE-434 (Unrestricted Upload of File with Dangerous Type) |
+| `graphql-dos` | Tests GraphQL endpoints for deeply nested queries triggering Resource Consumption DoS | CWE-770 (Allocation of Resources Without Limits or Throttling) |
+| `graphql-injection` | Injects SQLi, XSS, and CmdInj payloads dynamically into GraphQL JSON variables | CWE-74 (Improper Neutralization of Special Elements in Output Used by a Downstream Component) |
+| `graphql-introspection` | Detects if GraphQL introspection is enabled in production | CWE-200 (Exposure of Sensitive Information to an Unauthorized Actor) |
+| `insecure-deserialization` | Sends magic byte payloads for Java, Python, and JSON gadgets | CWE-502 (Deserialization of Untrusted Data) |
+| `jwt-blank-secret` | JWT blank secret bypass | CWE-310 (Cryptographic Issues) |
+| `jwt-none-alg` | JWT 'none' algorithm bypass | CWE-347 (Improper Verification of Cryptographic Signature) |
+| `mass-assignment` | Broken Object Property Level Auth (Mass Assignment) via JSON payloads | CWE-915 (Improperly Controlled Modification of Dynamically-Determined Object Attributes) |
+| `method-tampering` | Exposure of unsafe HTTP methods like TRACE | CWE-650 (Trusting HTTP Permission Methods on the Server Side) |
+| `nosql-injection` | MongoDB operator injection | CWE-943 (Improper Neutralization of Special Elements in Data Query Logic) |
+| `open-redirect` | Unvalidated redirects | CWE-601 (URL Redirection to Untrusted Site ('Open Redirect')) |
+| `path-traversal` | Directory Traversal for arbitrary file reads | CWE-22 (Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')) |
+| `rate-limiting` | Lack of rate limiting on sensitive endpoints | CWE-770 (Allocation of Resources Without Limits or Throttling) |
+| `request-smuggling` | Detects HTTP Request Smuggling vulnerabilities using malformed Transfer-Encoding headers | CWE-444 (Inconsistent Interpretation of HTTP Requests) |
+| `schema-validation` | Enforces OpenAPI schema constraints (maxLength, required properties, data types) | CWE-20 (Improper Input Validation) |
+| `security-headers` | Missing critical security headers (HSTS, CSP, etc.) | CWE-693 (Protection Mechanism Failure) |
+| `sensitive-query-params` | Detects sensitive information (passwords, tokens) exposed in URL query strings | CWE-598 (Use of GET Request Method With Sensitive Query Strings) |
+| `sqli` | SQL Injection in query parameters | CWE-89 (Improper Neutralization of Special Elements used in an SQL Command) |
+| `ssl-tls` | Scans SSL/TLS certificates for expiration, weak protocols, self-signed issues, and weak signature algorithms | CWE-295 (Improper Certificate Validation) |
+| `ssrf` | Server-Side Request Forgery via AWS metadata endpoints | CWE-918 (Server-Side Request Forgery (SSRF)) |
+| `ssti` | Server-Side Template Injection via mathematical payloads | CWE-1336 (Improper Neutralization of Special Elements Used in a Template Engine) |
+| `verbose-error` | Leaks of stack traces or sensitive errors | CWE-209 (Generation of Error Message Containing Sensitive Information) |
+| `xss` | Reflected Cross-Site Scripting via query params, JSON bodies, and headers | CWE-79 (Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')) |
+| `xxe-injection` | Injects malicious DTDs referencing external files like /etc/passwd | CWE-611 (Improper Restriction of XML External Entity Reference) |
 - **5 Discovery Modes**:
   - `openapi`: Parses OpenAPI v3 specifications (JSON/YAML)
   - `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.

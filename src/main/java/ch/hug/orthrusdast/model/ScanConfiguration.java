@@ -45,9 +45,12 @@ public record ScanConfiguration(
      * Check if a scanner ID should be executed given include/exclude rules.
      */
     public boolean shouldRunScanner(String scannerId) {
+        if (excludeScanners.contains(scannerId)) {
+            return false;
+        }
         if (!includeScanners.isEmpty()) {
             return includeScanners.contains(scannerId);
         }
-        return !excludeScanners.contains(scannerId);
+        return true;
     }
 }
