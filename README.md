@@ -11,7 +11,7 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
 - **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
 - **36 Specialized Scanners**:
 
-| Scanner ID | Description | CWE Associé |
+| Scanner ID | Description | Associated CWE |
 | --- | --- | --- |
 | `auth-bruteforce` | Brute force / weak password detection on authentication endpoints (uses SecLists top-100) | CWE-307 (Improper Restriction of Excessive Authentication Attempts) |
 | `bfla` | Broken Function Level Authorization via HTTP method replacement | CWE-285 (Improper Authorization) |
