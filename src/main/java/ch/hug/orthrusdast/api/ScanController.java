@@ -4,6 +4,7 @@ import ch.hug.orthrusdast.engine.ScanService;
 import ch.hug.orthrusdast.model.OAuth2Config;
 import ch.hug.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.hug.orthrusdast.model.ScanConfiguration;
+import ch.hug.orthrusdast.model.GatewayType;
 import ch.hug.orthrusdast.model.ScanResult;
 import ch.hug.orthrusdast.model.SecurityScheme;
 import org.springframework.http.HttpStatus;
@@ -70,7 +71,10 @@ public class ScanController {
                             authScheme,
                             secondaryAuthScheme,
                             request.language() != null ? request.language() : "en",
-                            Boolean.TRUE.equals(request.includePassed())
+                            request.includePassed() != null ? request.includePassed() : false,
+                            GatewayType.AUTO,
+                            null,
+                            null
                     );
 
                     return scanService.executeScan(request.discovererId(), request.target(), request.overrideHost(), config);

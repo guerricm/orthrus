@@ -35,7 +35,8 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, SecurityScheme authScheme) {
+    public Mono<List<Operation>> discover(String target, String overrideHost, ch.hug.orthrusdast.model.ScanConfiguration config) {
+        ch.hug.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Starting GraphQL discovery on {}", target);
 
         Operation introspectionOp = new Operation(

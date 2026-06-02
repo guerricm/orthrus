@@ -47,11 +47,29 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
   - `code-injection`: Injects eval/code payloads (PHP, Python, Node.js) to detect arbitrary code execution (CWE-94)
   - `schema-validation`: Enforces OpenAPI schema constraints (maxLength, required properties, data types) to detect Improper Input Validation (CWE-20)
 - **5 Discovery Modes**:
-  - `openapi`: Automatically extracts routes and generates mock payloads from an OpenAPI v3 specification.
+  - `openapi`: Parses OpenAPI v3 specifications (JSON/YAML)
   - `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.
-  - `blackbox`: Crawls HTML pages and forms up to a configurable depth.
-  - `well-known`: Probes common unprotected paths (`/actuator`, `/.env`, etc.).
-  - `curl`: Directly scans a single specified URL.
+  - `blackbox`: Crawls and fuzzes a target URL to discover endpoints dynamically
+  - `gateway`: Connects to API Gateways (Traefik, Kong, Spring Cloud, HAProxy, K8s) to extract routing rules dynamically
+  - `curl`: Reads cURL commands from a file
+  - `well-known`: Scans for standard sensitive files (e.g. `/.env`, `/.git/config`)
+
+### Gateway Mode Details
+The `gateway` mode is an incredibly powerful feature for DevSecOps. It probes the Gateway's Admin API to read its actual routing tables (e.g. `PathPrefix('/api')`), and automatically fuzzes the underlying routes.
+
+**Supported Gateways:**
+- Traefik (`/api/http/routers`)
+- Spring Cloud Gateway (`/actuator/gateway/routes`)
+- Kong API Gateway (`/routes`)
+- HAProxy (`/v2/services/haproxy/configuration/acls`)
+- Kubernetes Ingress (`/apis/networking.k8s.io/v1/ingresses`)
+
+**Gateway Flags:**
+- `--gateway-type`: `auto` (default), `traefik`, `spring-cloud-gateway`, `kong`, `haproxy`, `k8s`.
+- `--app-url`: If the Admin API (e.g., port 8080) is on a different port than the public app (e.g., port 80), specify the public URL to attack with `--app-url=http://myapp.com`.
+- `--k8s-token`: Provide your Kubernetes ServiceAccount token for K8s discovery (or use the `K8S_TOKEN` environment variable). Note: K8s is not auto-detected for security reasons, it must be explicitly specified with `--gateway-type=k8s`.
+
+### Authentication
 - **Reporting**: JSON, SARIF (for GitHub Advanced Security), HTML, PDF, and Console formats.
 - **API & CLI**: Run as a command-line tool or as a long-running REST API service.
 

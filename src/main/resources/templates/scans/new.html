@@ -25,7 +25,35 @@
                             </select>
                         </div>
                         
-
+                        <!-- Gateway specific options -->
+                        <div class="col-md-12" id="gateway-options" style="display: none;">
+                            <div class="card card-body bg-transparent border-secondary text-light mt-2">
+                                <h5 class="mb-3 text-primary">Gateway Configuration</h5>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="gatewayType" class="form-label">Gateway Type</label>
+                                        <select class="form-select" id="gatewayType" name="gatewayType">
+                                            <option value="auto">Auto-Detect</option>
+                                            <option value="traefik">Traefik</option>
+                                            <option value="spring-cloud-gateway">Spring Cloud Gateway</option>
+                                            <option value="kong">Kong API Gateway</option>
+                                            <option value="haproxy">HAProxy</option>
+                                            <option value="k8s">Kubernetes Ingress</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label for="appUrl" class="form-label">Public App URL (Optional)</label>
+                                        <input type="url" class="form-control" id="appUrl" name="appUrl" placeholder="https://public-api.example.com">
+                                        <div class="form-text text-muted">Use if the Admin API port differs from the public App port.</div>
+                                    </div>
+                                    <div class="col-md-12" id="k8s-token-container" style="display: none;">
+                                        <label for="k8sToken" class="form-label">Kubernetes ServiceAccount Token</label>
+                                        <input type="password" class="form-control" id="k8sToken" name="k8sToken" placeholder="ey...">
+                                        <div class="form-text text-warning">Required for Kubernetes Ingress discovery (unless K8S_TOKEN env var is set).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="col-md-12">
                             <div class="form-check form-switch mt-3 mb-2 ps-5">
@@ -148,6 +176,34 @@
             <!-- Results will be injected here by HTMX -->
         </div>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const discovererSelect = document.getElementById('discovererId');
+            const gatewayOptions = document.getElementById('gateway-options');
+            const gatewayTypeSelect = document.getElementById('gatewayType');
+            const k8sTokenContainer = document.getElementById('k8s-token-container');
+
+            function updateVisibility() {
+                if (discovererSelect.value === 'gateway') {
+                    gatewayOptions.style.display = 'block';
+                    if (gatewayTypeSelect.value === 'k8s') {
+                        k8sTokenContainer.style.display = 'block';
+                    } else {
+                        k8sTokenContainer.style.display = 'none';
+                    }
+                } else {
+                    gatewayOptions.style.display = 'none';
+                }
+            }
+
+            discovererSelect.addEventListener('change', updateVisibility);
+            gatewayTypeSelect.addEventListener('change', updateVisibility);
+            
+            // Initial call
+            updateVisibility();
+        });
+    </script>
 </main>
 </body>
 </html>

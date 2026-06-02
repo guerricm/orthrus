@@ -32,7 +32,8 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, SecurityScheme authScheme) {
+    public Mono<List<Operation>> discover(String target, String overrideHost, ch.hug.orthrusdast.model.ScanConfiguration config) {
+        ch.hug.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Parsing OpenAPI spec from: {}", target);
         
         // Parsing OpenAPI can be blocking, so we wrap it in Mono.fromCallable and subscribe on bounded elastic

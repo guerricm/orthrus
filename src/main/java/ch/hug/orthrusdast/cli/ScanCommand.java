@@ -4,6 +4,7 @@ import ch.hug.orthrusdast.engine.ScanService;
 import ch.hug.orthrusdast.model.ScanConfiguration;
 import ch.hug.orthrusdast.model.ScanResult;
 import ch.hug.orthrusdast.model.SecurityScheme;
+import ch.hug.orthrusdast.model.GatewayType;
 import ch.hug.orthrusdast.report.ReportGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +41,7 @@ public class ScanCommand implements Callable<Integer> {
         this.tokenFetcher = tokenFetcher;
     }
 
-    @Option(names = {"-d", "--discoverer"}, description = "Discoverer to use (openapi, blackbox, curl, well-known)", required = true)
+    @Option(names = {"-d", "--discoverer"}, description = "Discoverer to use (openapi, blackbox, curl, well-known, gateway)", required = true)
     String discovererId;
 
     @Option(names = {"-t", "--target"}, description = "Target URL or Spec path", required = true)
@@ -91,6 +92,15 @@ public class ScanCommand implements Callable<Integer> {
     @Option(names = {"-c", "--concurrency"}, description = "Number of concurrent threads for scanning (default: 10)", defaultValue = "10")
     int concurrency;
 
+    @Option(names = {"--gateway-type"}, description = "Gateway type: auto, traefik, kong, spring-cloud-gateway, k8s", defaultValue = "auto")
+    String gatewayType;
+
+    @Option(names = {"--app-url"}, description = "Public Application URL for Gateway Discovery (e.g. http://myapp.com)")
+    String appUrl;
+
+    @Option(names = {"--k8s-token"}, description = "Kubernetes ServiceAccount Token (or set K8S_TOKEN env var)")
+    String k8sToken;
+
     @Override
     public Integer call() throws Exception {
         log.info("Starting CLI scan. Discoverer: {}, Target: {}", discovererId, target);
@@ -135,7 +145,10 @@ public class ScanCommand implements Callable<Integer> {
                 authScheme,
                 secondaryAuthScheme,
                 language,
-                includePassed
+                includePassed,
+                GatewayType.fromString(gatewayType),
+                appUrl,
+                k8sToken
         );
 
         try {

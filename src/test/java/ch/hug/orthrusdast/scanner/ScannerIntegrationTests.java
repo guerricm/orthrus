@@ -3,6 +3,7 @@ package ch.hug.orthrusdast.scanner;
 import ch.hug.orthrusdast.http.ScanHttpClient;
 import ch.hug.orthrusdast.model.Operation;
 import ch.hug.orthrusdast.model.ScanConfiguration;
+import ch.hug.orthrusdast.model.GatewayType;
 import ch.hug.orthrusdast.model.SecurityScheme;
 import ch.hug.orthrusdast.model.Vulnerability;
 import okhttp3.mockwebserver.Dispatcher;
@@ -135,7 +136,7 @@ class ScannerIntegrationTests {
 
         SecurityScheme userA = SecurityScheme.bearer("TOKEN_A");
         SecurityScheme userB = SecurityScheme.bearer("TOKEN_B");
-        ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false, "json", userA, userB, "en", false);
+        ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false, "json", userA, userB, "en", false, GatewayType.AUTO, null, null);
 
         Operation op = new Operation(baseUrl + "/invoices/123", "GET", Map.<String, String>of(), Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);
 

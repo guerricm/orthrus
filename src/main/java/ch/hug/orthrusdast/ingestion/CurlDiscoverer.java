@@ -23,7 +23,8 @@ public class CurlDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, SecurityScheme authScheme) {
+    public Mono<List<Operation>> discover(String target, String overrideHost, ch.hug.orthrusdast.model.ScanConfiguration config) {
+        ch.hug.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Registering single target for curl-like scan: {}", target);
         
         // Assume GET if not otherwise specified. Advanced curl-like usage (setting method/headers) 

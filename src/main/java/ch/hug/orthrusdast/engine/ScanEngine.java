@@ -58,7 +58,7 @@ public class ScanEngine {
 
         // Thread-safe accumulators for stats
         Map<RiskLevel, Long> riskSummary = new ConcurrentHashMap<>();
-        return discoverer.discover(targetUrl, overrideHost, config.authScheme())
+        return discoverer.discover(targetUrl, overrideHost, config)
                 .flatMap(operations -> {
                     if (operations.isEmpty()) {
                         log.error("No operations discovered. Scan cannot proceed.");

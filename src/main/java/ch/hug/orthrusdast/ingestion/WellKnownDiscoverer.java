@@ -48,7 +48,8 @@ public class WellKnownDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String targetUrl, String overrideHost, SecurityScheme authScheme) {
+    public Mono<List<Operation>> discover(String targetUrl, String overrideHost, ch.hug.orthrusdast.model.ScanConfiguration config) {
+        ch.hug.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Starting well-known path discovery for base URL: {}", targetUrl);
         
         String baseUrl = targetUrl.endsWith("/") ? targetUrl.substring(0, targetUrl.length() - 1) : targetUrl;

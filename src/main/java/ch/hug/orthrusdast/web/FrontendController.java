@@ -4,6 +4,7 @@ import ch.hug.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.hug.orthrusdast.model.OAuth2Config;
 import ch.hug.orthrusdast.engine.ScanService;
 import ch.hug.orthrusdast.model.ScanConfiguration;
+import ch.hug.orthrusdast.model.GatewayType;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import ch.hug.orthrusdast.model.ScanResult;
@@ -140,6 +141,10 @@ public class FrontendController {
             String bearerTokenSecondary = formData.getFirst("bearerTokenSecondary");
             boolean includePassed = "true".equals(formData.getFirst("includePassed"));
 
+            String gatewayType = formData.getFirst("gatewayType");
+            String appUrl = formData.getFirst("appUrl");
+            String k8sToken = formData.getFirst("k8sToken");
+
             List<String> rawIncludeScanners = formData.get("includeScanners");
             final List<String> includeScanners = (rawIncludeScanners == null) ? List.of() : rawIncludeScanners;
             final List<String> excludeScanners = List.of();
@@ -186,7 +191,7 @@ public class FrontendController {
                         }
 
                         ScanConfiguration config = new ScanConfiguration(
-                                includeScanners, excludeScanners, concurrency, 5000, 10000, false, "html", authScheme, secondaryAuthScheme, "en", includePassed
+                                includeScanners, excludeScanners, concurrency, 5000, 10000, false, "html", authScheme, secondaryAuthScheme, "en", includePassed, GatewayType.fromString(gatewayType), appUrl, k8sToken
                         );
 
                         return scanService.executeScan(discovererId, target, null, config);

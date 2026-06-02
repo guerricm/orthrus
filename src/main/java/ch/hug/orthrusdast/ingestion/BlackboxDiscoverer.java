@@ -42,7 +42,8 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, SecurityScheme authScheme) {
+    public Mono<List<Operation>> discover(String target, String overrideHost, ch.hug.orthrusdast.model.ScanConfiguration config) {
+        ch.hug.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Starting black-box discovery from: {} (Max Depth: {})", target, maxDepth);
         
         return Mono.fromCallable(() -> {

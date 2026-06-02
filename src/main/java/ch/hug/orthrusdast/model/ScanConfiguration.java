@@ -16,7 +16,10 @@ public record ScanConfiguration(
         SecurityScheme authScheme,
         SecurityScheme secondaryAuthScheme,
         String language,
-        boolean includePassed
+        boolean includePassed,
+        GatewayType gatewayType,
+        String appUrl,
+        String k8sToken
 ) {
 
     public static ScanConfiguration defaults() {
@@ -31,7 +34,10 @@ public record ScanConfiguration(
                 null,
                 null,
                 "en",
-                false
+                false,
+                GatewayType.AUTO,
+                null,
+                null
         );
     }
 
