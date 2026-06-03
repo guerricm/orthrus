@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+    th:replace="~{fragments/layout :: layout(~{::div.container-fluid}, 'System - Orthrus DAST')}">
+
+<body>
+
+    <div class="container-fluid py-4 animate-fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>System Overview</h2>
+            <span class="badge bg-primary" th:text="${slaves.size()} + ' Slaves Registered'"></span>
+        </div>
+
+        <!-- Slaves Section -->
+        <h4 class="mb-3 text-light">Registered Slave Nodes</h4>
+        <div class="glass-card mb-5" style="padding: 0; overflow: hidden;">
+            <div class="table-responsive">
+                <table class="table table-hover table-dark align-top mb-0" style="background: transparent;">
+                    <thead class="text-muted">
+                        <tr>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Slave ID</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">URL</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Status</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Capacity</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">State</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                            <tr th:each="slave : ${slaves}">
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;"><code th:text="${slave.id}"></code></td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;" th:text="${slave.url}"></td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;">
+                                    <span class="badge bg-success"
+                                        th:if="${slave.status != null and slave.status.name() == 'IDLE'}">🟢 IDLE</span>
+                                    <span class="badge bg-warning text-dark"
+                                        th:if="${slave.status != null and slave.status.name() == 'BUSY'}">⚙️ BUSY</span>
+                                    <span class="badge bg-danger"
+                                        th:if="${slave.status != null and slave.status.name() == 'OFFLINE'}">🔴
+                                        OFFLINE</span>
+                                </td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-secondary" th:text="${activeJobsCount.get(slave.id) + ' / ' + slave.maxConcurrentScans}"></span>
+                                        <form th:action="@{'/system/slaves/' + ${slave.id} + '/concurrency'}" method="post" class="d-inline m-0 p-0">
+                                            <input type="hidden" name="maxConcurrentScans" th:value="${slave.maxConcurrentScans - 1}">
+                                            <button type="submit" class="btn btn-sm btn-outline-light py-0 px-2" th:disabled="${slave.maxConcurrentScans <= 0}">-</button>
+                                        </form>
+                                        <form th:action="@{'/system/slaves/' + ${slave.id} + '/concurrency'}" method="post" class="d-inline m-0 p-0">
+                                            <input type="hidden" name="maxConcurrentScans" th:value="${slave.maxConcurrentScans + 1}">
+                                            <button type="submit" class="btn btn-sm btn-outline-light py-0 px-2">+</button>
+                                        </form>
+                                    </div>
+                                </td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;">
+                                    <form th:action="@{'/system/slaves/' + ${slave.id} + '/toggle-active'}" method="post" class="m-0 p-0">
+                                        <button type="submit" th:class="'btn btn-sm ' + (${slave.isActive} ? 'btn-success' : 'btn-outline-danger')">
+                                            <i th:class="'bi ' + (${slave.isActive} ? 'bi-toggle-on' : 'bi-toggle-off')"></i>
+                                            <span th:text="${slave.isActive} ? 'Active' : 'Inactive'"></span>
+                                        </button>
+                                    </form>
+                                </td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;" th:text="${#temporals.format(slave.lastSeenAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                            </tr>
+                            <tr th:if="${slaves.isEmpty()}">
+                                <td colspan="6" class="text-center text-muted py-4 bg-transparent border-secondary" style="padding: 1rem;">No slaves are currently registered.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        <!-- Jobs Section -->
+        <h4 class="mb-3 text-light mt-5">Scan Job Queue</h4>
+        <div class="glass-card mb-5" style="padding: 0; overflow: hidden;">
+            <div class="table-responsive">
+                <table class="table table-hover table-dark align-top mb-0" style="background: transparent;">
+                    <thead class="text-muted">
+                        <tr>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Job ID</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Target</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Discoverer</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Status</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Slave</th>
+                            <th class="bg-transparent border-secondary" style="padding: 1rem;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                            <tr th:each="job : ${jobs}">
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;" th:text="${job.id}"></td>
+                                <td class="bg-transparent border-secondary text-truncate" style="padding: 1rem; max-width: 250px;" th:title="${job.target}"
+                                    th:text="${job.target}"></td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;" th:text="${job.discovererId}"></td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;">
+                                    <span class="badge bg-secondary"
+                                        th:if="${job.status != null and job.status.name() == 'PENDING'}">⏳
+                                        PENDING</span>
+                                    <span class="badge bg-primary"
+                                        th:if="${job.status != null and job.status.name() == 'RUNNING'}">⚙️
+                                        RUNNING</span>
+                                    <span class="badge bg-success"
+                                        th:if="${job.status != null and job.status.name() == 'COMPLETED'}">✅
+                                        COMPLETED</span>
+                                    <span class="badge bg-danger"
+                                        th:if="${job.status != null and job.status.name() == 'FAILED'}">❌ FAILED</span>
+                                </td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;">
+                                    <span th:if="${job.assignedSlaveId != null}"
+                                        th:text="${#strings.length(job.assignedSlaveId) > 8 ? #strings.substring(job.assignedSlaveId, 0, 8) + '...' : job.assignedSlaveId}"></span>
+                                    <span th:if="${job.assignedSlaveId == null}" class="text-muted">-</span>
+                                </td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;">
+                                    <a th:if="${job.resultId != null}"
+                                        th:href="@{'/web/scans/' + ${job.resultId} + '/pdf'}"
+                                        class="btn btn-sm btn-outline-primary" target="_blank" title="Download PDF Report">PDF</a>
+                                        
+                                    <form th:if="${job.status != null and (job.status.name() == 'FAILED' or job.status.name() == 'COMPLETED' or job.status.name() == 'RUNNING')}"
+                                          th:action="@{'/system/jobs/' + ${job.id} + '/restart'}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Restart Scan Job"><i class="bi bi-arrow-clockwise"></i> Restart</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr th:if="${jobs.isEmpty()}">
+                                <td colspan="6" class="text-center text-muted py-4 bg-transparent border-secondary" style="padding: 1rem;">No jobs in queue.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

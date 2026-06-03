@@ -1,0 +1,33 @@
+event:PENDING
+data:{"jobId":290,"status":"PENDING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan queued — waiting for an available slave node…"}
+
+event:RUNNING
+data:{"jobId":290,"status":"RUNNING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan dispatched to slave — running…"}
+
+event:COMPLETED
+data:{"jobId":290,"status":"COMPLETED","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":"d01fd808-2434-4803-877d-950d694016dc","pdfUrl":"/web/scans/d01fd808-2434-4803-877d-950d694016dc/pdf","grade":"F","totalVulns":121,"operationsScanned":19,"message":"Scan completed!"}
+
+event:PENDING
+data:{"jobId":291,"status":"PENDING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan queued — waiting for an available slave node…"}
+
+event:RUNNING
+data:{"jobId":291,"status":"RUNNING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan dispatched to slave — running…"}
+
+event:COMPLETED
+data:{"jobId":291,"status":"COMPLETED","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":"401af22c-7f72-49a2-b155-fbd057936e59","pdfUrl":"/web/scans/401af22c-7f72-49a2-b155-fbd057936e59/pdf","grade":"F","totalVulns":120,"operationsScanned":19,"message":"Scan completed!"}
+
+event:PENDING
+data:{"jobId":292,"status":"PENDING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan queued — waiting for an available slave node…"}
+
+event:RUNNING
+data:{"jobId":292,"status":"RUNNING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan dispatched to slave — running…"}
+
+event:COMPLETED
+data:{"jobId":292,"status":"COMPLETED","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":"552f772e-2057-40fb-b349-11dc934d2950","pdfUrl":"/web/scans/552f772e-2057-40fb-b349-11dc934d2950/pdf","grade":"F","totalVulns":121,"operationsScanned":19,"message":"Scan completed!"}
+
+event:PENDING
+data:{"jobId":293,"status":"PENDING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan queued — waiting for an available slave node…"}
+
+event:RUNNING
+data:{"jobId":293,"status":"RUNNING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan dispatched to slave — running…"}
+

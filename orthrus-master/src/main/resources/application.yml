@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+orthrus:
+  master:
+    url: http://localhost:8080
+    internal-token: "change-me-in-production"
+    slave-timeout-seconds: 30
+  slave:
+    advertised-url: http://not-used
+
+spring:
+  r2dbc:
+    url: r2dbc:h2:file:///./orthrus_db/data;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  main:
+    web-application-type: reactive

@@ -1,0 +1,68 @@
+<div class="glass-card fade-in" id="scan-tracker-294">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+        <div>
+            <h3 class="mb-0" id="scan-status-title">
+                <span class="spinner-border spinner-border-sm text-primary me-2" role="status"></span>
+                Scan Queued
+            </h3>
+            <p class="text-muted mb-0 mt-2">
+                <strong>Target:</strong> <span class="text-light">https://petstore3.swagger.io/api/v3/openapi.json</span><br>
+                <strong>Discoverer:</strong> <span class="text-light">openapi</span><br>
+                <strong>Launched At:</strong> <span class="text-light">2026-06-03 07:53:02</span><br>
+                <strong>Job ID:</strong> <span class="text-light">294</span>
+            </p>
+        </div>
+        <div id="scan-actions" style="display: none;">
+            <!-- PDF button will appear here once completed -->
+        </div>
+    </div>
+
+    <!-- Progress Timeline -->
+    <div id="scan-timeline" class="mb-4">
+        <div class="d-flex align-items-center mb-3">
+            <div class="scan-step active" id="step-pending">
+                <div class="scan-step-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
+                    </svg>
+                </div>
+                <span class="ms-2">Queued</span>
+            </div>
+            <div class="scan-step-line"></div>
+            <div class="scan-step" id="step-running">
+                <div class="scan-step-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/>
+                        <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/>
+                    </svg>
+                </div>
+                <span class="ms-2">Running</span>
+            </div>
+            <div class="scan-step-line"></div>
+            <div class="scan-step" id="step-completed">
+                <div class="scan-step-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M10.067.87a2.89 2.89 0 0 0-4.134 0l-.622.638-.89-.011a2.89 2.89 0 0 0-2.924 2.924l.01.89-.636.622a2.89 2.89 0 0 0 0 4.134l.637.622-.011.89a2.89 2.89 0 0 0 2.924 2.924l.89-.01.622.636a2.89 2.89 0 0 0 4.134 0l.622-.637.89.011a2.89 2.89 0 0 0 2.924-2.924l-.01-.89.636-.622a2.89 2.89 0 0 0 0-4.134l-.637-.622.011-.89a2.89 2.89 0 0 0-2.924-2.924l-.89.01zm.287 5.984-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 8.793l2.646-2.647a.5.5 0 0 1 .708.708"/>
+                    </svg>
+                </div>
+                <span class="ms-2">Completed</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Message -->
+    <div id="scan-message" class="text-center py-4">
+        <div class="custom-spinner mb-3" id="scan-spinner"></div>
+        <p class="text-muted fs-5" id="scan-message-text">
+            Scan queued — waiting for an available slave node…
+        </p>
+    </div>
+
+    <!-- Results (hidden until completed) -->
+    <div id="scan-results" style="display: none;">
+        <!-- Will be populated dynamically via SSE -->
+    </div>
+</div>

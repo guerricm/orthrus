@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - New Scan')}">
+<body>
+<main>
+    <div class="row justify-content-center">
+        <div class="col-lg-10 mb-5">
+            <h2 class="mb-4">Launch a New Scan</h2>
+            
+            <!-- Error Card: No online slaves -->
+            <div class="alert alert-danger shadow-sm mb-4 d-flex align-items-center" role="alert" th:unless="${hasOnlineSlaves}">
+                <span class="fs-1 me-3">🚨</span>
+                <div>
+                    <h5 class="alert-heading mb-1">No Slave Nodes Available</h5>
+                    <p class="mb-0">There are no online slave nodes connected to the master. You must start at least one slave node to fetch capabilities and launch a scan.</p>
+                </div>
+            </div>
+
+            <!-- Warning Card: All slaves are busy -->
+            <div class="alert alert-warning shadow-sm mb-4 d-flex align-items-center" role="alert" th:if="${allSlavesBusy}">
+                <span class="fs-1 me-3">⚠️</span>
+                <div>
+                    <h5 class="alert-heading mb-1">All Slaves Are Busy</h5>
+                    <p class="mb-0">All connected slave nodes are currently running scans. You can still queue a new scan, but it will remain PENDING until a node becomes IDLE.</p>
+                </div>
+            </div>
+
+            <div th:if="${hasOnlineSlaves}">
+            <div class="glass-card">
+                <h4 class="mb-4">Scan Configuration</h4>
+                
+                <form hx-post="/web/scans" hx-indicator="#loading" hx-disabled-elt="#launchBtn">
+                    <div class="row g-4">
+                        
+                        <div class="col-md-8">
+                            <label for="target" class="form-label">Target URL / Spec Path</label>
+                            <input type="text" class="form-control" id="target" name="target" 
+                                   value="https://petstore3.swagger.io/api/v3/openapi.json" 
+                                   placeholder="https://api.example.com/openapi.json" required>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="discovererId" class="form-label">Discovery Mode</label>
+                            <select class="form-select" id="discovererId" name="discovererId" required>
+                                <option th:each="disc : ${discoverers}" th:value="${disc}" th:text="${disc}" th:selected="${disc == 'openapi'}">openapi</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Gateway specific options -->
+                        <div class="col-md-12" id="gateway-options" style="display: none;">
+                            <div class="card card-body bg-transparent border-secondary text-light mt-2">
+                                <h5 class="mb-3 text-primary">Gateway Configuration</h5>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="gatewayType" class="form-label">Gateway Type</label>
+                                        <select class="form-select" id="gatewayType" name="gatewayType">
+                                            <option value="auto">Auto-Detect</option>
+                                            <option value="traefik">Traefik</option>
+                                            <option value="spring-cloud-gateway">Spring Cloud Gateway</option>
+                                            <option value="kong">Kong API Gateway</option>
+                                            <option value="haproxy">HAProxy</option>
+                                            <option value="k8s">Kubernetes Ingress</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label for="appUrl" class="form-label">Public App URL (Optional)</label>
+                                        <input type="url" class="form-control" id="appUrl" name="appUrl" placeholder="https://public-api.example.com">
+                                        <div class="form-text text-muted">Use if the Admin API port differs from the public App port.</div>
+                                    </div>
+                                    <div class="col-md-12" id="k8s-token-container" style="display: none;">
+                                        <label for="k8sToken" class="form-label">Kubernetes ServiceAccount Token</label>
+                                        <input type="password" class="form-control" id="k8sToken" name="k8sToken" placeholder="ey...">
+                                        <div class="form-text text-warning">Required for Kubernetes Ingress discovery (unless K8S_TOKEN env var is set).</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <div class="form-check form-switch mt-3 mb-2 ps-5">
+                                <input class="form-check-input" type="checkbox" role="switch" id="includePassed" name="includePassed" value="true" style="transform: scale(1.5); margin-left: -2.5rem;">
+                                <label class="form-check-label ms-2" for="includePassed" style="color: var(--text-main); font-weight: 500; padding-top: 2px;">Include Passed Tests in Reports</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <button class="btn btn-outline-light w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#advancedOptions" aria-expanded="false" aria-controls="advancedOptions">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sliders me-2" viewBox="0 0 16 16">
+                                  <path fill-rule="evenodd" d="M11.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M9.05 3a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0V3h9.05zM4.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M2.05 8a2.5 2.5 0 0 1 4.9 0H16v1H6.95a2.5 2.5 0 0 1-4.9 0H0V8h2.05zm9.45 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m-2.45 1a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0v-1h9.05z"/>
+                                </svg>
+                                Advanced Options (OAuth2, BOLA, Scanners)
+                            </button>
+                            
+                            <div class="collapse mt-3" id="advancedOptions">
+                                <div class="card card-body bg-transparent border-secondary text-light">
+                                    <h5 class="mb-3 text-primary">Authentication</h5>
+                                    
+                                    <h6 class="text-light border-bottom border-secondary pb-2 mb-3 mt-2">Option A: Manual Tokens</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="bearerToken" class="form-label">Primary Bearer Token</label>
+                                            <input type="password" class="form-control" id="bearerToken" name="bearerToken" placeholder="eyJhbGciOiJIUzI1NiIs...">
+                                            <div class="form-text text-muted">Injected in all standard requests.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="bearerTokenSecondary" class="form-label">Secondary Bearer Token</label>
+                                            <input type="password" class="form-control" id="bearerTokenSecondary" name="bearerTokenSecondary" placeholder="Secondary token">
+                                            <div class="form-text text-muted">For BOLA / Cross-User testing.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-center my-4 position-relative">
+                                        <hr class="border-secondary">
+                                        <span class="px-3 text-muted position-absolute top-50 start-50 translate-middle" style="background-color: var(--card-bg);">OR</span>
+                                    </div>
+
+                                    <h6 class="text-light border-bottom border-secondary pb-2 mb-3">Option B: Dynamic OAuth2 Tokens <small class="text-muted fw-normal">(Overrides Option A)</small></h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="oauth2Url" class="form-label">OAuth2 Token URL</label>
+                                            <input type="url" class="form-control" id="oauth2Url" name="oauth2Url" placeholder="https://keycloak.example.com/token">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="oauth2Grant" class="form-label">OAuth2 Grant Type</label>
+                                            <select class="form-select" id="oauth2Grant" name="oauth2Grant">
+                                                <option value="">-- Select Grant --</option>
+                                                <option value="client_credentials">Client Credentials</option>
+                                                <option value="password">Password</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="oauth2ClientId" class="form-label">OAuth2 Client ID</label>
+                                            <input type="text" class="form-control" id="oauth2ClientId" name="oauth2ClientId">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="oauth2ClientSecret" class="form-label">OAuth2 Client Secret</label>
+                                            <input type="password" class="form-control" id="oauth2ClientSecret" name="oauth2ClientSecret">
+                                        </div>
+                                        <div class="col-md-12">
+                                            <label for="oauth2Creds" class="form-label">OAuth2 Credentials (for Password Grant)</label>
+                                            <input type="text" class="form-control" id="oauth2Creds" name="oauth2Creds" placeholder="user1:pass1,user2:pass2">
+                                            <div class="form-text text-muted">Comma-separated list of username:password</div>
+                                        </div>
+                                    </div>
+
+                                    <h5 class="mt-4 mb-3 text-primary">Scanner Selection</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <div class="row">
+                                                <div class="col-md-4 mb-2" th:each="scanner : ${scanners}">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="includeScanners" th:value="${scanner.getId()}" th:id="'scanner_' + ${scanner.getId()}" checked>
+                                                        <label class="form-check-label text-light" th:for="'scanner_' + ${scanner.getId()}" th:text="${scanner.getId()}" th:title="${scanner.getName()}" data-bs-toggle="tooltip" data-bs-placement="top" style="cursor: help; border-bottom: 1px dotted #ccc;"></label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="form-text text-muted mt-2">Uncheck the scanners you want to skip. By default, all scanners are executed.</div>
+                                        </div>
+                                    </div>
+
+                                    <h5 class="mt-4 mb-3 text-primary">Performance</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <label for="concurrency" class="form-label">Scan Concurrency: <span id="concurrencyValue">10</span></label>
+                                            <input type="range" class="form-range" min="1" max="100" step="1" id="concurrency" name="concurrency" value="10" oninput="document.getElementById('concurrencyValue').innerText = this.value">
+                                            <div class="form-text text-muted">Higher values scan faster but generate more traffic on the target server. Reduce this if the API drops requests.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                    <div class="mt-4 text-end border-top border-secondary pt-4">
+                        <button type="submit" id="launchBtn" class="btn btn-primary btn-lg px-5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-shield-check me-2 mb-1" viewBox="0 0 16 16">
+                              <path d="M5.338 1.59a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.7 10.7 0 0 0 2.287 2.233c.346.244.652.42.893.533q.18.085.293.118a1 1 0 0 0 .746 0q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/>
+                              <path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0"/>
+                            </svg>
+                            Launch Scan
+                        </button>
+                    </div>
+                </form>
+            </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="htmx-indicator col-12 text-center mb-5">
+            <div class="custom-spinner mb-3"></div>
+            <h5 class="text-primary">Scanning target...</h5>
+            <p class="text-muted small">This may take a few moments depending on the API size.</p>
+        </div>
+
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const discovererSelect = document.getElementById('discovererId');
+            const gatewayOptions = document.getElementById('gateway-options');
+            const gatewayTypeSelect = document.getElementById('gatewayType');
+            const k8sTokenContainer = document.getElementById('k8s-token-container');
+
+            function updateVisibility() {
+                if (discovererSelect.value === 'gateway') {
+                    gatewayOptions.style.display = 'block';
+                    if (gatewayTypeSelect.value === 'k8s') {
+                        k8sTokenContainer.style.display = 'block';
+                    } else {
+                        k8sTokenContainer.style.display = 'none';
+                    }
+                } else {
+                    gatewayOptions.style.display = 'none';
+                }
+            }
+
+            discovererSelect.addEventListener('change', updateVisibility);
+            gatewayTypeSelect.addEventListener('change', updateVisibility);
+            
+            // Initial call
+            updateVisibility();
+
+        });
+    </script>
+</main>
+</body>
+</html>

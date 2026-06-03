@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<body>
+<div id="test"></div>
+<script>
+fetch('http://localhost:8080/scans/all')
+  .then(response => response.text())
+  .then(html => {
+    document.getElementById('test').innerHTML = html;
+    console.log("Injected HTML");
+  });
+</script>
+</body>
+</html>
