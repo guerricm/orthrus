@@ -1,7 +1,7 @@
 # Orthrus DAST
 
 <p align="center">
-  <img src="src/main/resources/static/images/logo.png" alt="Orthrus DAST Logo" width="300"/>
+  <img src="orthrus-master/src/main/resources/static/images/logo.png" alt="Orthrus DAST Logo" width="300"/>
 </p>
 
 Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot 4 and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
@@ -76,83 +76,86 @@ The `gateway` mode is an incredibly powerful feature for DevSecOps. It probes th
 - **Reporting**: JSON, SARIF (for GitHub Advanced Security), HTML, PDF, and Console formats.
 - **API & CLI**: Run as a command-line tool or as a long-running REST API service.
 
+## Architecture (Orthrus V2)
+
+Orthrus V2 introduces a highly scalable **Master-Slave** architecture:
+- **Master (`orthrus-master`)**: Coordinates the scan jobs, exposes a Web UI on port 8080, and maintains a database (H2 by default) of registered Slaves and Scan Jobs.
+- **Slave (`orthrus-slave`)**: Connects to the Master to retrieve jobs, executes the actual high-concurrency scans, and reports results back.
+- **CLI (`orthrus-cli`)**: A lightweight wrapper for the Engine providing a CLI interface for local execution or CI/CD integration without a Master.
+- **Engine Core (`orthrus-engine-core`)**: Shared execution engine containing the models, discoverers, scanners, and report generators used by all components.
+
 ## Prerequisites
 
 - Java 25 or higher
 - Maven 3.8+
+- Docker (optional, for containerized deployments)
 
 ## Building
 
-Compile and package the application:
+Compile and package the entire multi-module application:
 ```bash
 ./mvnw clean package -DskipTests
 ```
-This generates the executable JAR in the `target/` directory.
+This generates three executable JARs:
+- `orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar`
+- `orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar`
+- `orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar`
 
-## Usage (CLI Mode)
-
-To run a scan from the command line, pass arguments to the JAR. The command requires a discoverer (`-d`) and a target (`-t`).
-
+You can also build Docker images locally:
 ```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
+mvn spring-boot:build-image -pl orthrus-master
+mvn spring-boot:build-image -pl orthrus-slave
+mvn spring-boot:build-image -pl orthrus-cli
 ```
 
-### Examples
+## Usage (Distributed Mode)
+
+### 1. Start the Master
+The Master node orchestrates everything and exposes the Web UI on `http://localhost:8080`.
+```bash
+java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
+```
+
+### 2. Start one or more Slaves
+Slaves will automatically connect to the Master on port 8080. You can run multiple slaves on different machines or ports.
+```bash
+java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar --server.port=8081
+```
+
+Once running, navigate to `http://localhost:8080` to launch scans via the interface. You can view connected slaves and active jobs in the **System / Slaves** tab.
+
+## Usage (Standalone CLI Mode)
+
+If you just want to run a scan from your terminal without spinning up the Master/UI infrastructure, you can use the CLI JAR autonomously.
+
+```bash
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
+```
+
+### CLI Examples
 
 **Generate a professional PDF report in French:**
 ```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
 ```
 
-**Scan an OpenAPI specification:**
+**Automated OAuth2 Token Fetching for Cross-User BOLA (IDOR):**
+Automatically fetch tokens for two users to test for BOLA across boundaries:
 ```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f console
-```
-
-**Crawl a website (Blackbox):**
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
-```
-
-**Scan a single endpoint with a Bearer Token:**
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d curl -t "https://api.example.com/v1/users/123" --auth-bearer "eyJhb..."
-```
-
-**Generate a SARIF report for CI/CD:**
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d well-known -t https://example.com -f sarif --out vulnapi-results.sarif
-```
-
-**Test for Cross-User BOLA (IDOR) with two distinct users:**
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs --auth-bearer "TOKEN_USER_A" --auth-bearer-secondary "TOKEN_USER_B"
-```
-
-**Automated OAuth2 Token Fetching (e.g. Keycloak):**
-Automatically fetch tokens for one or multiple users before scanning (supports `password` or `client_credentials`):
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
   --oauth2-url "https://keycloak.example.com/realms/master/protocol/openid-connect/token" \
   --oauth2-grant "password" \
   --oauth2-client-id "orthrus-client" \
   --oauth2-creds "alice:pwd123,bob:pwd456"
 ```
-*(If exactly 2 sets of credentials are provided, they are mapped to the primary and secondary auth schemes for automated Cross-User BOLA testing).*
 
-**Generate a detailed report with all executed tests (passed & failed):**
+**Crawl a website (Blackbox):**
 ```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f html -o report.html --include-passed
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
 ```
-
-**Optimize performance by increasing concurrency (e.g. 100 threads for massive APIs):**
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -c 100
-```
-*This adds an "Execution Details" section at the end of the report, listing every scanner test against every endpoint, sorted by endpoint → method → scanner → status (failed first).*
 
 ### CLI Options
-- `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
+- `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`, `gateway`).
 - `-t, --target`: Target URL or Spec path.
 - `-c, --concurrency`: Number of concurrent threads to use during the scan (default: 10). Increase for massive APIs to speed up execution.
 - `--host`: Override the host URL for the target endpoints.
@@ -161,7 +164,7 @@ java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.examp
 - `-o, --out`: Output file path. If not provided, prints to standard output.
 - `--auth-bearer`: Provide a Bearer token to inject into all requests (Primary User).
 - `--auth-bearer-secondary`: Provide a secondary Bearer token for Cross-User BOLA testing (Secondary User).
-- `--oauth2-url`: OAuth2 token endpoint URL (e.g., Keycloak token endpoint).
+- `--oauth2-url`: OAuth2 token endpoint URL.
 - `--oauth2-client-id`: OAuth2 Client ID.
 - `--oauth2-client-secret`: OAuth2 Client Secret.
 - `--oauth2-grant`: OAuth2 Grant Type (`password` or `client_credentials`).
@@ -169,14 +172,9 @@ java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar -d openapi -t https://api.examp
 - `--include`: Comma-separated list of scanner IDs to run exclusively.
 - `--exclude`: Comma-separated list of scanner IDs to skip.
 - `--include-passed`: Include all executed tests (passed and failed) in the report. Adds an "Execution Details" section to HTML, PDF, JSON, and SARIF reports.
-
-## Usage (Web UI Mode)
-
-If you run the application without CLI arguments, it starts a Spring WebFlux server exposing a rich Web User Interface on **http://localhost:8080**.
-
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar
-```
+- `--gateway-type`: Gateway type: `auto`, `traefik`, `kong`, `spring-cloud-gateway`, `haproxy`, `k8s` (default: `auto`).
+- `--app-url`: Public Application URL for Gateway Discovery (e.g. http://myapp.com) if different from the admin interface.
+- `--k8s-token`: Kubernetes ServiceAccount Token (or set K8S_TOKEN env var).
 
 The Web UI provides a user-friendly, responsive experience with the following features:
 - **Interactive Dashboard**: View statistics and a history of all executed scans.
@@ -287,7 +285,7 @@ curl http://localhost:8080/api/v1/scans/discoverers
 Orthrus is designed to be highly extensible. To add a new scanner, implement the `SecurityScanner` interface and annotate the class with `@Component`. The engine will automatically pick it up and include it in scans.
 
 ```java
-import ch.hug.vulnapi.scanner.SecurityScanner;
+import ch.nexsol.vulnapi.scanner.SecurityScanner;
 import org.springframework.stereotype.Component;
 
 @Component

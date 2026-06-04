@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+    th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - Active Scans')}">
+
+<body>
+    <main>
+        <div class="row justify-content-center">
+            <div class="col-lg-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>All Scans</h2>
+                    <a href="/scans/new" class="btn btn-primary">Start New Scan</a>
+                </div>
+
+                <div id="scans-container" hx-get="/scans/all" hx-trigger="every 5s" hx-swap="outerHTML" hx-select="#scans-container">
+                    <div th:if="${activeJobs == null or activeJobs.isEmpty()}"
+                        class="alert alert-info bg-transparent border-info text-light d-flex align-items-center"
+                        role="alert">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-info-circle-fill me-3 flex-shrink-0" viewBox="0 0 16 16">
+                            <path
+                                d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2" />
+                        </svg>
+                        <div>
+                            No scans found.
+                        </div>
+                    </div>
+
+                    <div class="accordion" id="scansAccordion" th:if="${activeJobs != null and !activeJobs.isEmpty()}">
+                        <th:block th:each="jobMap : ${activeJobs}">
+                            <th:block th:if="${jobMap != null}">
+                                <div
+                                    th:insert="~{fragments/scan-queued :: scanQueued(jobId=${jobMap['job'].id}, target=${jobMap['job'].target}, discovererId=${jobMap['job'].discovererId}, createdAt=${jobMap['job'].createdAt}, status=${jobMap['job'].status.name()}, resultId=${jobMap['job'].resultId}, result=${jobMap['result']}, globalGrade=${jobMap['globalGrade']})}">
+                                </div>
+                            </th:block>
+                        </th:block>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <script>
+            let openPanels = [];
+            // Before HTMX replaces the DOM, save which accordions are open
+            document.addEventListener('htmx:beforeSwap', function (e) {
+                openPanels = Array.from(document.querySelectorAll('.accordion-collapse.show')).map(el => el.id);
+            });
+            // After HTMX settles the DOM, restore the open accordions
+            document.addEventListener('htmx:afterSettle', function (e) {
+                openPanels.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.classList.add('show');
+                        const btn = document.querySelector(`[data-bs-target="#${id}"]`);
+                        if (btn) {
+                            btn.classList.remove('collapsed');
+                            btn.setAttribute('aria-expanded', 'true');
+                        }
+                    }
+                });
+            });
+        </script>
+
+    </main>
+</body>
+
+</html>

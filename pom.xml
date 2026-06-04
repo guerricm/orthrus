@@ -9,57 +9,121 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <groupId>ch.hug.security</groupId>
-    <artifactId>orthrus-dast</artifactId>
+    <groupId>ch.nexsol.security</groupId>
+    <artifactId>orthrus-dast-parent</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Orthrus DAST</name>
-    <description>Orthrus Dynamic Application Security Testing</description>
+    <packaging>pom</packaging>
+    <name>Orthrus DAST Parent</name>
+    <description>Orthrus Dynamic Application Security Testing (V2 Multi-Module)</description>
+
+    <modules>
+        <module>orthrus-engine-core</module>
+        <module>orthrus-slave</module>
+        <module>orthrus-master</module>
+        <module>orthrus-cli</module>
+    </modules>
 
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
         <swagger-parser.version>2.1.22</swagger-parser.version>
         <jjwt.version>0.12.6</jjwt.version>
         <picocli.version>4.7.6</picocli.version>
     </properties>
 
-    <dependencies>
-        <!-- Spring Boot Core -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
+    <dependencyManagement>
+        <dependencies>
+            <!-- Modules -->
+            <dependency>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-engine-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-slave</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-master</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-cli</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
-        <!-- Spring WebFlux for Reactive HTTP (WebClient + Reactive REST API) -->
+            <!-- OpenAPI Parser -->
+            <dependency>
+                <groupId>io.swagger.parser.v3</groupId>
+                <artifactId>swagger-parser</artifactId>
+                <version>${swagger-parser.version}</version>
+            </dependency>
+
+            <!-- Jsoup for Blackbox Crawler -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>1.17.2</version>
+            </dependency>
+
+            <!-- Datafaker for generating mock payloads -->
+            <dependency>
+                <groupId>net.datafaker</groupId>
+                <artifactId>datafaker</artifactId>
+                <version>2.1.0</version>
+            </dependency>
+
+            <!-- JWT Processing -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <!-- Picocli for CLI -->
+            <dependency>
+                <groupId>info.picocli</groupId>
+                <artifactId>picocli-spring-boot-starter</artifactId>
+                <version>${picocli.version}</version>
+            </dependency>
+
+            <!-- OpenHTMLToPDF for PDF generation -->
+            <dependency>
+                <groupId>com.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-pdfbox</artifactId>
+                <version>1.0.10</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-slf4j</artifactId>
+                <version>1.0.10</version>
+            </dependency>
+            
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>mockwebserver</artifactId>
+                <version>4.12.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
-
-        <!-- GraphQL Starter for GraphQL support -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-graphql</artifactId>
-        </dependency>
-
-        <!-- Spring Data R2DBC -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.r2dbc</groupId>
-            <artifactId>r2dbc-h2</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- OpenAPI Parser -->
-        <dependency>
-            <groupId>io.swagger.parser.v3</groupId>
-            <artifactId>swagger-parser</artifactId>
-            <version>${swagger-parser.version}</version>
-        </dependency>
-
-        <!-- JSON Processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -68,69 +132,9 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
-
-        <!-- Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-
-        <!-- Jsoup for Blackbox Crawler -->
-        <dependency>
-            <groupId>org.jsoup</groupId>
-            <artifactId>jsoup</artifactId>
-            <version>1.17.2</version>
-        </dependency>
-
-        <!-- Datafaker for generating mock payloads -->
-        <dependency>
-            <groupId>net.datafaker</groupId>
-            <artifactId>datafaker</artifactId>
-            <version>2.1.0</version>
-        </dependency>
-
-        <!-- JWT Processing (for JWT scanners) -->
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>${jjwt.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>${jjwt.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>${jjwt.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- Picocli for CLI -->
-        <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli-spring-boot-starter</artifactId>
-            <version>${picocli.version}</version>
-        </dependency>
-
-        <!-- Thymeleaf for PDF templates -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
-
-        <!-- OpenHTMLToPDF for PDF generation -->
-        <dependency>
-            <groupId>com.openhtmltopdf</groupId>
-            <artifactId>openhtmltopdf-pdfbox</artifactId>
-            <version>1.0.10</version>
-        </dependency>
-        <dependency>
-            <groupId>com.openhtmltopdf</groupId>
-            <artifactId>openhtmltopdf-slf4j</artifactId>
-            <version>1.0.10</version>
         </dependency>
 
         <!-- Testing -->
@@ -147,16 +151,65 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>mockwebserver</artifactId>
-            <version>4.12.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
-
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <layers>
+                            <enabled>true</enabled>
+                        </layers>
+                        <image>
+                            <builder>paketobuildpacks/builder-noble-java-tiny:latest</builder>
+                            <runImage>paketobuildpacks/ubuntu-noble-run-tiny:latest</runImage>
+                            <env>
+                                <BP_JVM_VERSION>25.*</BP_JVM_VERSION>
+                                <BP_SPRING_CLOUD_BINDINGS_DISABLED>true</BP_SPRING_CLOUD_BINDINGS_DISABLED>
+                                <BP_UNPACK_LAYOUT_ONLY>true</BP_UNPACK_LAYOUT_ONLY>
+                                <BP_JVM_AOTCACHE_ENABLED>false</BP_JVM_AOTCACHE_ENABLED>
+                                <BPE_DELIM_JAVA_TOOL_OPTIONS xml:space="preserve"> </BPE_DELIM_JAVA_TOOL_OPTIONS>
+                                <BPE_APPEND_JAVA_TOOL_OPTIONS>
+                                    -Duser.timezone=UTC
+                                    -Dfile.encoding=UTF-8
+                                    -XX:MaxDirectMemorySize=64M
+                                    -XX:+UseCompactObjectHeaders
+                                </BPE_APPEND_JAVA_TOOL_OPTIONS>
+                                <JAVA_TOOL_OPTIONS>
+                                    -Duser.timezone=UTC
+                                    -Dfile.encoding=UTF-8
+                                    -XX:MaxDirectMemorySize=64M
+                                    -XX:+UseCompactObjectHeaders
+                                </JAVA_TOOL_OPTIONS>
+                            </env>
+                        </image>
+                        <docker>
+                            <publishRegistry>
+                                <username>${CI_REGISTRY_USER}</username>
+                                <password>${CI_REGISTRY_PASSWORD}</password>
+                            </publishRegistry>
+                        </docker>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.8.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
