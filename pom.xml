@@ -168,8 +168,6 @@
                             <env>
                                 <BP_JVM_VERSION>25.*</BP_JVM_VERSION>
                                 <BP_SPRING_CLOUD_BINDINGS_DISABLED>true</BP_SPRING_CLOUD_BINDINGS_DISABLED>
-                                <BP_UNPACK_LAYOUT_ONLY>true</BP_UNPACK_LAYOUT_ONLY>
-                                <BP_JVM_AOTCACHE_ENABLED>false</BP_JVM_AOTCACHE_ENABLED>
                                 <BPE_DELIM_JAVA_TOOL_OPTIONS xml:space="preserve"> </BPE_DELIM_JAVA_TOOL_OPTIONS>
                                 <BPE_APPEND_JAVA_TOOL_OPTIONS>
                                     -Duser.timezone=UTC
