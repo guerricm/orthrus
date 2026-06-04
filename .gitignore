@@ -25,3 +25,7 @@ hs_err_pid*
 replay_pid*
 orthrus_db/data.mv.db
 orthrus_db/data.trace.db
+
+.vscode/
+.agents/
+.DS_Store

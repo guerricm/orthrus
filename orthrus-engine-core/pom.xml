@@ -56,4 +56,8 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
     </dependencies>
+    <properties>
+        <spring-boot.build-image.skip>true</spring-boot.build-image.skip>
+    </properties>
+
 </project>
