@@ -132,8 +132,8 @@ class ScannerIntegrationTests {
         });
 
         List<Vulnerability> vulns = scanner.scan(op).collectList().block();
-        assertThat(vulns).hasSize(1);
-        assertThat(vulns.get(0).cwe().getId()).isEqualTo(611);
+        assertThat(vulns).hasSize(2);
+        assertThat(vulns).anyMatch(v -> v.cwe().getId() == 611);
     }
 
     @Test

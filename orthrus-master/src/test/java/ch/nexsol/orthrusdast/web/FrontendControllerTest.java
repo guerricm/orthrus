@@ -60,7 +60,8 @@ class FrontendControllerTest {
 
     @Test
     void testGetResultsPage() {
-        when(scanResultService.getHistory(0, 10)).thenReturn(reactor.core.publisher.Flux.empty());
+        when(scanJobRepository.findAllByOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
+            .thenReturn(reactor.core.publisher.Flux.empty());
 
         org.springframework.ui.Model model = new org.springframework.ui.ConcurrentModel();
         String viewName = controller.listScans(model).block();
