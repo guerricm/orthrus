@@ -80,8 +80,9 @@ The `gateway` mode is an incredibly powerful feature for DevSecOps. It probes th
 
 Orthrus V2 introduces a highly scalable **Master-Slave** architecture:
 - **Master (`orthrus-master`)**: Coordinates the scan jobs, exposes a Web UI on port 8080, and maintains a database (H2 by default) of registered Slaves and Scan Jobs.
-- **Slave (`orthrus-slave`)**: Connects to the Master to retrieve jobs, executes the actual high-concurrency scans, and reports results back. The Slave can also be run in **Standalone CLI Mode** if you prefer running it locally without a Master.
-- **Core (`orthrus-core`)**: Shared libraries, logic, and report generators used by both components.
+- **Slave (`orthrus-slave`)**: Connects to the Master to retrieve jobs, executes the actual high-concurrency scans, and reports results back.
+- **CLI (`orthrus-cli`)**: A lightweight wrapper for the Engine providing a CLI interface for local execution or CI/CD integration without a Master.
+- **Engine Core (`orthrus-engine-core`)**: Shared execution engine containing the models, discoverers, scanners, and report generators used by all components.
 
 ## Prerequisites
 
@@ -95,14 +96,16 @@ Compile and package the entire multi-module application:
 ```bash
 ./mvnw clean package -DskipTests
 ```
-This generates two executable JARs:
+This generates three executable JARs:
 - `orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar`
 - `orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar`
+- `orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar`
 
 You can also build Docker images locally:
 ```bash
 mvn spring-boot:build-image -pl orthrus-master
 mvn spring-boot:build-image -pl orthrus-slave
+mvn spring-boot:build-image -pl orthrus-cli
 ```
 
 ## Usage (Distributed Mode)
@@ -123,23 +126,23 @@ Once running, navigate to `http://localhost:8080` to launch scans via the interf
 
 ## Usage (Standalone CLI Mode)
 
-If you just want to run a scan from your terminal without spinning up the Master/UI infrastructure, you can use the Slave JAR autonomously. By passing CLI arguments, the Slave automatically disables its web server and acts as a pure CLI tool.
+If you just want to run a scan from your terminal without spinning up the Master/UI infrastructure, you can use the CLI JAR autonomously.
 
 ```bash
-java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 ```
 
 ### CLI Examples
 
 **Generate a professional PDF report in French:**
 ```bash
-java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
 ```
 
 **Automated OAuth2 Token Fetching for Cross-User BOLA (IDOR):**
 Automatically fetch tokens for two users to test for BOLA across boundaries:
 ```bash
-java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
   --oauth2-url "https://keycloak.example.com/realms/master/protocol/openid-connect/token" \
   --oauth2-grant "password" \
   --oauth2-client-id "orthrus-client" \
@@ -148,7 +151,7 @@ java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar -d openapi -t ht
 
 **Crawl a website (Blackbox):**
 ```bash
-java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
+java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
 ```
 
 ### CLI Options
@@ -282,7 +285,7 @@ curl http://localhost:8080/api/v1/scans/discoverers
 Orthrus is designed to be highly extensible. To add a new scanner, implement the `SecurityScanner` interface and annotate the class with `@Component`. The engine will automatically pick it up and include it in scans.
 
 ```java
-import ch.hug.vulnapi.scanner.SecurityScanner;
+import ch.nexsol.vulnapi.scanner.SecurityScanner;
 import org.springframework.stereotype.Component;
 
 @Component

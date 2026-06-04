@@ -1,6 +1,0 @@
-event:PENDING
-data:{"jobId":290,"status":"PENDING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan queued — waiting for an available slave node…"}
-
-event:RUNNING
-data:{"jobId":290,"status":"RUNNING","target":"https://petstore3.swagger.io/api/v3/openapi.json","resultId":null,"pdfUrl":null,"grade":null,"totalVulns":0,"operationsScanned":0,"message":"Scan dispatched to slave — running…"}
-

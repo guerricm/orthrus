@@ -8,36 +8,37 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>orthrus-slave</artifactId>
-    <name>Orthrus DAST Slave</name>
-    <description>Slave Engine</description>
+    <artifactId>orthrus-engine-core</artifactId>
+    <name>Orthrus DAST Engine Core</name>
+    <description>Core models, reports, and utilities</description>
 
     <dependencies>
         <dependency>
-            <groupId>ch.nexsol.security</groupId>
-            <artifactId>orthrus-engine-core</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-graphql</artifactId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-slf4j</artifactId>
+        </dependency>
+        
+        <!-- Extracted from Slave for engine logic -->
         <dependency>
             <groupId>io.swagger.parser.v3</groupId>
             <artifactId>swagger-parser</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
         </dependency>
-
         <dependency>
             <groupId>net.datafaker</groupId>
             <artifactId>datafaker</artifactId>
         </dependency>
-
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -45,32 +46,14 @@
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
-            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
-            <scope>runtime</scope>
         </dependency>
-
         <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli-spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>ch.nexsol.orthrusdast.OrthrusDastSlaveApplication</mainClass>
-                    <image>
-                        <name>docker.io/${dockerhub.user}/orthrus-slave:${project.version}</name>
-                    </image>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>

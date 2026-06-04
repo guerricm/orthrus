@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <groupId>ch.hug.security</groupId>
+    <groupId>ch.nexsol.security</groupId>
     <artifactId>orthrus-dast-parent</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -17,13 +17,14 @@
     <description>Orthrus Dynamic Application Security Testing (V2 Multi-Module)</description>
 
     <modules>
-        <module>orthrus-core</module>
+        <module>orthrus-engine-core</module>
         <module>orthrus-slave</module>
         <module>orthrus-master</module>
+        <module>orthrus-cli</module>
     </modules>
 
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
         <swagger-parser.version>2.1.22</swagger-parser.version>
         <jjwt.version>0.12.6</jjwt.version>
         <picocli.version>4.7.6</picocli.version>
@@ -33,18 +34,23 @@
         <dependencies>
             <!-- Modules -->
             <dependency>
-                <groupId>ch.hug.security</groupId>
-                <artifactId>orthrus-core</artifactId>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-engine-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.hug.security</groupId>
+                <groupId>ch.nexsol.security</groupId>
                 <artifactId>orthrus-slave</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.hug.security</groupId>
+                <groupId>ch.nexsol.security</groupId>
                 <artifactId>orthrus-master</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-cli</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -148,4 +154,63 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <layers>
+                            <enabled>true</enabled>
+                        </layers>
+                        <image>
+                            <builder>paketobuildpacks/builder-noble-java-tiny:latest</builder>
+                            <runImage>paketobuildpacks/ubuntu-noble-run-tiny:latest</runImage>
+                            <env>
+                                <BP_JVM_VERSION>25.*</BP_JVM_VERSION>
+                                <BP_SPRING_CLOUD_BINDINGS_DISABLED>true</BP_SPRING_CLOUD_BINDINGS_DISABLED>
+                                <BP_UNPACK_LAYOUT_ONLY>true</BP_UNPACK_LAYOUT_ONLY>
+                                <BP_JVM_AOTCACHE_ENABLED>false</BP_JVM_AOTCACHE_ENABLED>
+                                <BPE_DELIM_JAVA_TOOL_OPTIONS xml:space="preserve"> </BPE_DELIM_JAVA_TOOL_OPTIONS>
+                                <BPE_APPEND_JAVA_TOOL_OPTIONS>
+                                    -Duser.timezone=UTC
+                                    -Dfile.encoding=UTF-8
+                                    -XX:MaxDirectMemorySize=64M
+                                    -XX:+UseCompactObjectHeaders
+                                </BPE_APPEND_JAVA_TOOL_OPTIONS>
+                                <JAVA_TOOL_OPTIONS>
+                                    -Duser.timezone=UTC
+                                    -Dfile.encoding=UTF-8
+                                    -XX:MaxDirectMemorySize=64M
+                                    -XX:+UseCompactObjectHeaders
+                                </JAVA_TOOL_OPTIONS>
+                            </env>
+                        </image>
+                        <docker>
+                            <publishRegistry>
+                                <username>${CI_REGISTRY_USER}</username>
+                                <password>${CI_REGISTRY_PASSWORD}</password>
+                            </publishRegistry>
+                        </docker>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.8.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

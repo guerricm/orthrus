@@ -1,0 +1,10 @@
+orthrus:
+  master:
+    url: "http://localhost:8080"
+    internal-token: "cli-dummy-token"
+  slave:
+    advertised-url: "http://localhost:0"
+    
+logging:
+  level:
+    ch.nexsol.orthrusdast: INFO
