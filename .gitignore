@@ -28,3 +28,4 @@ orthrus_db/data.trace.db
 
 .vscode/
 .agents/
+.DS_Store
