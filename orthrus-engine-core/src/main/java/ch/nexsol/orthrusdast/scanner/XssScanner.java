@@ -60,7 +60,7 @@ public class XssScanner implements SecurityScanner {
                 
                 return InjectionHelper.generateInjectedOperations(operation, payload)
                         .concatMap(test -> executeAndCheck(test.mutatedOperation(), operation, test.injectionPoint(), payload));
-            });
+            }).take(1);
             
             return scanVulns.concatWith(oastService.pollInteractions(oastSession).map(interaction -> 
                 createVulnerabilityWithTrace(

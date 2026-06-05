@@ -76,7 +76,8 @@
     <!-- Status Message -->
     <div id="scan-message" class="text-center py-4" th:style="${status == 'COMPLETED' or status == 'FAILED' ? 'display: none;' : 'display: block;'}">
         <div class="custom-spinner mb-3" th:id="'scan-spinner-' + ${jobId}"></div>
-        <p class="text-muted fs-5" th:id="'scan-message-text-' + ${jobId}">
+        <p class="text-light fs-5" th:id="'scan-message-text-' + ${jobId}"
+           th:text="${status == 'PENDING' ? 'Scan queued — waiting for an available slave node…' : 'Scan is currently running on a slave node…'}">
             Scan queued — waiting for an available slave node…
         </p>
     </div>

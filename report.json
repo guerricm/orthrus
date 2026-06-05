@@ -1,12 +1,32 @@
 {
-  "id" : "70b48cd6-711f-4012-86c5-eea9f75fe642",
+  "id" : "505177ef-a222-47fa-be47-f9b50ac32ce2",
   "targetUrl" : "https://example.com",
-  "scanStartTime" : "2026-06-04T09:20:23.598485Z",
-  "scanEndTime" : "2026-06-04T09:20:33.471864Z",
+  "scanStartTime" : "2026-06-05T06:44:23.911164Z",
+  "scanEndTime" : "2026-06-05T06:44:41.201070Z",
   "operationsDiscovered" : 1,
   "operationsScanned" : 1,
   "vulnerabilities" : [ {
-    "id" : "92dbf111-cd1f-42aa-ac7f-04214506f316",
+    "id" : "1d8f116c-6259-4e2f-ae51-b40d81cbd72d",
+    "name" : "Cleartext Transmission of Sensitive Information",
+    "description" : "The API endpoint is exposed over unencrypted HTTP. Data sent and received can be intercepted.",
+    "riskLevel" : "HIGH",
+    "confidence" : "HIGH",
+    "scannerId" : "cleartext-transmission",
+    "operationUrl" : "https://example.com",
+    "operationMethod" : "GET",
+    "cwe" : "CWE_319",
+    "cves" : [ ],
+    "capecs" : [ "CAPEC-94" ],
+    "cvssScore" : 7.4,
+    "evidence" : "Endpoint was accessed over HTTPS but successfully responded to HTTP (port 80) without a redirect to HTTPS.",
+    "remediation" : "Ensure all API endpoints are exclusively accessible via HTTPS. Implement HSTS (HTTP Strict Transport Security) and enforce 301/302 redirects from HTTP to HTTPS.",
+    "requestDetails" : "GET http://example.com\n\n",
+    "responseDetails" : "No Response",
+    "attackVector" : "API Endpoint (Network)",
+    "technicalImpact" : "Unauthorized Access / Data Exposure",
+    "owaspCategory" : "A04_CRYPTOGRAPHIC_FAILURES"
+  }, {
+    "id" : "75ac46a6-9600-4d27-b349-e1dcb3afe91d",
     "name" : "Missing Security Header: HSTS",
     "description" : "The HTTP response does not contain the 'Strict-Transport-Security' security header.",
     "riskLevel" : "LOW",
@@ -26,7 +46,7 @@
     "technicalImpact" : "Unauthorized Access / Data Exposure",
     "owaspCategory" : "A02_SECURITY_MISCONFIGURATION"
   }, {
-    "id" : "eb1fbfd3-b597-440e-adc4-fc36b2289377",
+    "id" : "4556be74-3319-4a5a-9dc9-0cd0f8b6d865",
     "name" : "Missing Security Header: X-Content-Type-Options",
     "description" : "The HTTP response does not contain the 'X-Content-Type-Options' security header.",
     "riskLevel" : "LOW",
@@ -46,7 +66,7 @@
     "technicalImpact" : "Unauthorized Access / Data Exposure",
     "owaspCategory" : "A02_SECURITY_MISCONFIGURATION"
   }, {
-    "id" : "6e24135a-12a0-465a-a4e2-27e3b0990995",
+    "id" : "f7910a75-e076-4bb2-8201-331b2956134b",
     "name" : "Missing Security Header: X-Frame-Options",
     "description" : "The HTTP response does not contain the 'X-Frame-Options' security header.",
     "riskLevel" : "LOW",
@@ -66,7 +86,7 @@
     "technicalImpact" : "Unauthorized Access / Data Exposure",
     "owaspCategory" : "A02_SECURITY_MISCONFIGURATION"
   }, {
-    "id" : "de6c70ee-6e5e-4e7e-ac13-640a2e2e9520",
+    "id" : "c22206b4-628f-4d10-afb3-f797c1884bf2",
     "name" : "Missing Security Header: CSP",
     "description" : "The HTTP response does not contain the 'Content-Security-Policy' security header.",
     "riskLevel" : "LOW",
@@ -85,16 +105,57 @@
     "attackVector" : "API Endpoint (Network)",
     "technicalImpact" : "Unauthorized Access / Data Exposure",
     "owaspCategory" : "A02_SECURITY_MISCONFIGURATION"
+  }, {
+    "id" : "2e1e1aff-611c-4084-b1f9-d003dff44bd7",
+    "name" : "Missing Security Header: Permissions-Policy",
+    "description" : "The HTTP response does not contain the 'Permissions-Policy' security header.",
+    "riskLevel" : "LOW",
+    "confidence" : "HIGH",
+    "scannerId" : "security-headers",
+    "operationUrl" : "https://example.com",
+    "operationMethod" : "GET",
+    "cwe" : "CWE_693",
+    "cves" : [ ],
+    "capecs" : [ "CAPEC-310" ],
+    "cvssScore" : 4.3,
+    "evidence" : "Header 'Permissions-Policy' is missing from the response.",
+    "remediation" : "Configure your web server or application framework to include the 'Permissions-Policy' header in all nulls.",
+    "requestDetails" : "GET https://example.com\n\n",
+    "responseDetails" : "No Response",
+    "attackVector" : "API Endpoint (Network)",
+    "technicalImpact" : "Unauthorized Access / Data Exposure",
+    "owaspCategory" : "A02_SECURITY_MISCONFIGURATION"
+  }, {
+    "id" : "1f606866-e442-4bf5-b949-dae54dca4cb7",
+    "name" : "Missing Security Header: Referrer-Policy",
+    "description" : "The HTTP response does not contain the 'Referrer-Policy' security header.",
+    "riskLevel" : "LOW",
+    "confidence" : "HIGH",
+    "scannerId" : "security-headers",
+    "operationUrl" : "https://example.com",
+    "operationMethod" : "GET",
+    "cwe" : "CWE_693",
+    "cves" : [ ],
+    "capecs" : [ "CAPEC-310" ],
+    "cvssScore" : 4.3,
+    "evidence" : "Header 'Referrer-Policy' is missing from the response.",
+    "remediation" : "Configure your web server or application framework to include the 'Referrer-Policy' header in all nulls.",
+    "requestDetails" : "GET https://example.com\n\n",
+    "responseDetails" : "No Response",
+    "attackVector" : "API Endpoint (Network)",
+    "technicalImpact" : "Unauthorized Access / Data Exposure",
+    "owaspCategory" : "A02_SECURITY_MISCONFIGURATION"
   } ],
   "riskSummary" : {
     "INFO" : 0,
-    "LOW" : 4,
+    "LOW" : 6,
     "MEDIUM" : 0,
-    "HIGH" : 0,
+    "HIGH" : 1,
     "CRITICAL" : 0
   },
   "scannerSummary" : {
-    "security-headers" : 4
+    "security-headers" : 6,
+    "cleartext-transmission" : 1
   },
   "configuration" : {
     "includeScanners" : [ ],

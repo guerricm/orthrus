@@ -42,31 +42,31 @@
                 </div>
                 <div class="col-6 col-md-4">
                     <div class="stat-box border-danger">
-                        <div class="stat-value text-critical" th:text="${result.riskSummary().getOrDefault(T(ch.hug.orthrusdast.model.RiskLevel).CRITICAL, 0)}">0</div>
+                        <div class="stat-value text-critical" th:text="${result.riskSummary().getOrDefault(T(ch.nexsol.orthrusdast.model.RiskLevel).CRITICAL, 0)}">0</div>
                         <div class="stat-label text-critical">Critical</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-4">
                     <div class="stat-box border-warning">
-                        <div class="stat-value text-high" th:text="${result.riskSummary().getOrDefault(T(ch.hug.orthrusdast.model.RiskLevel).HIGH, 0)}">0</div>
+                        <div class="stat-value text-high" th:text="${result.riskSummary().getOrDefault(T(ch.nexsol.orthrusdast.model.RiskLevel).HIGH, 0)}">0</div>
                         <div class="stat-label text-high">High</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-4">
                     <div class="stat-box" style="border-color: var(--grade-c);">
-                        <div class="stat-value text-medium" th:text="${result.riskSummary().getOrDefault(T(ch.hug.orthrusdast.model.RiskLevel).MEDIUM, 0)}">0</div>
+                        <div class="stat-value text-medium" th:text="${result.riskSummary().getOrDefault(T(ch.nexsol.orthrusdast.model.RiskLevel).MEDIUM, 0)}">0</div>
                         <div class="stat-label text-medium">Medium</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-4">
                     <div class="stat-box" style="border-color: var(--grade-a);">
-                        <div class="stat-value text-low" th:text="${result.riskSummary().getOrDefault(T(ch.hug.orthrusdast.model.RiskLevel).LOW, 0)}">0</div>
+                        <div class="stat-value text-low" th:text="${result.riskSummary().getOrDefault(T(ch.nexsol.orthrusdast.model.RiskLevel).LOW, 0)}">0</div>
                         <div class="stat-label text-low">Low</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-4">
                     <div class="stat-box border-info">
-                        <div class="stat-value text-info" th:text="${result.riskSummary().getOrDefault(T(ch.hug.orthrusdast.model.RiskLevel).INFO, 0)}">0</div>
+                        <div class="stat-value text-info" th:text="${result.riskSummary().getOrDefault(T(ch.nexsol.orthrusdast.model.RiskLevel).INFO, 0)}">0</div>
                         <div class="stat-label text-info">Info</div>
                     </div>
                 </div>

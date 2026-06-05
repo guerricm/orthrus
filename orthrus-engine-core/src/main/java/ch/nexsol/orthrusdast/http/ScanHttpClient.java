@@ -53,14 +53,22 @@ public class ScanHttpClient {
                 .headers(headers -> {
                     // Apply operation headers
                     if (operation.headers() != null) {
-                        operation.headers().forEach(headers::set);
+                        operation.headers().forEach((k, v) -> {
+                            if (v != null) {
+                                headers.set(k, v.replaceAll("[\\x00-\\x08\\x0A-\\x1F\\x7F]", "").trim());
+                            }
+                        });
                     }
                     // Apply auth scheme
                     if (operation.authScheme() != null) {
                         applyAuth(headers, operation.authScheme());
                     }
                     // Apply extra headers (scanner-injected)
-                    extraHeaders.forEach(headers::set);
+                    extraHeaders.forEach((k, v) -> {
+                        if (v != null) {
+                            headers.set(k, v.replaceAll("[\\x00-\\x08\\x0A-\\x1F\\x7F]", "").trim());
+                        }
+                    });
                 });
 
         String body = bodyOverride != null ? bodyOverride : operation.body();
@@ -142,7 +150,11 @@ public class ScanHttpClient {
     private void applyAuth(HttpHeaders headers, SecurityScheme scheme) {
         if (scheme.paramLocation() == SecurityScheme.ParamLocation.HEADER) {
             String headerName = scheme.headerName() != null ? scheme.headerName() : "Authorization";
-            headers.set(headerName, scheme.toAuthorizationHeaderValue());
+            String headerValue = scheme.toAuthorizationHeaderValue();
+            if (headerValue != null) {
+                headerValue = headerValue.replaceAll("[\\x00-\\x08\\x0A-\\x1F\\x7F]", "").trim();
+                headers.set(headerName, headerValue);
+            }
         }
         // Query param auth is handled in buildUri
     }
