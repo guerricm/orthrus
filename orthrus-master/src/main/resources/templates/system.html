@@ -31,12 +31,13 @@
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;" th:text="${slave.url}"></td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;">
                                     <span class="badge bg-success"
-                                        th:if="${slave.status != null and slave.status.name() == 'IDLE'}">🟢 IDLE</span>
+                                        th:if="${slave.status != null and slave.status.name() != 'OFFLINE' and slave.maxConcurrentScans > 0 and activeJobsCount.get(slave.id) < slave.maxConcurrentScans}">🟢 AVAILABLE</span>
                                     <span class="badge bg-warning text-dark"
-                                        th:if="${slave.status != null and slave.status.name() == 'BUSY'}">⚙️ BUSY</span>
+                                        th:if="${slave.status != null and slave.status.name() != 'OFFLINE' and slave.maxConcurrentScans > 0 and activeJobsCount.get(slave.id) >= slave.maxConcurrentScans}">⚙️ BUSY</span>
+                                    <span class="badge bg-secondary"
+                                        th:if="${slave.status != null and slave.status.name() != 'OFFLINE' and slave.maxConcurrentScans == 0}">⏸️ DISABLED</span>
                                     <span class="badge bg-danger"
-                                        th:if="${slave.status != null and slave.status.name() == 'OFFLINE'}">🔴
-                                        OFFLINE</span>
+                                        th:if="${slave.status != null and slave.status.name() == 'OFFLINE'}">🔴 OFFLINE</span>
                                 </td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;">
                                     <div class="d-flex align-items-center gap-2">

@@ -186,23 +186,33 @@ public class FrontendController {
 
     @GetMapping("/scans/new")
     public Mono<String> newScan(Model model) {
-        return slaveNodeRepository.findAll().collectList().flatMap(slaves -> {
-            long idleCount = slaves.stream().filter(s -> s.getStatus() == ch.nexsol.orthrusdast.model.NodeStatus.IDLE)
-                    .count();
-            long busyCount = slaves.stream().filter(s -> s.getStatus() == ch.nexsol.orthrusdast.model.NodeStatus.BUSY)
-                    .count();
+        return Mono.zip(
+                scanJobRepository.findAll().collectList(),
+                slaveNodeRepository.findAll().collectList()
+        ).flatMap(tuple -> {
+            java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1();
+            java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
 
-            model.addAttribute("idleSlaves", idleCount);
-            model.addAttribute("busySlaves", busyCount);
-            model.addAttribute("totalSlaves", slaves.size());
+            long totalCapacity = 0;
+            long activeJobsTotal = 0;
+            long availableCapacity = 0;
+
+            for (ch.nexsol.orthrusdast.entity.SlaveNodeEntity slave : slaves) {
+                if (slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
+                    totalCapacity += slave.getMaxConcurrentScans();
+                    long activeJobs = jobs.stream()
+                            .filter(j -> slave.getId().equals(j.getAssignedSlaveId()) && j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
+                            .count();
+                    activeJobsTotal += activeJobs;
+                    availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
+                }
+            }
+            model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
+            model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
 
             ch.nexsol.orthrusdast.entity.SlaveNodeEntity activeSlave = slaves.stream()
-                    .filter(s -> s.getStatus() == ch.nexsol.orthrusdast.model.NodeStatus.IDLE
-                            || s.getStatus() == ch.nexsol.orthrusdast.model.NodeStatus.BUSY)
+                    .filter(s -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE)
                     .findFirst().orElse(null);
-
-            model.addAttribute("hasOnlineSlaves", activeSlave != null);
-            model.addAttribute("allSlavesBusy", activeSlave != null && idleCount == 0 && busyCount > 0);
 
             if (activeSlave != null) {
                 return webClient.get().uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
