@@ -9,13 +9,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - ORTHRUS_MASTER_INTERNAL_TOKEN=super-secret-internal-token
+      - SPRING_R2DBC_URL=r2dbc:h2:file:////tmp/orthrus_db;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
     volumes:
-      - orthrus_db_data:/workspace/orthrus_db # Mount H2 database data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - orthrus_db_data:/tmp # Mount H2 database data
     networks:
       - orthrus-network
 
@@ -32,12 +28,7 @@ services:
       - ORTHRUS_SLAVE_ADVERTISED_URL=http://orthrus-slave:8081
     depends_on:
       orthrus-master:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+        condition: service_started
     networks:
       - orthrus-network
 
