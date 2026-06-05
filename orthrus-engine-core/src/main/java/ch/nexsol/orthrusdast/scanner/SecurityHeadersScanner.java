@@ -36,6 +36,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return httpClient.send(operation).flatMapMany(response -> {
             List<Vulnerability> vulns = new ArrayList<>();
 
@@ -50,6 +51,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
 
             return Flux.fromIterable(vulns);
         });
+            });
     }
 
     private void checkHeader(ch.nexsol.orthrusdast.http.ScanHttpResponse response, String headerName, String shortName, CWEReference cwe, Operation operation, List<Vulnerability> vulns) {

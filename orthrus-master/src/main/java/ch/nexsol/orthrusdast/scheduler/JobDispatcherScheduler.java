@@ -72,7 +72,8 @@ public class JobDispatcherScheduler {
                                             .println("Slave " + slave.getId() + " is unreachable. Marking as OFFLINE.");
                                     return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
                                             ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE.name(), slave.getLastSeenAt())
-                                            .doOnSuccess(r -> System.out.println("Rows updated to OFFLINE: " + r));
+                                            .flatMap(r -> failZombieScansForSlave(slave.getId()))
+                                            .doOnSuccess(r -> System.out.println("Slave " + slave.getId() + " marked OFFLINE and zombie scans failed."));
                                 } else if (isUp && slave.getStatus() == ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
                                     System.out.println("Slave " + slave.getId() + " is back online. Marking as IDLE.");
                                     return slaveNodeRepository
@@ -84,6 +85,31 @@ public class JobDispatcherScheduler {
                             });
                 })
                 .subscribe();
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void monitorGlobalTimeouts() {
+        // Find jobs that have been RUNNING for more than 4 hours
+        Instant fourHoursAgo = Instant.now().minus(java.time.Duration.ofHours(4));
+        scanJobRepository.findByStatusAndStartedAtBefore(JobStatus.RUNNING, fourHoursAgo)
+                .flatMap(job -> {
+                    System.out.println("Job " + job.getId() + " has exceeded the global 4-hour timeout. Marking as FAILED.");
+                    job.setStatus(JobStatus.FAILED);
+                    return scanJobRepository.save(job)
+                            .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Global Timeout Exceeded (4h)")));
+                })
+                .subscribe();
+    }
+
+    private Mono<Void> failZombieScansForSlave(String slaveId) {
+        return scanJobRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING)
+                .flatMap(job -> {
+                    System.out.println("Failing zombie job " + job.getId() + " because assigned slave " + slaveId + " went OFFLINE.");
+                    job.setStatus(JobStatus.FAILED);
+                    return scanJobRepository.save(job)
+                            .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Slave node crashed or disconnected")));
+                })
+                .then();
     }
 
     record ScanJobRequest(Long jobId, String discovererId, String target, String scanConfigurationJson) {

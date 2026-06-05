@@ -39,6 +39,7 @@ public class SsrfScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return oastService.createSession().flatMapMany(session -> {
             
             // Payloads: AWS Metadata and Blind OAST URL
@@ -94,5 +95,6 @@ public class SsrfScanner implements SecurityScanner {
 
             return Flux.concat(errorBasedVulns, blindVulns);
         });
+            });
     }
 }

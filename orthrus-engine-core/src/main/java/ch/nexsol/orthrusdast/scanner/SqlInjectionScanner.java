@@ -47,6 +47,7 @@ public class SqlInjectionScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         log.debug("Scanning for SQL Injection: {}", operation.url());
 
         return oastService.createSession().flatMapMany(oastSession -> {
@@ -77,6 +78,7 @@ public class SqlInjectionScanner implements SecurityScanner {
                 )
             ));
         });
+            });
     }
     
     private Flux<Vulnerability> executeSqlInjectionTest(Operation originalOp, Operation testOp, String injectionPoint, String payload) {

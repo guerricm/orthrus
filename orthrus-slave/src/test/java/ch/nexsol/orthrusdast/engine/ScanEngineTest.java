@@ -75,10 +75,10 @@ class ScanEngineTest {
             }
         };
 
-        ScanResult result = engine.runScan(mockDiscoverer, "http://localhost", null, config).block();
+        List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = engine.runScan(mockDiscoverer, "http://localhost", null, config).collectList().block();
 
-        assertNotNull(result);
-        assertEquals(0, result.vulnerabilities().size());
+        assertNotNull(attempts);
+        assertEquals(20, attempts.size());
         
         // Assert max concurrency is bounded close to configured value
         assertTrue(maxScans.get() >= 5 && maxScans.get() <= 6, "Expected max concurrency around 5, but was " + maxScans.get());

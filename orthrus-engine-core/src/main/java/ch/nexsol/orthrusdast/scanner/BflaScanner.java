@@ -34,6 +34,7 @@ public class BflaScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         String method = operation.method().toUpperCase();
         Flux<Vulnerability> methodChangeVulns = Flux.empty();
         Flux<Vulnerability> methodOverrideVulns = Flux.empty();
@@ -52,6 +53,7 @@ public class BflaScanner implements SecurityScanner {
         }
 
         return Flux.concat(methodChangeVulns, methodOverrideVulns);
+            });
     }
 
     private Flux<Vulnerability> executeBflaCheck(Operation operation, String testMethod, java.util.Map<String, String> testHeaders, String context) {

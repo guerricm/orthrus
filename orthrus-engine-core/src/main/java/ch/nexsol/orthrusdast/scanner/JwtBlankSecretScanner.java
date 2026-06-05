@@ -43,6 +43,7 @@ public class JwtBlankSecretScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         if (operation.authScheme() == null || operation.authScheme().type() != SecurityScheme.AuthType.BEARER) {
             return Flux.empty();
         }
@@ -94,5 +95,6 @@ public class JwtBlankSecretScanner implements SecurityScanner {
                         return Flux.empty();
                     }
                 }).take(1); // Stop after finding the first weak secret that works
+            });
     }
 }

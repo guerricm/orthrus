@@ -238,6 +238,36 @@ public class FrontendController {
         });
     }
 
+    @PostMapping("/scans/{id}/cancel")
+    public Mono<String> cancelScan(@PathVariable Long id) {
+        return scanJobRepository.findById(id)
+                .flatMap(job -> {
+                    if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING) {
+                        job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.CANCELLED);
+                        return scanJobRepository.save(job)
+                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")));
+                    } else if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING) {
+                        job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.CANCELLED);
+                        return scanJobRepository.save(job)
+                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")))
+                                .flatMap(j -> {
+                                    if (job.getAssignedSlaveId() != null) {
+                                        return slaveNodeRepository.findById(job.getAssignedSlaveId())
+                                                .flatMap(slave -> webClient.delete()
+                                                        .uri(slave.getUrl() + "/api/v1/slave/scans/" + id)
+                                                        .retrieve()
+                                                        .bodyToMono(Void.class)
+                                                        .onErrorResume(e -> Mono.empty())
+                                                );
+                                    }
+                                    return Mono.empty();
+                                });
+                    }
+                    return Mono.empty();
+                })
+                .thenReturn("redirect:/scans/all");
+    }
+
     @GetMapping("/scans/all")
     public Mono<String> activeScans(Model model) {
         return scanJobRepository.findAllByOrderByCreatedAtDesc(org.springframework.data.domain.PageRequest.of(0, 100))
@@ -436,18 +466,18 @@ public class FrontendController {
                                 secondaryAuthScheme, "en", includePassed, GatewayType.fromString(gatewayType), appUrl,
                                 k8sToken);
 
-                        try {
-                            String configJson = objectMapper.writeValueAsString(config);
-                            ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                    discovererId, target, configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING);
-                            return scanJobRepository.save(job)
-                                    .doOnSuccess(savedJob -> {
-                                        jobEventPublisher.emit(savedJob.getId(),
-                                                JobEvent.queued(savedJob.getId(), target));
-                                    });
-                        } catch (Exception e) {
-                            return Mono.error(e);
-                        }
+                        return Mono.fromCallable(() -> objectMapper.writeValueAsString(config))
+                                .flatMap(configJson -> {
+                                    ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+                                            discovererId, target, configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+                                    return scanJobRepository.save(job);
+                                })
+                                .doOnSuccess(savedJob -> {
+                                    jobEventPublisher.emit(savedJob.getId(),
+                                            JobEvent.queued(savedJob.getId(), target));
+                                })
+                                .doOnError(e -> org.slf4j.LoggerFactory.getLogger(FrontendController.class)
+                                        .error("Failed to create or save scan job for target: {}", target, e));
                     })
                     .map(savedJob -> {
                         exchange.getResponse().getHeaders().add("HX-Redirect", "/scans/all");

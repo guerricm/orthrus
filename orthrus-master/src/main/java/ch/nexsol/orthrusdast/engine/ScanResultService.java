@@ -52,6 +52,57 @@ public class ScanResultService {
                 });
     }
 
+    public Mono<Void> saveBatch(String resultId, List<ch.nexsol.orthrusdast.model.ScanAttempt> batch) {
+        List<VulnerabilityEntity> vulnEntities = new java.util.ArrayList<>();
+        for (ch.nexsol.orthrusdast.model.ScanAttempt attempt : batch) {
+            if (attempt.vulnerabilities() != null) {
+                for (Vulnerability v : attempt.vulnerabilities()) {
+                    vulnEntities.add(mapToEntity(v, resultId));
+                }
+            }
+        }
+        if (vulnEntities.isEmpty()) {
+            return Mono.empty();
+        }
+        return vulnerabilityRepository.saveAll(vulnEntities).then();
+    }
+
+    public Mono<Void> createPlaceholderResult(String resultId, String targetUrl, java.time.Instant startTime) {
+        ScanResultEntity entity = new ScanResultEntity(
+                resultId,
+                targetUrl,
+                startTime,
+                null,
+                0,
+                0
+        );
+        // Only insert if it doesn't exist
+        return scanResultRepository.findById(resultId)
+                .switchIfEmpty(scanResultRepository.save(entity))
+                .then();
+    }
+
+    public Mono<ScanResult> finalizeJobResult(String resultId, String targetUrl, java.time.Instant startTime, java.time.Instant endTime, int testsCount) {
+        return scanResultRepository.finalizeScanResult(resultId, endTime, testsCount)
+                .defaultIfEmpty(0)
+                .flatMap(rows -> {
+                    if (rows == 0) {
+                        ScanResultEntity entity = new ScanResultEntity(
+                                resultId,
+                                targetUrl,
+                                startTime,
+                                endTime,
+                                0,
+                                testsCount
+                        );
+                        return scanResultRepository.save(entity)
+                                .onErrorResume(e -> Mono.empty()) // in case of race condition duplicate key
+                                .then(findById(resultId));
+                    }
+                    return findById(resultId);
+                });
+    }
+
     public Mono<ScanResult> findById(String id) {
         return scanResultRepository.findById(id)
                 .flatMap(entity -> vulnerabilityRepository.findByScanResultId(id)
@@ -131,7 +182,9 @@ public class ScanResultService {
                     ve.attackVector(),
                     ve.technicalImpact()
             );
-        }).toList();
+        })
+        .sorted(java.util.Comparator.comparing(Vulnerability::riskLevel).reversed())
+        .toList();
 
         Map<RiskLevel, Long> riskSummary = vulnerabilities.stream()
                 .collect(Collectors.groupingBy(Vulnerability::riskLevel, Collectors.counting()));

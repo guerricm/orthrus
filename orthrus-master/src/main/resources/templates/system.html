@@ -104,6 +104,8 @@
                                         COMPLETED</span>
                                     <span class="badge bg-danger"
                                         th:if="${job.status != null and job.status.name() == 'FAILED'}">❌ FAILED</span>
+                                    <span class="badge bg-dark"
+                                        th:if="${job.status != null and job.status.name() == 'CANCELLED'}">⛔ CANCELLED</span>
                                 </td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;">
                                     <span th:if="${job.assignedSlaveId != null}"
@@ -115,9 +117,13 @@
                                         th:href="@{'/web/scans/' + ${job.resultId} + '/pdf'}"
                                         class="btn btn-sm btn-outline-primary" target="_blank" title="Download PDF Report">PDF</a>
                                         
-                                    <form th:if="${job.status != null and (job.status.name() == 'FAILED' or job.status.name() == 'COMPLETED' or job.status.name() == 'RUNNING')}"
+                                    <form th:if="${job.status != null and (job.status.name() == 'FAILED' or job.status.name() == 'COMPLETED' or job.status.name() == 'RUNNING' or job.status.name() == 'CANCELLED')}"
                                           th:action="@{'/system/jobs/' + ${job.id} + '/restart'}" method="post" class="d-inline">
                                         <button type="submit" class="btn btn-sm btn-outline-warning" title="Restart Scan Job"><i class="bi bi-arrow-clockwise"></i> Restart</button>
+                                    </form>
+                                    <form th:if="${job.status != null and (job.status.name() == 'PENDING' or job.status.name() == 'RUNNING')}"
+                                          th:action="@{'/scans/' + ${job.id} + '/cancel'}" method="post" class="d-inline ms-1">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Stop Scan Job"><i class="bi bi-stop-circle"></i> Stop</button>
                                     </form>
                                 </td>
                             </tr>

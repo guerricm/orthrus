@@ -44,6 +44,7 @@ public class SensitiveQueryScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         Flux<Vulnerability> passiveVulns = Flux.empty();
         Flux<Vulnerability> activeVulns = Flux.empty();
 
@@ -118,5 +119,6 @@ public class SensitiveQueryScanner implements SecurityScanner {
         }
 
         return Flux.concat(passiveVulns, activeVulns);
+        });
     }
 }

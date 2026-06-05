@@ -54,6 +54,7 @@ public class CommandInjectionScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return oastService.createSession().flatMapMany(oastSession -> {
             String oastPayloadContent = "curl http://" + oastSession.domain();
             String timePayloadContent = "sleep 5";
@@ -88,6 +89,7 @@ public class CommandInjectionScanner implements SecurityScanner {
                 )
             ));
         });
+            });
     }
     
     private Flux<Vulnerability> executeCommandInjectionTest(Operation originalOp, Operation testOp, String injectionPoint, String payload) {

@@ -39,6 +39,7 @@ public class RateLimitingScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         // We only scan POST/PUT/DELETE for rate limiting to avoid overwhelming GET endpoints during general scans,
         // or specifically target login/auth endpoints.
         boolean isStateChanging = !operation.method().equalsIgnoreCase("GET") && !operation.method().equalsIgnoreCase("OPTIONS");
@@ -103,5 +104,6 @@ public class RateLimitingScanner implements SecurityScanner {
                         });
                     }
                 });
+            });
     }
 }

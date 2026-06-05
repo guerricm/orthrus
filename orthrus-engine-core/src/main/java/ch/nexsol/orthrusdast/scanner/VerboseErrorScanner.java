@@ -38,6 +38,7 @@ public class VerboseErrorScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         Flux<Vulnerability> bodyVulns = Flux.empty();
         Flux<Vulnerability> queryVulns = Flux.empty();
 
@@ -70,6 +71,7 @@ public class VerboseErrorScanner implements SecurityScanner {
         }
 
         return Flux.concat(bodyVulns, queryVulns);
+            });
     }
 
     private Flux<Vulnerability> executeErrorCheck(Operation testOp, Operation originalOp, String context) {

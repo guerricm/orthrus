@@ -41,6 +41,7 @@ public class JwtNoneAlgorithmScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         if (operation.authScheme() == null || operation.authScheme().type() != SecurityScheme.AuthType.BEARER) {
             return Flux.empty();
         }
@@ -82,5 +83,6 @@ public class JwtNoneAlgorithmScanner implements SecurityScanner {
                                 return Flux.empty();
                             });
                 }).take(1); // Stop on first success
+            });
     }
 }

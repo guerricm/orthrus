@@ -69,55 +69,91 @@ public class MasterInternalApiController {
     }
 
     /**
-     * Called by Slave to post the final result of a scan.
+     * Called by Slave to post a batch of attempts.
      */
-    @PostMapping("/jobs/{id}/result")
-    public Mono<ResponseEntity<Void>> postJobResult(@PathVariable Long id, @RequestBody ScanResult result) {
+    @PostMapping("/jobs/{id}/attempts")
+    public Mono<ResponseEntity<Void>> postJobAttemptsBatch(@PathVariable Long id, @RequestBody java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt> batch) {
+        return scanJobRepository.findById(id)
+                .flatMap(job -> {
+                    Mono<Void> ensureResultExists = Mono.empty();
+                    if (job.getResultId() == null) {
+                        job.setResultId(java.util.UUID.randomUUID().toString());
+                        ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(), job.getCreatedAt() != null ? job.getCreatedAt() : Instant.now());
+                    }
+                    
+                    int vulnsInBatch = 0;
+                    for (ch.nexsol.orthrusdast.model.ScanAttempt attempt : batch) {
+                        if (attempt.vulnerabilities() != null) {
+                            vulnsInBatch += attempt.vulnerabilities().size();
+                        }
+                    }
+
+                    job.setTestsCount((job.getTestsCount() != null ? job.getTestsCount() : 0) + batch.size());
+                    job.setVulnsCount((job.getVulnsCount() != null ? job.getVulnsCount() : 0) + vulnsInBatch);
+                    
+                    return ensureResultExists
+                            .then(scanResultService.saveBatch(job.getResultId(), batch))
+                            .then(scanJobRepository.save(job))
+                            .thenReturn(ResponseEntity.ok().<Void>build());
+                })
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    record CompleteJobRequest(Instant startTime, Instant endTime) {}
+
+    /**
+     * Called by Slave to mark job as complete.
+     */
+    @PostMapping("/jobs/{id}/complete")
+    public Mono<ResponseEntity<Void>> postJobComplete(@PathVariable Long id, @RequestBody CompleteJobRequest request) {
         return scanJobRepository.findById(id)
                 .flatMap(job -> {
                     job.setStatus(JobStatus.COMPLETED);
-                    job.setCompletedAt(Instant.now());
+                    job.setCompletedAt(request.endTime() != null ? request.endTime() : Instant.now());
                     
-                    return scanResultService.save(result)
-                            .flatMap(savedResult -> {
-                                job.setResultId(savedResult.id());
-                                job.setVulnsCount(result.vulnerabilities() != null ? result.vulnerabilities().size() : 0);
-                                job.setTestsCount(result.attempts() != null ? result.attempts().size() : 0);
-                                return scanJobRepository.save(job)
-                                        .doOnSuccess(j -> {
-                                            long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
-                                            long high = result.riskSummary().getOrDefault(RiskLevel.HIGH, 0L);
-                                            long medium = result.riskSummary().getOrDefault(RiskLevel.MEDIUM, 0L);
-                                            long low = result.riskSummary().getOrDefault(RiskLevel.LOW, 0L);
-                                            String grade = "A";
-                                            if (critical > 0) grade = "F";
-                                            else if (high > 0) grade = "D";
-                                            else if (medium > 0) grade = "C";
-                                            else if (low > 0) grade = "B";
+                    Mono<Void> ensureResultExists = Mono.empty();
+                    if (job.getResultId() == null) {
+                        job.setResultId(java.util.UUID.randomUUID().toString());
+                        ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(), request.startTime() != null ? request.startTime() : Instant.now());
+                    }
+                    
+                    int testsCount = job.getTestsCount() != null ? job.getTestsCount() : 0;
+                    
+                    return ensureResultExists
+                            .then(scanResultService.finalizeJobResult(job.getResultId(), job.getTarget(), request.startTime(), job.getCompletedAt(), testsCount))
+                            .flatMap(result -> scanJobRepository.save(job)
+                                .doOnSuccess(j -> {
+                                    long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
+                                    long high = result.riskSummary().getOrDefault(RiskLevel.HIGH, 0L);
+                                    long medium = result.riskSummary().getOrDefault(RiskLevel.MEDIUM, 0L);
+                                    long low = result.riskSummary().getOrDefault(RiskLevel.LOW, 0L);
+                                    String grade = "A";
+                                    if (critical > 0) grade = "F";
+                                    else if (high > 0) grade = "D";
+                                    else if (medium > 0) grade = "C";
+                                    else if (low > 0) grade = "B";
 
-                                            long info = result.riskSummary().getOrDefault(RiskLevel.INFO, 0L);
+                                    long info = result.riskSummary().getOrDefault(RiskLevel.INFO, 0L);
 
-                                            jobEventPublisher.emit(id, JobEvent.completed(
-                                                    id, job.getTarget(), savedResult.id(),
-                                                    grade, result.vulnerabilities().size(),
-                                                    critical, high, medium, low, info,
-                                                    result.operationsScanned()));
-                                            jobEventPublisher.complete(id);
-                                            
-                                            // Update slave status
-                                            if (job.getAssignedSlaveId() != null) {
-                                                slaveNodeRepository.findById(job.getAssignedSlaveId())
-                                                    .flatMap(slave -> scanJobRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
-                                                        .flatMap(runningCount -> {
-                                                            if (runningCount < slave.getMaxConcurrentScans()) {
-                                                                return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.IDLE.name(), slave.getLastSeenAt());
-                                                            }
-                                                            return Mono.empty();
-                                                        }))
-                                                    .subscribe();
-                                            }
-                                        });
-                            });
+                                    jobEventPublisher.emit(id, JobEvent.completed(
+                                            id, job.getTarget(), result.id(),
+                                            grade, result.vulnerabilities().size(),
+                                            critical, high, medium, low, info,
+                                            result.operationsScanned()));
+                                    jobEventPublisher.complete(id);
+                                    
+                                    if (job.getAssignedSlaveId() != null) {
+                                        slaveNodeRepository.findById(job.getAssignedSlaveId())
+                                            .flatMap(slave -> scanJobRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
+                                                .flatMap(runningCount -> {
+                                                    if (runningCount < slave.getMaxConcurrentScans()) {
+                                                        return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.IDLE.name(), slave.getLastSeenAt());
+                                                    }
+                                                    return Mono.empty();
+                                                }))
+                                            .subscribe();
+                                    }
+                                }));
                 })
                 .map(j -> ResponseEntity.ok().<Void>build())
                 .defaultIfEmpty(ResponseEntity.notFound().build());

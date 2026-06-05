@@ -4,7 +4,7 @@ import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.ScanResult;
+
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
@@ -45,7 +45,7 @@ public class ScanEngine {
     /**
      * Runs a complete scan asynchronously.
      */
-    public Mono<ScanResult> runScan(EndpointDiscoverer discoverer, String targetUrl, String overrideHost, ScanConfiguration config) {
+    public Flux<ScanAttempt> runScan(EndpointDiscoverer discoverer, String targetUrl, String overrideHost, ScanConfiguration config) {
         log.info("Starting scan engine with concurrency: {}", config.concurrency());
         Instant startTime = Instant.now();
 
@@ -56,62 +56,21 @@ public class ScanEngine {
 
         log.info("Active scanners: {}", activeScanners.stream().map(SecurityScanner::getId).toList());
 
-        // Thread-safe accumulators for stats
-        Map<RiskLevel, Long> riskSummary = new ConcurrentHashMap<>();
         return discoverer.discover(targetUrl, overrideHost, config)
-                .flatMap(operations -> {
+                .flatMapMany(operations -> {
                     if (operations.isEmpty()) {
                         log.error("No operations discovered. Scan cannot proceed.");
-                        return Mono.error(new IllegalStateException("Discovery failed or no endpoints found. Please check your target URL and documentation."));
+                        return Flux.error(new IllegalStateException("Discovery failed or no endpoints found. Please check your target URL and documentation."));
                     }
 
                     log.info("Discovered {} operations. Starting scan...", operations.size());
 
-                    Map<RiskLevel, Long> riskSummaryAccumulator = new EnumMap<>(RiskLevel.class);
-                    for (RiskLevel level : RiskLevel.values()) {
-                        riskSummaryAccumulator.put(level, 0L);
-                    }
-                    Map<String, Integer> scannerSummary = new HashMap<>();
-
-                    Flux<ScanAttempt> attemptsFlux = Flux.fromIterable(operations)
-                            .flatMap(op -> scanOperation(op, activeScanners, config), config.concurrency());
-
-                    return attemptsFlux
+                    return Flux.fromIterable(operations)
+                            .flatMap(op -> scanOperation(op, activeScanners, config), config.concurrency())
                             .doOnNext(attempt -> {
                                 for (Vulnerability vuln : attempt.vulnerabilities()) {
                                     log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
-                                    riskSummaryAccumulator.compute(vuln.riskLevel(), (k, v) -> v + 1);
-                                    scannerSummary.compute(vuln.scannerId(), (k, v) -> (v == null ? 0 : v) + 1);
                                 }
-                            })
-                            .collectList()
-                            .map(attempts -> {
-                                Instant endTime = Instant.now();
-                                
-                                List<Vulnerability> allVulns = attempts.stream()
-                                    .flatMap(a -> a.vulnerabilities().stream())
-                                    .collect(Collectors.toList());
-                                
-                                List<Vulnerability> sortedVulns = new java.util.ArrayList<>(allVulns);
-                                sortedVulns.sort(java.util.Comparator.comparing(Vulnerability::riskLevel).reversed());
-
-                                ScanResult result = new ScanResult(
-                                        UUID.randomUUID().toString(),
-                                        targetUrl,
-                                        startTime,
-                                        endTime,
-                                        operations.size(),
-                                        operations.size(),
-                                        sortedVulns,
-                                        new EnumMap<>(riskSummaryAccumulator),
-                                        new HashMap<>(scannerSummary),
-                                        config,
-                                        config.includePassed() ? sortAttempts(attempts) : List.of()
-                                );
-                                
-                                log.info("Scan completed in {}. Found {} vulnerabilities in {} executed tests.", result.formattedDuration(), allVulns.size(), attempts.size());
-
-                                return result;
                             });
                 });
     }
@@ -143,35 +102,5 @@ public class ScanEngine {
                 );
     }
     
-    private ScanResult createEmptyResult(String targetUrl, Instant startTime, ScanConfiguration config) {
-        Map<RiskLevel, Long> riskSummary = new EnumMap<>(RiskLevel.class);
-        for (RiskLevel level : RiskLevel.values()) {
-            riskSummary.put(level, 0L);
-        }
-        return new ScanResult(
-                UUID.randomUUID().toString(),
-                targetUrl,
-                startTime,
-                Instant.now(),
-                0,
-                0,
-                List.of(),
-                new EnumMap<>(riskSummary),
-                new HashMap<>(),
-                config,
-                List.of()
-        );
-    }
 
-    /**
-     * Sort attempts by endpoint URL, method, scanner name, then status (failed first).
-     */
-    private List<ScanAttempt> sortAttempts(List<ScanAttempt> attempts) {
-        List<ScanAttempt> sorted = new ArrayList<>(attempts);
-        sorted.sort(Comparator.comparing(ScanAttempt::operationUrl)
-                .thenComparing(ScanAttempt::operationMethod)
-                .thenComparing(ScanAttempt::scannerName)
-                .thenComparing(ScanAttempt::passed)); // false (failed) < true (passed)
-        return sorted;
-    }
 }

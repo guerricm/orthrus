@@ -41,6 +41,7 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         log.debug("Scanning for Broken Authentication: {}", operation.url());
 
         // We care if the endpoint supposedly requires auth, if we can guess it's sensitive, or if it modifies state
@@ -78,6 +79,7 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
             executeAuthCheck(garbageAuthOp, operation, "Invalid Authentication Accepted", "Endpoint returned OK despite a completely invalid/garbage token."),
             executeAuthCheck(sqliAuthOp, operation, "SQLi Bypass in Authentication", "Endpoint returned OK when injecting SQL into the Authorization header.")
         );
+            });
     }
     
     private Flux<Vulnerability> executeAuthCheck(Operation testOp, Operation originalOp, String title, String evidence) {

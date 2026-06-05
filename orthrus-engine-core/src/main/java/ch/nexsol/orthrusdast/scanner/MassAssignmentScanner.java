@@ -40,6 +40,7 @@ public class MassAssignmentScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         String method = operation.method().toUpperCase();
         if (!("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
             return Flux.empty();
@@ -89,6 +90,7 @@ public class MassAssignmentScanner implements SecurityScanner {
             log.debug("Failed to parse or modify JSON body for {}: {}", operation.url(), e.getMessage());
             return Flux.empty();
         }
+        });
     }
 
     private Flux<Vulnerability> executeMassAssignmentCheck(Operation testOp, Operation originalOp, String testType, String context) {
@@ -114,6 +116,4 @@ public class MassAssignmentScanner implements SecurityScanner {
                     return Flux.empty();
                 });
     }
-
-
 }

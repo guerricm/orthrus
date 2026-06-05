@@ -50,6 +50,7 @@ public class FileUploadScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         // Only target endpoints that likely accept multipart/form-data
         if (!List.of("POST", "PUT").contains(operation.method().toUpperCase())) {
             return Flux.empty();
@@ -64,6 +65,7 @@ public class FileUploadScanner implements SecurityScanner {
             testUpload(operation, "shell.php", "application/x-httpd-php", PHP_SHELL_PAYLOAD, "PHP Web Shell Upload", "upload of a PHP Web Shell"),
             testUpload(operation, "shell.php.jpg", "image/jpeg", PHP_SHELL_PAYLOAD, "PHP Web Shell Upload (Double Extension)", "upload of a PHP Web Shell bypassing extension checks using a double extension (.php.jpg)")
         );
+            });
     }
 
     private Flux<Vulnerability> testUpload(Operation operation, String filename, String contentType, String payload, String title, String context) {

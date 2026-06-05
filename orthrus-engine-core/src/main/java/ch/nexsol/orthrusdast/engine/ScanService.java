@@ -2,10 +2,12 @@ package ch.nexsol.orthrusdast.engine;
 
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -35,10 +37,10 @@ public class ScanService {
     /**
      * Execute a scan based on a target and a specific discoverer ID.
      */
-    public Mono<ScanResult> executeScan(String discovererId, String target, String overrideHost, ScanConfiguration config) {
+    public Flux<ScanAttempt> executeScan(String discovererId, String target, String overrideHost, ScanConfiguration config) {
         EndpointDiscoverer discoverer = discoverers.get(discovererId);
         if (discoverer == null) {
-            return Mono.error(new IllegalArgumentException("Unknown discoverer ID: " + discovererId));
+            return Flux.error(new IllegalArgumentException("Unknown discoverer ID: " + discovererId));
         }
 
         log.info("Executing scan with discoverer '{}' on target '{}'", discovererId, target);

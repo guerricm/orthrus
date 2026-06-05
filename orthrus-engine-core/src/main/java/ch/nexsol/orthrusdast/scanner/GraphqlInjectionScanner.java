@@ -54,6 +54,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         if (!"POST".equalsIgnoreCase(operation.method()) || operation.body() == null
                 || !operation.body().contains("\"variables\"")) {
             return Flux.empty();
@@ -108,6 +109,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
                 return Flux.empty();
             }
         });
+            });
     }
 
     private Flux<Vulnerability> testVariable(Operation operation, Map<String, Object> originalBodyMap,

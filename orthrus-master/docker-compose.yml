@@ -1,0 +1,97 @@
+version: "3.7"
+
+services:
+
+########### MASTER
+  orthrus-master:
+    image: repo-docker.hcuge.ch:9082/nexsoltech/orthrus-master:0.0.1-SNAPSHOT
+    environment:
+      ENVIRONMENT: dev
+      ORTHRUS_MASTER_INTERNAL_TOKEN: super-secret-internal-token
+      SPRING_R2DBC_URL: r2dbc:h2:file:////data/orthrus_db;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    user: root
+    volumes:
+      - db_data_vm:/data
+    networks:
+      network:
+      infra_network:
+      traefik_network:
+    deploy:
+      labels:
+        - "traefik.enable=true"       
+        - "traefik.http.routers.orthrus-unsecure.rule=Host(`orthrus.hisaas-dev.hcuge.ch`)"
+        # - "traefik.http.routers.orthrus-unsecure.middlewares=redirect@file"
+        - "traefik.http.routers.orthrus-unsecure.entrypoints=http"
+        - "traefik.http.routers.orthrus.rule=Host(`orthrus.hisaas-dev.hcuge.ch`)"
+        - "traefik.http.routers.orthrus.tls=true"
+        - "traefik.http.routers.orthrus.entrypoints=https"
+        - "traefik.http.services.orthrus.loadbalancer.server.port=8080"
+        - "traefik.http.services.orthrus.loadbalancer.healthCheck.path=/actuator/health/liveness"
+        - "traefik.http.services.orthrus.loadbalancer.healthCheck.interval=11s"
+        - "traefik.http.services.orthrus.loadbalancer.healthCheck.timeout=10s"
+        - "traefik.http.services.orthrus.loadbalancer.healthCheck.scheme=http"
+        - "traefik.http.services.orthrus.loadbalancer.healthCheck.port=8080"
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2048M
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+        preferences:
+          - spread: node.labels.datacenter
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 60s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+
+  orthrus-slave-01:
+    image: repo-docker.hcuge.ch:9082/nexsoltech/orthrus-slave:0.0.1-SNAPSHOT
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - ORTHRUS_MASTER_URL=http://orthrus-master:8080
+      - ORTHRUS_MASTER_INTERNAL_TOKEN=super-secret-internal-token
+      - ORTHRUS_SLAVE_ID=slave-01
+      - ORTHRUS_SLAVE_ADVERTISED_URL=http://orthrus-slave-01:8081
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0 -XX:MaxDirectMemorySize=1G
+    networks:
+      network:
+      infra_network:
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4096M
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+        preferences:
+          - spread: node.labels.datacenter
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 60s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+
+volumes:
+  db_data_vm:
+    name: ${DB_VOLUME}
+
+networks:
+  network:
+    driver: overlay
+  infra_network:
+    external: true
+  traefik_network:
+    external: true

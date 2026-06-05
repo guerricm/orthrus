@@ -47,6 +47,7 @@ public class SslCertificateScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         if (operation.url() == null || !operation.url().toLowerCase().startsWith("https://")) {
             return Flux.empty();
         }
@@ -69,6 +70,7 @@ public class SslCertificateScanner implements SecurityScanner {
             log.warn("Failed to parse URL for SSL scanning: {}", operation.url());
             return Flux.empty();
         }
+            });
     }
 
     private Flux<Vulnerability> scanHost(String hostname, int port, Operation operation) {

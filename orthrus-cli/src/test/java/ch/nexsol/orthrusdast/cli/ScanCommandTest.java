@@ -20,7 +20,7 @@ class ScanCommandTest {
     void testCallWithValidParameters() throws Exception {
         ScanService scanService = Mockito.mock(ScanService.class);
         when(scanService.executeScan(anyString(), any(), any(), any()))
-                .thenReturn(reactor.core.publisher.Mono.just(new ch.nexsol.orthrusdast.model.ScanResult("target", "openapi", java.time.Instant.now(), java.time.Instant.now(), 0, 0, List.of(), java.util.Map.of(), java.util.Map.of(), null, List.of())));
+                .thenReturn(reactor.core.publisher.Flux.empty());
 
         ReportGenerator mockGenerator = Mockito.mock(ReportGenerator.class);
         when(mockGenerator.getFormat()).thenReturn("json");

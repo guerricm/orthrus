@@ -153,7 +153,38 @@ public class ScanCommand implements Callable<Integer> {
 
         try {
             // Block until scan is complete because this is a CLI command
-            ScanResult result = scanService.executeScan(discovererId, target, overrideHost, config).block();
+            java.time.Instant startTime = java.time.Instant.now();
+            List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = scanService.executeScan(discovererId, target, overrideHost, config).collectList().block();
+            
+            if (attempts == null) {
+                attempts = List.of();
+            }
+
+            int testsCount = attempts.size();
+            List<ch.nexsol.orthrusdast.model.Vulnerability> vulnerabilities = attempts.stream()
+                .filter(a -> a.vulnerabilities() != null)
+                .flatMap(a -> a.vulnerabilities().stream())
+                .sorted(java.util.Comparator.comparing(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel).reversed())
+                .toList();
+
+            Map<ch.nexsol.orthrusdast.model.RiskLevel, Long> riskSummary = vulnerabilities.stream()
+                .collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel, Collectors.counting()));
+            Map<String, Integer> scannerSummary = vulnerabilities.stream()
+                .collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::scannerId, Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+
+            ScanResult result = new ScanResult(
+                java.util.UUID.randomUUID().toString(),
+                target,
+                startTime,
+                java.time.Instant.now(),
+                0,
+                testsCount,
+                vulnerabilities,
+                riskSummary,
+                scannerSummary,
+                config,
+                attempts
+            );
 
             ReportGenerator generator = reportGenerators.get(format.toLowerCase());
             if (generator == null) {

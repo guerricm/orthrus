@@ -82,6 +82,7 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         String urlLower = operation.url().toLowerCase();
         boolean isAuthEndpoint = urlLower.contains("/login") || urlLower.contains("/auth") 
                               || urlLower.contains("/token") || urlLower.contains("/signin");
@@ -165,6 +166,7 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
         }
 
         return Flux.concat(bruteForceVulns, enumerationVulns);
+            });
     }
 
     private String truncate(String text) {

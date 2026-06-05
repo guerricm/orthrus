@@ -41,6 +41,7 @@ public class GraphqlIntrospectionScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         // Very basic heuristic: if it looks like a GraphQL operation
         if (operation.body() != null && !operation.body().contains("\"query\"") && !operation.url().contains("graphql")) {
             return Flux.empty();
@@ -100,6 +101,7 @@ public class GraphqlIntrospectionScanner implements SecurityScanner {
         });
 
         return Flux.concat(postVuln, getVuln, suggestionVuln);
+            });
     }
 
     private String truncate(String text) {

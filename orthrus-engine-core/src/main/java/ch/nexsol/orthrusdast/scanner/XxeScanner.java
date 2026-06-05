@@ -43,6 +43,7 @@ public class XxeScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         // Only target POST/PUT/PATCH endpoints that might accept XML
         if (!List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
             return Flux.empty();
@@ -102,5 +103,6 @@ public class XxeScanner implements SecurityScanner {
                         "Unauthorized Access / Data Exposure")
             ));
         });
+            });
     }
 }

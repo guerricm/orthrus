@@ -41,9 +41,11 @@ public class NoSqlInjectionScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return Flux.just(PAYLOAD_1, PAYLOAD_2)
                 .concatMap(payload -> InjectionHelper.generateInjectedOperations(operation, payload)
                         .concatMap(test -> executeNoSqlInjectionTest(operation, test.mutatedOperation(), test.injectionPoint(), payload)));
+            });
     }
     
     private Flux<Vulnerability> executeNoSqlInjectionTest(Operation originalOp, Operation testOp, String injectionPoint, String payload) {

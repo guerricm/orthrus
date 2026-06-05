@@ -79,16 +79,16 @@ public class ScanController {
                             null
                     );
 
-                    try {
-                        String configJson = objectMapper.writeValueAsString(config);
-                        ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                request.discovererId(), request.target(), configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING
-                        );
-                        return scanJobRepository.save(job)
-                                .map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)); // Need a DTO or just return job ID
-                    } catch (Exception e) {
-                        return Mono.error(e);
-                    }
+                    return Mono.fromCallable(() -> objectMapper.writeValueAsString(config))
+                            .flatMap(configJson -> {
+                                ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+                                        request.discovererId(), request.target(), configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING
+                                );
+                                return scanJobRepository.save(job);
+                            })
+                            .map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need a DTO or just return job ID
+                            .doOnError(e -> org.slf4j.LoggerFactory.getLogger(ScanController.class)
+                                    .error("Failed to create or save scan job for target: {}", request.target(), e));
                 })
                 .onErrorResume(IllegalArgumentException.class, e ->
                         Mono.just(ResponseEntity.badRequest().build()))

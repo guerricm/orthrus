@@ -38,6 +38,7 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         Flux<Vulnerability> unusualMethodVulns = Flux.fromArray(UNUSUAL_METHODS)
                 .flatMap(method -> testMethod(operation, method));
 
@@ -72,6 +73,7 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
         }
 
         return Flux.concat(unusualMethodVulns, overrideVulns);
+            });
     }
 
     private Flux<Vulnerability> testMethod(Operation operation, String method) {

@@ -38,6 +38,7 @@ public class CorsScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         String targetHost = "target.com";
         try {
             URI uri = new URI(operation.url());
@@ -98,5 +99,6 @@ public class CorsScanner implements SecurityScanner {
                 return Flux.empty();
             })
         ).take(1); // Stop after finding one bypass
+            });
     }
 }

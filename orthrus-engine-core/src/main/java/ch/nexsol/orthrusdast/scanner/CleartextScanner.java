@@ -34,6 +34,7 @@ public class CleartextScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         String url = operation.url().toLowerCase();
         
         if (url.startsWith("http://")) {
@@ -59,6 +60,7 @@ public class CleartextScanner implements SecurityScanner {
         }
         
         return Flux.empty();
+            });
     }
 
     private Vulnerability createCleartextVuln(Operation originalOp, Operation testOp, boolean isLocal, String reason) {

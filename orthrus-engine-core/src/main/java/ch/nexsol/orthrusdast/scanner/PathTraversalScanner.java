@@ -44,6 +44,7 @@ public class PathTraversalScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         List<String> payloads = List.of(
             "../../../../../../../../../../../../etc/passwd",
             "..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\windows\\win.ini",
@@ -78,6 +79,7 @@ public class PathTraversalScanner implements SecurityScanner {
                 })
             );
         });
+            });
     }
 
     private String truncate(String text) {

@@ -37,6 +37,7 @@ public class CookieSecurityScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return httpClient.send(operation).flatMapMany(response -> {
             List<Vulnerability> vulns = new ArrayList<>();
 
@@ -49,6 +50,7 @@ public class CookieSecurityScanner implements SecurityScanner {
 
             return Flux.fromIterable(vulns);
         });
+            });
     }
 
     private void checkCookie(String cookie, Operation operation, List<Vulnerability> vulns, ch.nexsol.orthrusdast.http.ScanHttpResponse response) {

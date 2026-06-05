@@ -39,6 +39,7 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         String method = operation.method().toUpperCase();
         if (!("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
             return Flux.empty();
@@ -112,6 +113,7 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
         }
 
         return Flux.concat(xxeVulns, bypassVulns);
+            });
     }
     
     private String truncate(String text) {

@@ -1,6 +1,8 @@
 package ch.nexsol.orthrusdast.client;
 
-import ch.nexsol.orthrusdast.model.ScanResult;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import java.util.List;
+import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -27,6 +29,9 @@ public class MasterApiClient {
     private final String slaveId;
     private final String slaveUrl;
     private NodeStatus currentStatus = NodeStatus.IDLE;
+    
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MasterApiClient.class);
+    private boolean masterDownLogged = false;
 
     public MasterApiClient(OrthrusProperties properties) {
         this.webClient = WebClient.builder()
@@ -43,7 +48,11 @@ public class MasterApiClient {
     @EventListener(ApplicationReadyEvent.class)
     public void registerToMaster() {
         String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\"}", slaveId, slaveUrl);
-        System.out.println("Registering slave to master at " + masterUrl);
+        if (!masterDownLogged) {
+            log.info("Registering slave to master at {}", masterUrl);
+        } else {
+            log.debug("Registering slave to master at {}", masterUrl);
+        }
         
         webClient.post()
                 .uri(masterUrl + "/api/internal/slaves/register")
@@ -52,8 +61,22 @@ public class MasterApiClient {
                 .retrieve()
                 .bodyToMono(Void.class)
                 .subscribe(
-                        success -> System.out.println("Successfully registered to master with ID: " + slaveId),
-                        error -> System.err.println("Failed to register to master: " + error.getMessage())
+                        success -> {
+                            if (masterDownLogged) {
+                                log.info("Successfully reconnected and registered to master with ID: {}", slaveId);
+                                masterDownLogged = false;
+                            } else {
+                                log.info("Successfully registered to master with ID: {}", slaveId);
+                            }
+                        },
+                        error -> {
+                            if (!masterDownLogged) {
+                                log.warn("Failed to register to master: {}", error.getMessage());
+                                masterDownLogged = true;
+                            } else {
+                                log.debug("Failed to register to master: {}", error.getMessage());
+                            }
+                        }
                 );
     }
 
@@ -64,24 +87,44 @@ public class MasterApiClient {
                 .retrieve()
                 .bodyToMono(Void.class)
                 .subscribe(
-                        success -> {}, // Silent success
+                        success -> {
+                            if (masterDownLogged) {
+                                log.info("Heartbeat successful. Master is back online.");
+                                masterDownLogged = false;
+                            }
+                        },
                         error -> {
-                            System.err.println("Heartbeat failed (" + error.getMessage() + "). Attempting to re-register...");
+                            if (!masterDownLogged) {
+                                log.warn("Heartbeat failed ({}). Attempting to re-register...", error.getMessage());
+                            } else {
+                                log.debug("Heartbeat failed ({}). Attempting to re-register...", error.getMessage());
+                            }
                             registerToMaster();
                         }
                 );
     }
 
-    public Mono<Void> sendJobResult(Long jobId, ScanResult result) {
+    public Mono<Void> sendJobAttemptsBatch(Long jobId, List<ScanAttempt> batch) {
         return webClient.post()
-                .uri(masterUrl + "/api/internal/jobs/" + jobId + "/result")
+                .uri(masterUrl + "/api/internal/jobs/" + jobId + "/attempts")
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(result)
+                .bodyValue(batch)
+                .retrieve()
+                .bodyToMono(Void.class);
+    }
+
+    public Mono<Void> completeJob(Long jobId, Instant startTime) {
+        // We only send the startTime and endTime. The Master will calculate totals from the batches it received.
+        String payload = String.format("{\"startTime\": \"%s\", \"endTime\": \"%s\"}", startTime.toString(), Instant.now().toString());
+        return webClient.post()
+                .uri(masterUrl + "/api/internal/jobs/" + jobId + "/complete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(Void.class)
                 .doOnSuccess(v -> setStatus(NodeStatus.IDLE))
                 .doOnError(e -> {
-                    System.err.println("Failed to send job result to master: " + e.getMessage());
+                    log.error("Failed to send complete job to master: {}", e.getMessage());
                     setStatus(NodeStatus.IDLE);
                 });
     }

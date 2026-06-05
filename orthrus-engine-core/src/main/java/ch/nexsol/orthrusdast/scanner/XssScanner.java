@@ -52,6 +52,7 @@ public class XssScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return oastService.createSession().flatMapMany(oastSession -> {
             
             Flux<Vulnerability> scanVulns = payloadLoader.getPayloads("xss").concatMap(rawPayload -> {
@@ -79,6 +80,7 @@ public class XssScanner implements SecurityScanner {
                 )
             ));
         });
+            });
     }
 
     private Flux<Vulnerability> executeAndCheck(Operation testOp, Operation originalOp, String injectionPoint, String payload) {

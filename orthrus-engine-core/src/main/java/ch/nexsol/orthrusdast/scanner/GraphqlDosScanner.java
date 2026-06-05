@@ -49,6 +49,7 @@ public class GraphqlDosScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         // Only target GraphQL endpoints
         if (!operation.url().toLowerCase().contains("graphql") && 
             !(operation.expectedContentTypes() != null && operation.expectedContentTypes().contains("application/graphql"))) {
@@ -76,6 +77,7 @@ public class GraphqlDosScanner implements SecurityScanner {
             executeDosCheck(testOpIntrospection, operation, "Deep Introspection Query"),
             executeDosCheck(testOpAlias, operation, "Alias Batching (1000 aliases)")
         );
+            });
     }
 
     private Flux<Vulnerability> executeDosCheck(Operation testOp, Operation originalOp, String payloadType) {

@@ -42,10 +42,12 @@ public class BolaScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         Flux<Vulnerability> pathBola = testPathBola(operation);
         Flux<Vulnerability> queryBola = testQueryBola(operation);
         
         return Flux.concat(pathBola, queryBola);
+            });
     }
 
     private Flux<Vulnerability> testPathBola(Operation operation) {

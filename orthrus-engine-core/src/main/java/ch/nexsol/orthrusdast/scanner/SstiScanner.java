@@ -43,9 +43,11 @@ public class SstiScanner implements SecurityScanner {
 
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
+        return Flux.defer(() -> {
         return Flux.just(PAYLOAD_1, PAYLOAD_2, "<%=" + EXPECTED_RESULT + "%>", "#{7384*8931}", "<%=7384*8931%>")
                 .concatMap(payload -> InjectionHelper.generateInjectedOperations(operation, payload)
                         .concatMap(test -> executeSstiTest(operation, test.mutatedOperation(), test.injectionPoint(), payload)));
+            });
     }
     
     private Flux<Vulnerability> executeSstiTest(Operation originalOp, Operation testOp, String injectionPoint, String payload) {
