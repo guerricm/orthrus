@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" th:fragment="layout(content, title)">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:fragment="layout(content, title)">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +23,7 @@
 
 <div class="wrapper">
     <!-- Sidebar -->
-    <nav class="sidebar">
+    <nav class="sidebar d-flex flex-column">
         <div class="sidebar-header text-center pb-4">
             <img th:src="@{/images/logo.png}" alt="Orthrus DAST Logo" width="90" class="mb-3" style="border-radius: 50%; box-shadow: 0 0 20px rgba(110, 86, 207, 0.4); border: 2px solid rgba(255, 255, 255, 0.1);">
             <br>
@@ -75,7 +75,7 @@
                                 Statistics
                             </a>
                         </li>
-            <li class="nav-item">
+            <li class="nav-item" sec:authorize="hasRole('ADMIN')">
                 <a class="nav-link" href="/system">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-hdd-network" viewBox="0 0 16 16">
                       <path d="M4.5 5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M3 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
@@ -93,6 +93,23 @@
                 </a>
             </li>
         </ul>
+
+        <div class="mt-auto p-3 w-100 border-top border-secondary" style="background-color: rgba(0,0,0,0.1);">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="text-truncate me-2" style="max-width: 150px;">
+                    <small class="text-muted d-block" style="font-size: 0.75rem;">Logged in as</small>
+                    <strong class="text-light text-truncate" sec:authentication="name">User</strong>
+                </div>
+                <form th:action="@{/logout}" method="post" class="m-0">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Logout">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/>
+                          <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
     </nav>
 
     <!-- Main Content -->

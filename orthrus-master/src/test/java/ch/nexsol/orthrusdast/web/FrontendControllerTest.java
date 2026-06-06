@@ -39,12 +39,15 @@ class FrontendControllerTest {
     @org.mockito.Mock
     private ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher;
 
+    @org.mockito.Mock
+    private org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations;
+
     private FrontendController controller;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
         controller = new FrontendController(scanResultService, pdfReportGenerator, tokenFetcher, statisticsService,
-                scanJobRepository, slaveNodeRepository, objectMapper, jobEventPublisher);
+                scanJobRepository, slaveNodeRepository, objectMapper, jobEventPublisher, clientRegistrations);
     }
 
     @Test

@@ -47,13 +47,15 @@ public class FrontendController {
     private final tools.jackson.databind.ObjectMapper objectMapper;
     private final org.springframework.web.reactive.function.client.WebClient webClient;
     private final JobEventPublisher jobEventPublisher;
+    private final org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations;
 
     public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator,
             OAuth2TokenFetcher tokenFetcher, StatisticsService statisticsService,
             ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
             ch.nexsol.orthrusdast.repository.SlaveNodeRepository slaveNodeRepository,
             tools.jackson.databind.ObjectMapper objectMapper,
-            JobEventPublisher jobEventPublisher) {
+            JobEventPublisher jobEventPublisher,
+            org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations) {
         this.scanResultService = scanResultService;
         this.pdfReportGenerator = pdfReportGenerator;
         this.tokenFetcher = tokenFetcher;
@@ -63,6 +65,13 @@ public class FrontendController {
         this.objectMapper = objectMapper;
         this.webClient = org.springframework.web.reactive.function.client.WebClient.builder().build();
         this.jobEventPublisher = jobEventPublisher;
+        this.clientRegistrations = clientRegistrations;
+    }
+
+    @GetMapping("/login")
+    public Mono<String> login(Model model) {
+        model.addAttribute("oauth2Enabled", clientRegistrations.getIfAvailable() != null);
+        return Mono.just("login");
     }
 
     @GetMapping("/manual")
