@@ -233,7 +233,7 @@
                         <div class="col-md-12 mb-2" th:if="${config.oauth2Config != null}">
                             <strong>Authentication:</strong> <span class="badge bg-primary">Dynamic OAuth2</span>
                             <div class="card bg-dark border-secondary mt-2 p-3">
-                                <div><small class="text-muted">OAuth2 URL:</small> <span th:text="${config.oauth2Config.url}"></span></div>
+                                <div><small class="text-muted">OAuth2 URL:</small> <span th:text="${config.oauth2Config.tokenUrl}"></span></div>
                                 <div><small class="text-muted">Grant Type:</small> <span th:text="${config.oauth2Config.grantType}"></span></div>
                                 <div><small class="text-muted">Client ID:</small> <span th:text="${config.oauth2Config.clientId}"></span></div>
                             </div>
