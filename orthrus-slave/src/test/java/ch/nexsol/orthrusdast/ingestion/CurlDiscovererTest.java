@@ -16,7 +16,7 @@ class CurlDiscovererTest {
     @Test
     void testDiscoverSimpleUrl() {
         CurlDiscoverer discoverer = new CurlDiscoverer();
-        StepVerifier.create(discoverer.discover("http://example.com/api", null, null))
+        StepVerifier.create(discoverer.discover("http://example.com/api", null))
             .assertNext(ops -> {
                 assertEquals(1, ops.size());
                 assertEquals("http://example.com/api", ops.get(0).url());

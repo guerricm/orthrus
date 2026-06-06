@@ -91,7 +91,8 @@ public class FrontendController {
                 scanJobRepository.findAll().collectList(),
                 slaveNodeRepository.findAll().collectList()).map(tuple -> {
                     java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1().stream()
-                            .filter(j -> j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING || j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
+                            .filter(j -> j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING
+                                    || j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
                             .collect(java.util.stream.Collectors.toList());
                     jobs.sort((j1, j2) -> Long.compare(j2.getId(), j1.getId()));
                     java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
@@ -117,36 +118,42 @@ public class FrontendController {
         return scanJobRepository.findById(id)
                 .flatMap(job -> {
                     try {
-                        ch.nexsol.orthrusdast.model.ScanConfiguration oldConfig = objectMapper.readValue(job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                        ch.nexsol.orthrusdast.model.ScanConfiguration oldConfig = objectMapper.readValue(
+                                job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
                         if (oldConfig.oauth2Config() != null) {
                             return tokenFetcher.fetchTokens(oldConfig.oauth2Config())
-                                .defaultIfEmpty(java.util.List.of())
-                                .flatMap(fetchedTokens -> {
-                                    ch.nexsol.orthrusdast.model.SecurityScheme authScheme = oldConfig.authScheme();
-                                    ch.nexsol.orthrusdast.model.SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
-                                    if (!fetchedTokens.isEmpty()) {
-                                        authScheme = fetchedTokens.get(0);
-                                        if (fetchedTokens.size() > 1) {
-                                            secondaryAuthScheme = fetchedTokens.get(1);
+                                    .defaultIfEmpty(java.util.List.of())
+                                    .flatMap(fetchedTokens -> {
+                                        ch.nexsol.orthrusdast.model.SecurityScheme authScheme = oldConfig.authScheme();
+                                        ch.nexsol.orthrusdast.model.SecurityScheme secondaryAuthScheme = oldConfig
+                                                .secondaryAuthScheme();
+                                        if (!fetchedTokens.isEmpty()) {
+                                            authScheme = fetchedTokens.get(0);
+                                            if (fetchedTokens.size() > 1) {
+                                                secondaryAuthScheme = fetchedTokens.get(1);
+                                            }
                                         }
-                                    }
-                                    ch.nexsol.orthrusdast.model.ScanConfiguration updatedConfig = new ch.nexsol.orthrusdast.model.ScanConfiguration(
-                                        oldConfig.includeScanners(), oldConfig.excludeScanners(), oldConfig.concurrency(),
-                                        oldConfig.httpConnectTimeoutMs(), oldConfig.httpReadTimeoutMs(), oldConfig.ignoreSslErrors(),
-                                        oldConfig.reportFormat(), authScheme, secondaryAuthScheme, oldConfig.language(),
-                                        oldConfig.includePassed(), oldConfig.gatewayType(), oldConfig.appUrl(), oldConfig.k8sToken(),
-                                        oldConfig.oauth2Config()
-                                    );
-                                    try {
-                                        String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
-                                        ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                                job.getDiscovererId(), job.getTarget(), updatedConfigJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING
-                                        );
-                                        return scanJobRepository.save(newJob);
-                                    } catch (Exception e) {
-                                        return Mono.error(e);
-                                    }
-                                });
+                                        ch.nexsol.orthrusdast.model.ScanConfiguration updatedConfig = new ch.nexsol.orthrusdast.model.ScanConfiguration(
+                                                oldConfig.includeScanners(), oldConfig.excludeScanners(),
+                                                oldConfig.concurrency(),
+                                                oldConfig.httpConnectTimeoutMs(), oldConfig.httpReadTimeoutMs(),
+                                                oldConfig.ignoreSslErrors(),
+                                                oldConfig.reportFormat(), authScheme, secondaryAuthScheme,
+                                                oldConfig.language(),
+                                                oldConfig.includePassed(), oldConfig.gatewayType(), oldConfig.appUrl(),
+                                                oldConfig.k8sToken(),
+                                                oldConfig.oauth2Config(),
+                                                oldConfig.openapiOverrideHost());
+                                        try {
+                                            String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
+                                            ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+                                                    job.getDiscovererId(), job.getTarget(), updatedConfigJson,
+                                                    ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+                                            return scanJobRepository.save(newJob);
+                                        } catch (Exception e) {
+                                            return Mono.error(e);
+                                        }
+                                    });
                         }
                     } catch (Exception e) {
                         // fallback
@@ -156,11 +163,11 @@ public class FrontendController {
                             job.getDiscovererId(),
                             job.getTarget(),
                             job.getScanConfigurationJson(),
-                            ch.nexsol.orthrusdast.model.JobStatus.PENDING
-                    );
+                            ch.nexsol.orthrusdast.model.JobStatus.PENDING);
                     return scanJobRepository.save(newJob);
                 })
-                .doOnNext(newJob -> jobEventPublisher.emit(newJob.getId(), JobEvent.queued(newJob.getId(), newJob.getTarget())))
+                .doOnNext(newJob -> jobEventPublisher.emit(newJob.getId(),
+                        JobEvent.queued(newJob.getId(), newJob.getTarget())))
                 .thenReturn("redirect:/scans/all");
     }
 
@@ -243,54 +250,54 @@ public class FrontendController {
     public Mono<String> newScan(Model model) {
         return Mono.zip(
                 scanJobRepository.findAll().collectList(),
-                slaveNodeRepository.findAll().collectList()
-        ).flatMap(tuple -> {
-            java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1();
-            java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
+                slaveNodeRepository.findAll().collectList()).flatMap(tuple -> {
+                    java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1();
+                    java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
 
-            long totalCapacity = 0;
-            long activeJobsTotal = 0;
-            long availableCapacity = 0;
+                    long totalCapacity = 0;
+                    long activeJobsTotal = 0;
+                    long availableCapacity = 0;
 
-            for (ch.nexsol.orthrusdast.entity.SlaveNodeEntity slave : slaves) {
-                if (slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
-                    totalCapacity += slave.getMaxConcurrentScans();
-                    long activeJobs = jobs.stream()
-                            .filter(j -> slave.getId().equals(j.getAssignedSlaveId()) && j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
-                            .count();
-                    activeJobsTotal += activeJobs;
-                    availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
-                }
-            }
-            model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
-            model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
+                    for (ch.nexsol.orthrusdast.entity.SlaveNodeEntity slave : slaves) {
+                        if (slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
+                            totalCapacity += slave.getMaxConcurrentScans();
+                            long activeJobs = jobs.stream()
+                                    .filter(j -> slave.getId().equals(j.getAssignedSlaveId())
+                                            && j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
+                                    .count();
+                            activeJobsTotal += activeJobs;
+                            availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
+                        }
+                    }
+                    model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
+                    model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
 
-            ch.nexsol.orthrusdast.entity.SlaveNodeEntity activeSlave = slaves.stream()
-                    .filter(s -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE)
-                    .findFirst().orElse(null);
+                    ch.nexsol.orthrusdast.entity.SlaveNodeEntity activeSlave = slaves.stream()
+                            .filter(s -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE)
+                            .findFirst().orElse(null);
 
-            if (activeSlave != null) {
-                return webClient.get().uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
-                        .retrieve()
-                        .bodyToMono(CapabilitiesResponse.class)
-                        .map(caps -> {
-                            model.addAttribute("discoverers", caps.discoverers());
-                            model.addAttribute("scanners", caps.scanners());
-                            return "scans/new";
-                        })
-                        .onErrorResume(e -> {
-                            model.addAttribute("discoverers", java.util.List.of());
-                            model.addAttribute("scanners", java.util.List.of());
-                            model.addAttribute("error",
-                                    "Failed to fetch capabilities from active slave: " + e.getMessage());
-                            return Mono.just("scans/new");
-                        });
-            } else {
-                model.addAttribute("discoverers", java.util.List.of());
-                model.addAttribute("scanners", java.util.List.of());
-                return Mono.just("scans/new");
-            }
-        });
+                    if (activeSlave != null) {
+                        return webClient.get().uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
+                                .retrieve()
+                                .bodyToMono(CapabilitiesResponse.class)
+                                .map(caps -> {
+                                    model.addAttribute("discoverers", caps.discoverers());
+                                    model.addAttribute("scanners", caps.scanners());
+                                    return "scans/new";
+                                })
+                                .onErrorResume(e -> {
+                                    model.addAttribute("discoverers", java.util.List.of());
+                                    model.addAttribute("scanners", java.util.List.of());
+                                    model.addAttribute("error",
+                                            "Failed to fetch capabilities from active slave: " + e.getMessage());
+                                    return Mono.just("scans/new");
+                                });
+                    } else {
+                        model.addAttribute("discoverers", java.util.List.of());
+                        model.addAttribute("scanners", java.util.List.of());
+                        return Mono.just("scans/new");
+                    }
+                });
     }
 
     @PostMapping("/scans/{id}/cancel")
@@ -300,11 +307,14 @@ public class FrontendController {
                     if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING) {
                         job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.CANCELLED);
                         return scanJobRepository.save(job)
-                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")));
+                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent
+                                        .failed(j.getId(), j.getTarget(), "Scan cancelled by user")));
                     } else if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING) {
                         job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.CANCELLED);
                         return scanJobRepository.save(job)
-                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")))
+                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(),
+                                        ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(),
+                                                "Scan cancelled by user")))
                                 .flatMap(j -> {
                                     if (job.getAssignedSlaveId() != null) {
                                         return slaveNodeRepository.findById(job.getAssignedSlaveId())
@@ -312,8 +322,7 @@ public class FrontendController {
                                                         .uri(slave.getUrl() + "/api/v1/slave/scans/" + id)
                                                         .retrieve()
                                                         .bodyToMono(Void.class)
-                                                        .onErrorResume(e -> Mono.empty())
-                                                );
+                                                        .onErrorResume(e -> Mono.empty()));
                                     }
                                     return Mono.empty();
                                 });
@@ -344,9 +353,12 @@ public class FrontendController {
                         java.util.Map<String, Object> map = new java.util.HashMap<>();
                         map.put("job", job);
                         try {
-                            ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                            ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(
+                                    job.getScanConfigurationJson(),
+                                    ch.nexsol.orthrusdast.model.ScanConfiguration.class);
                             map.put("config", conf);
-                        } catch(Exception e) {}
+                        } catch (Exception e) {
+                        }
 
                         if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.COMPLETED
                                 && job.getResultId() != null) {
@@ -470,6 +482,7 @@ public class FrontendController {
             String gatewayType = formData.getFirst("gatewayType");
             String appUrl = formData.getFirst("appUrl");
             String k8sToken = formData.getFirst("k8sToken");
+            String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
 
             List<String> rawIncludeScanners = formData.get("includeScanners");
             final List<String> includeScanners = (rawIncludeScanners == null) ? List.of() : rawIncludeScanners;
@@ -525,12 +538,13 @@ public class FrontendController {
                         ScanConfiguration scanConfig = new ScanConfiguration(
                                 includeScanners, excludeScanners, concurrency, 5000, 10000, false, "html", authScheme,
                                 secondaryAuthScheme, "en", includePassed, GatewayType.fromString(gatewayType), appUrl,
-                                k8sToken, finalOauth2Config);
+                                k8sToken, finalOauth2Config, openapiOverrideHost);
 
                         return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig))
                                 .flatMap(configJson -> {
                                     ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                            discovererId, target, configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+                                            discovererId, target, configJson,
+                                            ch.nexsol.orthrusdast.model.JobStatus.PENDING);
                                     return scanJobRepository.save(job);
                                 })
                                 .doOnSuccess(savedJob -> {
@@ -556,10 +570,14 @@ public class FrontendController {
                 .flatMap(result -> scanJobRepository.findByResultId(id)
                         .map(job -> {
                             try {
-                                ScanConfiguration config = objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
-                                return new ScanResult(result.id(), result.targetUrl(), result.scanStartTime(), result.scanEndTime(),
-                                        result.operationsDiscovered(), result.operationsScanned(), result.vulnerabilities(),
-                                        result.riskSummary(), result.scannerSummary(), config, result.attempts(), job.getDiscovererId());
+                                ScanConfiguration config = objectMapper.readValue(job.getScanConfigurationJson(),
+                                        ScanConfiguration.class);
+                                return new ScanResult(result.id(), result.targetUrl(), result.scanStartTime(),
+                                        result.scanEndTime(),
+                                        result.operationsDiscovered(), result.operationsScanned(),
+                                        result.vulnerabilities(),
+                                        result.riskSummary(), result.scannerSummary(), config, result.attempts(),
+                                        job.getDiscovererId());
                             } catch (Exception e) {
                                 return result;
                             }

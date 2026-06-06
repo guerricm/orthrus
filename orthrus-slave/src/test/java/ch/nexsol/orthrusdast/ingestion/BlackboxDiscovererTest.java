@@ -15,7 +15,7 @@ public class BlackboxDiscovererTest {
         // Since it's a component now, we would normally use @SpringBootTest or set properties manually
         // For a simple test, we just verify it doesn't crash on a bad URL
         
-        StepVerifier.create(discoverer.discover("http://invalid-local-domain-that-does-not-exist.test", null, null))
+        StepVerifier.create(discoverer.discover("http://invalid-local-domain-that-does-not-exist.test", null))
             .assertNext(operations -> assertTrue(operations.isEmpty() || operations.size() == 1))
             .verifyComplete();
     }

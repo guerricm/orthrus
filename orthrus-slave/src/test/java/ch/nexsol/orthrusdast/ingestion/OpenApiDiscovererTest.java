@@ -10,7 +10,7 @@ class OpenApiDiscovererTest {
     void testDiscoverEmptySpec() {
         OpenApiDiscoverer discoverer = new OpenApiDiscoverer();
         
-        StepVerifier.create(discoverer.discover("invalid-url", null, null))
+        StepVerifier.create(discoverer.discover("invalid-url", null))
             .expectErrorMatches(throwable -> throwable instanceof IllegalArgumentException &&
                     throwable.getMessage().contains("Failed to parse OpenAPI specification"))
             .verify();

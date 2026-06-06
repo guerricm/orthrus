@@ -21,7 +21,7 @@ class WellKnownDiscovererTest {
             .thenReturn(reactor.core.publisher.Mono.just(new ch.nexsol.orthrusdast.http.ScanHttpResponse(org.springframework.http.HttpStatus.NOT_FOUND, new org.springframework.http.HttpHeaders(), "", 0L)));
 
         WellKnownDiscoverer discoverer = new WellKnownDiscoverer(mockClient);
-        StepVerifier.create(discoverer.discover("http://invalid-url:9999", null, null))
+        StepVerifier.create(discoverer.discover("http://invalid-url:9999", null))
             .assertNext(ops -> org.junit.jupiter.api.Assertions.assertTrue(ops.isEmpty()))
             .verifyComplete();
     }

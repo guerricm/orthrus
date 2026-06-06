@@ -41,64 +41,70 @@ public class ScanCommand implements Callable<Integer> {
         this.tokenFetcher = tokenFetcher;
     }
 
-    @Option(names = {"-d", "--discoverer"}, description = "Discoverer to use (openapi, blackbox, curl, well-known, gateway)", required = true)
+    @Option(names = { "-d",
+            "--discoverer" }, description = "Discoverer to use (openapi, blackbox, curl, well-known, gateway)", required = true)
     String discovererId;
 
-    @Option(names = {"-t", "--target"}, description = "Target URL or Spec path", required = true)
+    @Option(names = { "-t", "--target" }, description = "Target URL or Spec path", required = true)
     String target;
 
-    @Option(names = {"--host"}, description = "Override host URL")
+    @Option(names = { "--host" }, description = "Override host URL")
     String overrideHost;
 
-    @Option(names = {"-f", "--format"}, description = "Report format (json, sarif, html, pdf, console)", defaultValue = "console")
+    @Option(names = { "-f",
+            "--format" }, description = "Report format (json, sarif, html, pdf, console)", defaultValue = "console")
     String format;
 
-    @Option(names = {"--lang"}, description = "Report language (en, fr)", defaultValue = "en")
+    @Option(names = { "--lang" }, description = "Report language (en, fr)", defaultValue = "en")
     String language;
 
-    @Option(names = {"-o", "--out"}, description = "Output file path (default: stdout)")
+    @Option(names = { "-o", "--out" }, description = "Output file path (default: stdout)")
     String outputFile;
 
-    @Option(names = {"--auth-bearer"}, description = "Bearer token for API authentication (User A)")
+    @Option(names = { "--auth-bearer" }, description = "Bearer token for API authentication (User A)")
     String bearerToken;
 
-    @Option(names = {"--auth-bearer-secondary"}, description = "Secondary Bearer token for Cross-User BOLA testing (User B)")
+    @Option(names = {
+            "--auth-bearer-secondary" }, description = "Secondary Bearer token for Cross-User BOLA testing (User B)")
     String secondaryBearerToken;
 
-    @Option(names = {"--include"}, description = "Comma-separated list of scanners to include", split = ",")
+    @Option(names = { "--include" }, description = "Comma-separated list of scanners to include", split = ",")
     List<String> includeScanners;
 
-    @Option(names = {"--exclude"}, description = "Comma-separated list of scanners to exclude", split = ",")
+    @Option(names = { "--exclude" }, description = "Comma-separated list of scanners to exclude", split = ",")
     List<String> excludeScanners;
 
-    @Option(names = {"--oauth2-url"}, description = "OAuth2 token endpoint URL")
+    @Option(names = { "--oauth2-url" }, description = "OAuth2 token endpoint URL")
     String oauth2Url;
 
-    @Option(names = {"--include-passed"}, description = "Include passed tests in the report")
+    @Option(names = { "--include-passed" }, description = "Include passed tests in the report")
     boolean includePassed;
 
-    @Option(names = {"--oauth2-client-id"}, description = "OAuth2 Client ID")
+    @Option(names = { "--oauth2-client-id" }, description = "OAuth2 Client ID")
     String oauth2ClientId;
 
-    @Option(names = {"--oauth2-client-secret"}, description = "OAuth2 Client Secret")
+    @Option(names = { "--oauth2-client-secret" }, description = "OAuth2 Client Secret")
     String oauth2ClientSecret;
 
-    @Option(names = {"--oauth2-grant"}, description = "OAuth2 Grant Type (password, client_credentials)")
+    @Option(names = { "--oauth2-grant" }, description = "OAuth2 Grant Type (password, client_credentials)")
     String oauth2Grant;
 
-    @Option(names = {"--oauth2-creds"}, description = "Comma-separated list of user:pass credentials", split = ",")
+    @Option(names = { "--oauth2-creds" }, description = "Comma-separated list of user:pass credentials", split = ",")
     List<String> oauth2Creds;
 
-    @Option(names = {"-c", "--concurrency"}, description = "Number of concurrent threads for scanning (default: 10)", defaultValue = "10")
+    @Option(names = { "-c",
+            "--concurrency" }, description = "Number of concurrent threads for scanning (default: 10)", defaultValue = "10")
     int concurrency;
 
-    @Option(names = {"--gateway-type"}, description = "Gateway type: auto, traefik, kong, spring-cloud-gateway, k8s", defaultValue = "auto")
+    @Option(names = {
+            "--gateway-type" }, description = "Gateway type: auto, traefik, kong, spring-cloud-gateway, k8s", defaultValue = "auto")
     String gatewayType;
 
-    @Option(names = {"--app-url"}, description = "Public Application URL for Gateway Discovery (e.g. http://myapp.com)")
+    @Option(names = {
+            "--app-url" }, description = "Public Application URL for Gateway Discovery (e.g. http://myapp.com)")
     String appUrl;
 
-    @Option(names = {"--k8s-token"}, description = "Kubernetes ServiceAccount Token (or set K8S_TOKEN env var)")
+    @Option(names = { "--k8s-token" }, description = "Kubernetes ServiceAccount Token (or set K8S_TOKEN env var)")
     String k8sToken;
 
     @Override
@@ -121,7 +127,7 @@ public class ScanCommand implements Callable<Integer> {
             log.info("Fetching OAuth2 tokens from {}", oauth2Url);
             oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds);
             List<SecurityScheme> fetchedTokens = tokenFetcher.fetchTokens(oauth2Config).block();
-            
+
             if (fetchedTokens != null && !fetchedTokens.isEmpty()) {
                 authScheme = fetchedTokens.get(0);
                 if (fetchedTokens.size() > 1) {
@@ -150,44 +156,47 @@ public class ScanCommand implements Callable<Integer> {
                 GatewayType.fromString(gatewayType),
                 appUrl,
                 k8sToken,
-                oauth2Config
-        );
+                oauth2Config,
+                null);
 
         try {
             // Block until scan is complete because this is a CLI command
             java.time.Instant startTime = java.time.Instant.now();
-            List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = scanService.executeScan(discovererId, target, overrideHost, config).collectList().block();
-            
+            List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = scanService
+                    .executeScan(discovererId, target, config).collectList().block();
+
             if (attempts == null) {
                 attempts = List.of();
             }
 
             int testsCount = attempts.size();
             List<ch.nexsol.orthrusdast.model.Vulnerability> vulnerabilities = attempts.stream()
-                .filter(a -> a.vulnerabilities() != null)
-                .flatMap(a -> a.vulnerabilities().stream())
-                .sorted(java.util.Comparator.comparing(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel).reversed())
-                .toList();
+                    .filter(a -> a.vulnerabilities() != null)
+                    .flatMap(a -> a.vulnerabilities().stream())
+                    .sorted(java.util.Comparator.comparing(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel)
+                            .reversed())
+                    .toList();
 
             Map<ch.nexsol.orthrusdast.model.RiskLevel, Long> riskSummary = vulnerabilities.stream()
-                .collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel, Collectors.counting()));
+                    .collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel,
+                            Collectors.counting()));
             Map<String, Integer> scannerSummary = vulnerabilities.stream()
-                .collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::scannerId, Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+                    .collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::scannerId,
+                            Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
             ScanResult result = new ScanResult(
-                java.util.UUID.randomUUID().toString(),
-                target,
-                startTime,
-                java.time.Instant.now(),
-                0,
-                testsCount,
-                vulnerabilities,
-                riskSummary,
-                scannerSummary,
-                config,
-                attempts,
-                discovererId
-            );
+                    java.util.UUID.randomUUID().toString(),
+                    target,
+                    startTime,
+                    java.time.Instant.now(),
+                    0,
+                    testsCount,
+                    vulnerabilities,
+                    riskSummary,
+                    scannerSummary,
+                    config,
+                    attempts,
+                    discovererId);
 
             ReportGenerator generator = reportGenerators.get(format.toLowerCase());
             if (generator == null) {

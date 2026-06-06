@@ -34,7 +34,7 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, ScanConfiguration config) {
+    public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
         log.info("Starting API Gateway Discovery on Admin URL: {}", target);
         
         GatewayType gatewayType = config.gatewayType() != null ? config.gatewayType() : GatewayType.AUTO;
@@ -91,7 +91,7 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
             }
 
             return Flux.fromIterable(fullUrlsToFuzz)
-                    .flatMap(url -> blackboxDiscoverer.discover(url, overrideHost, config))
+                    .flatMap(url -> blackboxDiscoverer.discover(url, config))
                     .flatMapIterable(ops -> ops)
                     .collectList()
                     .map(allOps -> {

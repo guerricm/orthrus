@@ -22,5 +22,5 @@ public interface EndpointDiscoverer {
      * @param config the scan configuration
      * @return a Mono emitting a List of discovered operations
      */
-    Mono<List<Operation>> discover(String target, String overrideHost, ScanConfiguration config);
+    Mono<List<Operation>> discover(String target, ScanConfiguration config);
 }

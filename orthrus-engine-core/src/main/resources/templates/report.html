@@ -617,7 +617,8 @@
             <tr>
                 <td style="width: 5px; background-color: #e67e22;"></td>
                 <td style="padding: 4px 10px;"><strong style="color: #e67e22;" th:text="#{severity.high}">HIGH</strong>:
-                    <span th:text="#{severity.desc.high}">Significant threat.</span></td>
+                    <span th:text="#{severity.desc.high}">Significant threat.</span>
+                </td>
             </tr>
             <tr>
                 <td colspan="2" style="height: 6px;"></td>
@@ -634,7 +635,8 @@
             <tr>
                 <td style="width: 5px; background-color: #27ae60;"></td>
                 <td style="padding: 4px 10px;"><strong style="color: #27ae60;" th:text="#{severity.low}">LOW</strong>:
-                    <span th:text="#{severity.desc.low}">Minimal impact.</span></td>
+                    <span th:text="#{severity.desc.low}">Minimal impact.</span>
+                </td>
             </tr>
             <tr>
                 <td colspan="2" style="height: 6px;"></td>
@@ -642,7 +644,8 @@
             <tr>
                 <td style="width: 5px; background-color: #3498db;"></td>
                 <td style="padding: 4px 10px;"><strong style="color: #3498db;" th:text="#{severity.info}">INFO</strong>:
-                    <span th:text="#{severity.desc.info}">Informational.</span></td>
+                    <span th:text="#{severity.desc.info}">Informational.</span>
+                </td>
             </tr>
         </table>
     </div>
@@ -716,14 +719,17 @@
 
     <!-- Execution Conditions -->
     <div class="page-break" th:if="${config != null}"></div>
-    <div class="section-title" th:if="${config != null}">3. <span th:text="#{report.conditions.title}">Execution Conditions</span></div>
-    
+    <div class="section-title" th:if="${config != null}">3. <span th:text="#{report.conditions.title}">Execution
+            Conditions</span></div>
+
     <div style="margin-top: 20px; font-size: 9pt;" th:if="${config != null}">
         <table class="attempt-table" style="width: 100%;">
             <tbody>
                 <tr>
-                    <td style="width: 30%;"><strong th:text="#{report.conditions.discoverer}">Discoverer Mode</strong></td>
-                    <td style="width: 70%;"><span style="text-transform: uppercase;" th:text="${discovererId}"></span></td>
+                    <td style="width: 30%;"><strong th:text="#{report.conditions.discoverer}">Discoverer Mode</strong>
+                    </td>
+                    <td style="width: 70%;"><span style="text-transform: uppercase;" th:text="${discovererId}"></span>
+                    </td>
                 </tr>
                 <tr>
                     <td><strong th:text="#{report.conditions.concurrency}">Concurrency</strong></td>
@@ -737,7 +743,8 @@
                     <td><strong th:text="#{report.conditions.auth}">Authentication (Primary)</strong></td>
                     <td>
                         <span th:text="${config.authScheme().type().name()}"></span>
-                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all; background-color: #f4f4f4; padding: 5px; border-radius: 4px;" th:if="${config.authScheme().type().name() == 'BEARER' or config.authScheme().type().name().startsWith('OAUTH2')}">
+                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all; background-color: #f4f4f4; padding: 5px; border-radius: 4px;"
+                            th:if="${config.authScheme().type().name() == 'BEARER' or config.authScheme().type().name().startsWith('OAUTH2')}">
                             <span th:text="${config.authScheme().value()}"></span>
                         </div>
                     </td>
@@ -746,7 +753,8 @@
                     <td><strong th:text="#{report.conditions.authSecondary}">Authentication (Secondary)</strong></td>
                     <td>
                         <span th:text="${config.secondaryAuthScheme().type().name()}"></span>
-                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all; background-color: #f4f4f4; padding: 5px; border-radius: 4px;" th:if="${config.secondaryAuthScheme().type().name() == 'BEARER' or config.secondaryAuthScheme().type().name().startsWith('OAUTH2')}">
+                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all; background-color: #f4f4f4; padding: 5px; border-radius: 4px;"
+                            th:if="${config.secondaryAuthScheme().type().name() == 'BEARER' or config.secondaryAuthScheme().type().name().startsWith('OAUTH2')}">
                             <span th:text="${config.secondaryAuthScheme().value()}"></span>
                         </div>
                     </td>
@@ -760,7 +768,8 @@
     <div class="section-title" th:if="${not #lists.isEmpty(vulnerabilities)}">4. <span
             th:text="#{report.details.title}">Detailed Findings</span></div>
 
-    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break" th:style="${!stat.first} ? 'page-break-before: always;' : ''">
+    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break"
+        th:style="${!stat.first} ? 'page-break-before: always;' : ''">
         <div class="vuln-header">
             <h3 class="vuln-title" th:text="${vuln.name()}">Vulnerability Title</h3>
             <table class="vuln-meta">
@@ -853,12 +862,14 @@
                 | <span class="attempt-fail"><span th:text="#{report.execution.failed}">Failed</span>: <span
                         th:text="${group.failed()}"></span></span>
                 <span th:if="${group.authError() > 0}">
-                | <span style="color: #f39c12; font-weight: bold;"><span th:text="#{report.execution.authError}">Auth Error</span>: <span
-                        th:text="${group.authError()}"></span></span>
+                    | <span style="color: #f39c12; font-weight: bold;"><span
+                            th:text="#{report.execution.authError}">Auth Error</span>: <span
+                            th:text="${group.authError()}"></span></span>
                 </span>
                 <span th:if="${group.error() > 0}">
-                | <span style="color: #7f8c8d; font-weight: bold;"><span th:text="#{report.execution.error}">Error</span>: <span
-                        th:text="${group.error()}"></span></span>
+                    | <span style="color: #7f8c8d; font-weight: bold;"><span
+                            th:text="#{report.execution.error}">Error</span>: <span
+                            th:text="${group.error()}"></span></span>
                 </span>
             </p>
 
@@ -882,9 +893,11 @@
                                 th:text="#{report.execution.passed}">PASSED</span>
                             <span th:if="${attempt.status().name() == 'FAILED'}" class="attempt-fail"
                                 th:text="#{report.execution.failed}">FAILED</span>
-                            <span th:if="${attempt.status().name() == 'AUTH_ERROR'}" style="color: #f39c12; font-weight: bold;"
-                                th:text="#{report.execution.authError}">AUTH ERROR</span>
-                            <span th:if="${attempt.status().name() == 'ERROR'}" style="color: #7f8c8d; font-weight: bold;"
+                            <span th:if="${attempt.status().name() == 'AUTH_ERROR'}"
+                                style="color: #f39c12; font-weight: bold;" th:text="#{report.execution.authError}">AUTH
+                                ERROR</span>
+                            <span th:if="${attempt.status().name() == 'ERROR'}"
+                                style="color: #7f8c8d; font-weight: bold;"
                                 th:text="#{report.execution.error}">ERROR</span>
                         </td>
                     </tr>

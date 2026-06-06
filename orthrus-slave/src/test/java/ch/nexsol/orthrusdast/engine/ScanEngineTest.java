@@ -69,18 +69,18 @@ class ScanEngineTest {
         // Concurrency set to 5
         ScanConfiguration config = new ScanConfiguration(
                 List.of(), List.of(), 5, 5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null
-        );
+        , null);
 
         ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer mockDiscoverer = new ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer() {
             @Override
             public String getId() { return "mock-disc"; }
             @Override
-            public reactor.core.publisher.Mono<List<Operation>> discover(String target, String overrideHost, ScanConfiguration cfg) {
+            public reactor.core.publisher.Mono<List<Operation>> discover(String target, ScanConfiguration cfg) {
                 return reactor.core.publisher.Mono.just(operations);
             }
         };
 
-        List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = engine.runScan(mockDiscoverer, "http://localhost", null, config).collectList().block();
+        List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = engine.runScan(mockDiscoverer, "http://localhost", config).collectList().block();
 
         assertNotNull(attempts);
         assertEquals(20, attempts.size());

@@ -23,7 +23,7 @@ public class CurlDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+    public Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
         ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Registering single target for curl-like scan: {}", target);
         

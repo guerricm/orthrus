@@ -19,7 +19,7 @@ class ScanCommandTest {
     @Test
     void testCallWithValidParameters() throws Exception {
         ScanService scanService = Mockito.mock(ScanService.class);
-        when(scanService.executeScan(anyString(), any(), any(), any()))
+        when(scanService.executeScan(anyString(), any(), any()))
                 .thenReturn(reactor.core.publisher.Flux.empty());
 
         ReportGenerator mockGenerator = Mockito.mock(ReportGenerator.class);
