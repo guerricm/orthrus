@@ -183,13 +183,11 @@
                                 <BPE_APPEND_JAVA_TOOL_OPTIONS>
                                     -Duser.timezone=UTC
                                     -Dfile.encoding=UTF-8
-                                    -XX:MaxDirectMemorySize=64M
                                     -XX:+UseCompactObjectHeaders
                                 </BPE_APPEND_JAVA_TOOL_OPTIONS>
                                 <JAVA_TOOL_OPTIONS>
                                     -Duser.timezone=UTC
                                     -Dfile.encoding=UTF-8
-                                    -XX:MaxDirectMemorySize=64M
                                     -XX:+UseCompactObjectHeaders
                                 </JAVA_TOOL_OPTIONS>
                             </env>
