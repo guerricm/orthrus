@@ -8,6 +8,10 @@ orthrus:
     slave-timeout-seconds: 30
   slave:
     advertised-url: http://not-used
+  security:
+    admin:
+      username: ${ADMIN_USERNAME:superadmin}
+      password: ${ADMIN_PASSWORD:superpassword}
 
 spring:
   r2dbc:
