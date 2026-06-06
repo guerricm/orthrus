@@ -24,7 +24,7 @@
     </modules>
 
     <properties>
-        <revision>0.0.1-SNAPSHOT</revision>
+        <revision>0.0.2-SNAPSHOT</revision>
         <java.version>25</java.version>
         <swagger-parser.version>2.1.43</swagger-parser.version>
         <jjwt.version>0.13.0</jjwt.version>
