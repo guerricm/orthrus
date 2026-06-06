@@ -209,7 +209,7 @@ public class ScanCommand implements Callable<Integer> {
                 os = new FileOutputStream(outputFile);
             }
 
-            generator.generateReport(result, os).block();
+            generator.generateReport(result, os, includePassed).block();
 
             if (os != System.out) {
                 os.close();

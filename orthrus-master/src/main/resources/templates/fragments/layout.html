@@ -146,6 +146,43 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- PDF Options Modal -->
+    <div class="modal fade" id="pdfOptionsModal" tabindex="-1" aria-labelledby="pdfOptionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background-color: var(--bg-darker); border: 1px solid var(--border-color);">
+                <div class="modal-header border-bottom border-secondary">
+                    <h5 class="modal-title" id="pdfOptionsModalLabel">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-file-earmark-pdf-fill me-2 text-info" viewBox="0 0 16 16">
+                            <path d="M5.523 12.424c.14-.082.293-.162.459-.238a7.878 7.878 0 0 1-.45.606c-.28.337-.498.516-.635.572a.266.266 0 0 1-.035.012.282.282 0 0 1-.026-.044c-.056-.11-.054-.216.04-.36.106-.165.319-.354.647-.548zm2.455-1.647c-.119.025-.237.05-.356.078a21.148 21.148 0 0 0 .5-1.05 12.045 12.045 0 0 0 .51.858c-.217.032-.436.07-.654.114zm2.525.939a3.881 3.881 0 0 1-.435-.41c.228.005.434.022.612.054.317.057.466.147.518.209a.095.095 0 0 1 .026.064.436.436 0 0 1-.06.2.307.307 0 0 1-.094.124.107.107 0 0 1-.069.015c-.09-.003-.258-.066-.498-.256zM8.278 6.97c-.04.244-.108.524-.2.829a4.86 4.86 0 0 1-.089-.346c-.076-.353-.087-.63-.046-.822.038-.177.11-.248.196-.283a.517.517 0 0 1 .145-.04c.013.03.028.092.032.198.005.122-.007.277-.038.465z"/>
+                            <path fill-rule="evenodd" d="M4 0h5.293A1 1 0 0 1 10 .293L13.707 4a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zm5.5 1.5v2a1 1 0 0 0 1 1h2l-3-3zM4.165 13.668c.09.18.23.343.438.419.206.075.412.04.58-.059.31-.184.553-.463.774-.81a13.34 13.34 0 0 1 2.012-2.467 7.367 7.367 0 0 1 1.291-.56c.307-.116.634-.142.923-.051.353.111.64.33.82.651.183.324.234.693.136 1.055-.098.362-.338.653-.667.822-.329.17-.704.21-1.071.11-.367-.1-.692-.324-.897-.626-.062-.092-.112-.19-.151-.291a13.419 13.419 0 0 1-1.558-1.503 14.197 14.197 0 0 1-1.357-2.148c-.08-.168-.152-.341-.214-.52-.152-.441-.24-1.005-.205-1.57.034-.564.21-1.127.531-1.558.16-.215.364-.395.597-.522.234-.127.49-.2.75-.205.26-.005.518.06.745.187.227.126.417.307.56.52.338.502.43 1.157.26 1.764-.171.606-.607 1.1-1.17 1.341-.564.24-1.226.23-1.782-.027a13.374 13.374 0 0 1-1.66-1.003 13.385 13.385 0 0 1-1.506-1.392c-.417-.468-.788-1-1.092-1.56-.098-.18-.184-.367-.258-.56-.073-.193-.134-.391-.181-.594-.047-.203-.081-.41-.102-.619-.021-.208-.028-.419-.021-.63.007-.21.03-.42.068-.628z"/>
+                        </svg>Download PDF Report
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-light">
+                    <p>Configure the content of your PDF report.</p>
+                    <div class="form-check form-switch mt-3 mb-2 ps-5">
+                        <input class="form-check-input" type="checkbox" role="switch" id="modalIncludePassed"
+                            style="transform: scale(1.5); margin-left: -2.5rem;">
+                        <label class="form-check-label ms-2" for="modalIncludePassed"
+                            style="color: var(--text-main); font-weight: 500; padding-top: 2px;">Include Execution Logs (Passed tests)</label>
+                    </div>
+                    <small class="text-light opacity-75 d-block mt-2">If checked, the report will include a detailed table of every test executed, including those that did not result in a vulnerability. This acts as an audit trail but can make the report significantly longer.</small>
+                </div>
+                <div class="modal-footer border-top border-secondary">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" id="confirmPdfDownloadBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download me-2" viewBox="0 0 16 16">
+                          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                          <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                        </svg>Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const path = window.location.pathname;
@@ -167,6 +204,9 @@
             [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
         });
 
+        let currentPdfDownloadUrl = '';
+        let currentPdfDownloadButton = null;
+
         window.downloadPdf = function (button, url, event) {
             if (event) {
                 event.preventDefault();
@@ -174,14 +214,33 @@
             }
             if (button.classList.contains('disabled') || button.disabled) return;
 
+            // Store context for the modal
+            currentPdfDownloadUrl = url;
+            currentPdfDownloadButton = button;
+
+            // Show the modal
+            const pdfModal = new bootstrap.Modal(document.getElementById('pdfOptionsModal'));
+            // Reset the switch to default false
+            document.getElementById('modalIncludePassed').checked = false;
+            pdfModal.show();
+        };
+
+        document.getElementById('confirmPdfDownloadBtn').addEventListener('click', function() {
+            const includePassed = document.getElementById('modalIncludePassed').checked;
+            const finalUrl = currentPdfDownloadUrl + (currentPdfDownloadUrl.includes('?') ? '&' : '?') + 'includePassed=' + includePassed;
+            const button = currentPdfDownloadButton;
+
+            // Hide the modal
+            bootstrap.Modal.getInstance(document.getElementById('pdfOptionsModal')).hide();
+
+            // Proceed with download logic
             button.classList.add('disabled');
             button.disabled = true;
             const originalContent = button.innerHTML;
-            // Keep button dimensions
             button.style.minWidth = button.offsetWidth + 'px';
             button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
 
-            fetch(url)
+            fetch(finalUrl)
                 .then(response => {
                     if (!response.ok) throw new Error('Download failed');
                     const disposition = response.headers.get('Content-Disposition');
@@ -215,7 +274,7 @@
                     button.disabled = false;
                     button.style.minWidth = '';
                 });
-        };
+        });
     </script>
 </body>
 

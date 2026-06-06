@@ -45,14 +45,14 @@ public class HtmlReportGenerator implements ReportGenerator {
      * @return a Mono signaling completion
      */
     @Override
-    public Mono<Void> generateReport(ScanResult result, OutputStream output) {
+    public Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed) {
         return Mono.fromRunnable(() -> {
             try {
                 // 1. Determine Language
                 String langStr = result.configuration() != null && result.configuration().language() != null
                         ? result.configuration().language()
                         : "en";
-                Locale locale = Locale.forLanguageTag(langStr);
+                Locale locale = org.springframework.util.StringUtils.parseLocaleString(langStr);
 
                 // 2. Prepare Context for Thymeleaf
                 Context context = new Context(locale);
@@ -94,7 +94,7 @@ public class HtmlReportGenerator implements ReportGenerator {
                 context.setVariable("globalGrade", grade);
 
                 // 4. Execution Details (if --include-passed)
-                if (result.attempts() != null && !result.attempts().isEmpty()) {
+                if (includePassed && result.attempts() != null && !result.attempts().isEmpty()) {
                     java.util.LinkedHashMap<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> grouped = new java.util.LinkedHashMap<>();
                     for (ch.nexsol.orthrusdast.model.ScanAttempt a : result.attempts()) {
                         String key = a.operationMethod() + " " + a.operationUrl();

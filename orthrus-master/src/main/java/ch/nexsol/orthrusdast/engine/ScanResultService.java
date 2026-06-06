@@ -1,5 +1,6 @@
 package ch.nexsol.orthrusdast.engine;
 
+import ch.nexsol.orthrusdast.entity.ScanAttemptEntity;
 import ch.nexsol.orthrusdast.entity.ScanResultEntity;
 import ch.nexsol.orthrusdast.entity.VulnerabilityEntity;
 import ch.nexsol.orthrusdast.model.ScanResult;
@@ -8,6 +9,10 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.OwaspReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.repository.ScanAttemptRepository;
+import ch.nexsol.orthrusdast.repository.ScanJobRepository;
+import tools.jackson.databind.ObjectMapper;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.repository.ScanResultRepository;
 import ch.nexsol.orthrusdast.repository.VulnerabilityRepository;
 import org.springframework.stereotype.Service;
@@ -24,10 +29,16 @@ public class ScanResultService {
 
     private final ScanResultRepository scanResultRepository;
     private final VulnerabilityRepository vulnerabilityRepository;
+    private final ScanAttemptRepository scanAttemptRepository;
+    private final ScanJobRepository scanJobRepository;
+    private final ObjectMapper objectMapper;
 
-    public ScanResultService(ScanResultRepository scanResultRepository, VulnerabilityRepository vulnerabilityRepository) {
+    public ScanResultService(ScanResultRepository scanResultRepository, VulnerabilityRepository vulnerabilityRepository, ScanAttemptRepository scanAttemptRepository, ScanJobRepository scanJobRepository, ObjectMapper objectMapper) {
         this.scanResultRepository = scanResultRepository;
         this.vulnerabilityRepository = vulnerabilityRepository;
+        this.scanAttemptRepository = scanAttemptRepository;
+        this.scanJobRepository = scanJobRepository;
+        this.objectMapper = objectMapper;
     }
 
     public Mono<ScanResult> save(ScanResult result) {
@@ -54,17 +65,23 @@ public class ScanResultService {
 
     public Mono<Void> saveBatch(String resultId, List<ch.nexsol.orthrusdast.model.ScanAttempt> batch) {
         List<VulnerabilityEntity> vulnEntities = new java.util.ArrayList<>();
+        List<ScanAttemptEntity> attemptEntities = new java.util.ArrayList<>();
         for (ch.nexsol.orthrusdast.model.ScanAttempt attempt : batch) {
+            attemptEntities.add(new ScanAttemptEntity(
+                    null, resultId, attempt.scannerId(), attempt.scannerName(),
+                    attempt.operationMethod(), attempt.operationUrl(), attempt.status().name()));
+            
             if (attempt.vulnerabilities() != null) {
                 for (Vulnerability v : attempt.vulnerabilities()) {
                     vulnEntities.add(mapToEntity(v, resultId));
                 }
             }
         }
-        if (vulnEntities.isEmpty()) {
-            return Mono.empty();
-        }
-        return vulnerabilityRepository.saveAll(vulnEntities).then();
+        
+        Mono<Void> saveAttempts = attemptEntities.isEmpty() ? Mono.empty() : scanAttemptRepository.saveAll(attemptEntities).then();
+        Mono<Void> saveVulns = vulnEntities.isEmpty() ? Mono.empty() : vulnerabilityRepository.saveAll(vulnEntities).then();
+        
+        return Mono.when(saveAttempts, saveVulns);
     }
 
     public Mono<Void> createPlaceholderResult(String resultId, String targetUrl, java.time.Instant startTime) {
@@ -105,23 +122,47 @@ public class ScanResultService {
 
     public Mono<ScanResult> findById(String id) {
         return scanResultRepository.findById(id)
-                .flatMap(entity -> vulnerabilityRepository.findByScanResultId(id)
-                        .collectList()
-                        .map(vulnEntities -> mapToDomain(entity, vulnEntities)));
+                .flatMap(entity -> Mono.zip(
+                        vulnerabilityRepository.findByScanResultId(id).collectList(),
+                        scanAttemptRepository.findByScanResultId(id).collectList(),
+                        scanJobRepository.findByResultId(id).map(job -> {
+                            try {
+                                return objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
+                            } catch (Exception e) {
+                                return ScanConfiguration.defaults();
+                            }
+                        }).defaultIfEmpty(ScanConfiguration.defaults())
+                ).map(tuple -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
     }
 
     public Flux<ScanResult> findAll() {
         return scanResultRepository.findAll()
-                .flatMap(entity -> vulnerabilityRepository.findByScanResultId(entity.id())
-                        .collectList()
-                        .map(vulnEntities -> mapToDomain(entity, vulnEntities)));
+                .flatMap(entity -> Mono.zip(
+                        vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
+                        scanAttemptRepository.findByScanResultId(entity.id()).collectList(),
+                        scanJobRepository.findByResultId(entity.id()).map(job -> {
+                            try {
+                                return objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
+                            } catch (Exception e) {
+                                return ScanConfiguration.defaults();
+                            }
+                        }).defaultIfEmpty(ScanConfiguration.defaults())
+                ).map(tuple -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
     }
 
     public Flux<ScanResult> getHistory(int page, int size) {
         return scanResultRepository.findAllByOrderByScanStartTimeDesc(org.springframework.data.domain.PageRequest.of(page, size))
-                .flatMap(entity -> vulnerabilityRepository.findByScanResultId(entity.id())
-                        .collectList()
-                        .map(vulnEntities -> mapToDomain(entity, vulnEntities)));
+                .flatMap(entity -> Mono.zip(
+                        vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
+                        scanAttemptRepository.findByScanResultId(entity.id()).collectList(),
+                        scanJobRepository.findByResultId(entity.id()).map(job -> {
+                            try {
+                                return objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
+                            } catch (Exception e) {
+                                return ScanConfiguration.defaults();
+                            }
+                        }).defaultIfEmpty(ScanConfiguration.defaults())
+                ).map(tuple -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
     }
 
     private VulnerabilityEntity mapToEntity(Vulnerability v, String scanResultId) {
@@ -148,7 +189,7 @@ public class ScanResultService {
         );
     }
 
-    private ScanResult mapToDomain(ScanResultEntity entity, List<VulnerabilityEntity> vulnEntities) {
+    private ScanResult mapToDomain(ScanResultEntity entity, List<VulnerabilityEntity> vulnEntities, List<ScanAttemptEntity> attemptEntities, ScanConfiguration configuration) {
         List<Vulnerability> vulnerabilities = vulnEntities.stream().map(ve -> {
             CWEReference cwe = null;
             if (ve.cweId() != null) {
@@ -192,6 +233,18 @@ public class ScanResultService {
         Map<String, Integer> scannerSummary = vulnerabilities.stream()
                 .collect(Collectors.groupingBy(Vulnerability::scannerId, Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
+        List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = attemptEntities.stream().map(ae -> {
+            List<Vulnerability> relatedVulns = vulnerabilities.stream()
+                .filter(v -> v.scannerId().equals(ae.scannerId()) && v.operationMethod().equals(ae.operationMethod()) && v.operationUrl().equals(ae.operationUrl()))
+                .toList();
+            return new ch.nexsol.orthrusdast.model.ScanAttempt(
+                ae.scannerId(), ae.scannerName(), ae.operationMethod(), ae.operationUrl(),
+                ch.nexsol.orthrusdast.model.AttemptStatus.valueOf(ae.status()),
+                relatedVulns
+            );
+        }).toList();
+
+
         return new ScanResult(
                 entity.id(),
                 entity.targetUrl(),
@@ -202,8 +255,8 @@ public class ScanResultService {
                 vulnerabilities,
                 riskSummary,
                 scannerSummary,
-                null, // configuration omitted from DB for simplicity for now
-                Collections.emptyList(), // attempts omitted
+                configuration,
+                attempts,
                 "UNKNOWN" // discovererId omitted from DB
         );
     }

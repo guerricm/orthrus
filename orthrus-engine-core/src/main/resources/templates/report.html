@@ -884,8 +884,7 @@
                     <tr th:each="attempt : ${group.attempts()}">
                         <td th:text="${attempt.scannerId()}">sqli</td>
                         <td>
-                            <code th:text="${attempt.payload() != null ? attempt.payload() : 'N/A'}"
-                                style="background-color: transparent; color: #333;"></code>
+                            <span th:text="${attempt.scannerName()}">Scanner Name</span>
                         </td>
                         <td>
                             <span th:if="${attempt.status().name() == 'PASSED'}" class="attempt-pass"

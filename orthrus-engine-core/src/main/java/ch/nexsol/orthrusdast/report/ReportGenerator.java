@@ -21,5 +21,5 @@ public interface ReportGenerator {
      * @param output The output stream to write to
      * @return a Mono that completes when the report is fully written
      */
-    Mono<Void> generateReport(ScanResult result, OutputStream output);
+    Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed);
 }

@@ -28,7 +28,7 @@ public class ConsoleReportGenerator implements ReportGenerator {
     }
 
     @Override
-    public Mono<Void> generateReport(ScanResult result, OutputStream output) {
+    public Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed) {
          return Mono.fromRunnable(() -> {
             try (PrintWriter writer = new PrintWriter(output, true, StandardCharsets.UTF_8)) {
                 

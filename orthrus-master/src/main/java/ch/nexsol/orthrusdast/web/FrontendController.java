@@ -565,7 +565,7 @@ public class FrontendController {
     }
 
     @GetMapping("/web/scans/{id}/pdf")
-    public Mono<ResponseEntity<org.springframework.core.io.Resource>> downloadPdf(@PathVariable String id) {
+    public Mono<ResponseEntity<org.springframework.core.io.Resource>> downloadPdf(@PathVariable String id, @RequestParam(defaultValue = "false") boolean includePassed) {
         return scanResultService.findById(id)
                 .flatMap(result -> scanJobRepository.findByResultId(id)
                         .map(job -> {
@@ -585,7 +585,7 @@ public class FrontendController {
                         .defaultIfEmpty(result))
                 .flatMap(result -> {
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    return pdfReportGenerator.generateReport(result, out)
+                    return pdfReportGenerator.generateReport(result, out, includePassed)
                             .then(Mono.fromCallable(
                                     () -> new org.springframework.core.io.ByteArrayResource(out.toByteArray())));
                 })
