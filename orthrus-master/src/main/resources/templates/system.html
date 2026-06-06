@@ -113,9 +113,10 @@
                                     <span th:if="${job.assignedSlaveId == null}" class="text-muted">-</span>
                                 </td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;">
-                                    <a th:if="${job.resultId != null}"
-                                        th:href="@{'/web/scans/' + ${job.resultId} + '/pdf'}"
-                                        class="btn btn-sm btn-outline-primary" target="_blank" title="Download PDF Report">PDF</a>
+                                    <button th:if="${job.resultId != null}"
+                                        th:data-pdf-url="@{'/web/scans/' + ${job.resultId} + '/pdf'}"
+                                        onclick="window.downloadPdf(this, this.getAttribute('data-pdf-url'), event);"
+                                        class="btn btn-sm btn-outline-primary" title="Download PDF Report">PDF</button>
                                         
                                     <form th:if="${job.status != null and (job.status.name() == 'FAILED' or job.status.name() == 'COMPLETED' or job.status.name() == 'RUNNING' or job.status.name() == 'CANCELLED')}"
                                           th:action="@{'/system/jobs/' + ${job.id} + '/restart'}" method="post" class="d-inline">

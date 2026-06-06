@@ -34,7 +34,7 @@
                             <span class="badge bg-danger rounded-pill px-2 py-1"><span th:text="${result.vulnerabilities().size()}">0</span> vulns</span>
                         </div>
                         <span th:if="${status == 'COMPLETED'}" th:data-pdf-url="@{'/web/scans/' + ${resultId} + '/pdf'}"
-                            onclick="window.location.href=this.getAttribute('data-pdf-url'); event.stopPropagation();"
+                            onclick="window.downloadPdf(this, this.getAttribute('data-pdf-url'), event);"
                             class="btn btn-sm btn-outline-info" title="Download PDF Report" style="z-index: 10;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                 viewBox="0 0 16 16">
@@ -50,7 +50,7 @@
 
                     <span th:if="${status == 'FAILED' or status == 'COMPLETED' or status == 'CANCELLED'}"
                           th:data-restart-url="@{'/system/jobs/' + ${jobId} + '/restart'}"
-                          onclick="event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); document.body.appendChild(f); f.submit();"
+                          onclick="event.preventDefault(); event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); document.body.appendChild(f); f.submit();"
                           class="btn btn-sm btn-outline-warning ms-2" title="Restart Scan Job" style="z-index: 10;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
                     </span>

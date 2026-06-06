@@ -124,6 +124,56 @@
         const tooltipTriggerList = evt.detail.elt.querySelectorAll('[data-bs-toggle="tooltip"]');
         [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
     });
+
+    window.downloadPdf = function(button, url, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        if (button.classList.contains('disabled') || button.disabled) return;
+        
+        button.classList.add('disabled');
+        button.disabled = true;
+        const originalContent = button.innerHTML;
+        // Keep button dimensions
+        button.style.minWidth = button.offsetWidth + 'px';
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error('Download failed');
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = 'report.pdf';
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                    if (matches != null && matches[1]) { 
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                return response.blob().then(blob => ({blob, filename}));
+            })
+            .then(({blob, filename}) => {
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(blobUrl);
+                a.remove();
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to generate/download PDF.');
+            })
+            .finally(() => {
+                button.innerHTML = originalContent;
+                button.classList.remove('disabled');
+                button.disabled = false;
+                button.style.minWidth = '';
+            });
+    };
 </script>
 </body>
 </html>
