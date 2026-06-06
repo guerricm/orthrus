@@ -74,23 +74,54 @@ public interface SecurityScanner {
         if (url != null && url.length() > 200) {
             url = url.substring(0, 200) + "...[TRUNCATED]";
         }
-        sb.append(op.method()).append(" ").append(url);
         
-        // Append query params if they aren't already in the URL
+        // Reconstruct URL with query params
+        StringBuilder fullUrl = new StringBuilder(url != null ? url : "");
         if (op.queryParams() != null && !op.queryParams().isEmpty() && op.url() != null && !op.url().contains("?")) {
-            sb.append("?");
+            fullUrl.append("?");
             op.queryParams().forEach((k, v) -> {
                 String val = v;
                 if (val != null && val.length() > 100) val = val.substring(0, 100) + "...[TRUNCATED]";
-                sb.append(k).append("=").append(val).append("&");
+                fullUrl.append(k).append("=").append(val).append("&");
             });
-            sb.setLength(sb.length() - 1); // remove last &
+            fullUrl.setLength(fullUrl.length() - 1); // remove last &
         }
-        sb.append("\n");
         
-        if (op.headers() != null) {
-            op.headers().forEach((k, v) -> sb.append(k).append(": ").append(v).append("\n"));
+        sb.append(op.method()).append(" ").append(fullUrl).append(" HTTP/1.1\n");
+        
+        try {
+            if (url != null) {
+                java.net.URI uri = java.net.URI.create(url);
+                if (uri.getHost() != null) {
+                    sb.append("Host: ").append(uri.getHost()).append("\n");
+                }
+            }
+        } catch (Exception e) {
+            // Ignore URI parsing errors
         }
+        
+        sb.append("User-Agent: Orthrus-DAST/1.0\n");
+        sb.append("Accept: */*\n");
+        
+        if (op.authScheme() != null && op.authScheme().paramLocation() == ch.nexsol.orthrusdast.model.SecurityScheme.ParamLocation.HEADER) {
+            String headerName = op.authScheme().headerName() != null ? op.authScheme().headerName() : "Authorization";
+            sb.append(headerName).append(": ").append(op.authScheme().toAuthorizationHeaderValue()).append("\n");
+        }
+        
+        boolean hasContentType = false;
+        if (op.headers() != null) {
+            for (java.util.Map.Entry<String, String> entry : op.headers().entrySet()) {
+                if ("Content-Type".equalsIgnoreCase(entry.getKey())) {
+                    hasContentType = true;
+                }
+                sb.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+            }
+        }
+        
+        if (op.body() != null && !op.body().isEmpty() && !hasContentType) {
+            sb.append("Content-Type: application/json\n");
+        }
+        
         sb.append("\n");
         if (op.body() != null && !op.body().isEmpty()) {
             sb.append(op.body().length() > 1000 ? op.body().substring(0, 1000) + "... [TRUNCATED]" : op.body());

@@ -8,6 +8,7 @@ import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,21 +38,33 @@ public class SecurityHeadersScanner implements SecurityScanner {
     @Override
     public Flux<Vulnerability> scan(Operation operation) {
         return Flux.defer(() -> {
-        return httpClient.send(operation).flatMapMany(response -> {
-            List<Vulnerability> vulns = new ArrayList<>();
+            Mono<ch.nexsol.orthrusdast.http.ScanHttpResponse> normalResponseMono = httpClient.send(operation);
+            
+            // Send a bogus method to trigger a container-level error page (e.g., 405 or 400) which often leaks Server headers
+            Operation errorOp = new Operation(operation.url(), "BOGUS_METHOD_TEST", operation.headers(), operation.queryParams(), operation.body(), operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme());
+            Mono<ch.nexsol.orthrusdast.http.ScanHttpResponse> errorResponseMono = httpClient.send(errorOp, false).onErrorResume(e -> Mono.empty());
 
-            checkHeader(response, "Strict-Transport-Security", "HSTS", CWEReference.CWE_693, operation, vulns);
-            checkHeader(response, "X-Content-Type-Options", "X-Content-Type-Options", CWEReference.CWE_693, operation, vulns);
-            checkHeader(response, "X-Frame-Options", "X-Frame-Options", CWEReference.CWE_1021, operation, vulns);
-            checkHeader(response, "Content-Security-Policy", "CSP", CWEReference.CWE_693, operation, vulns);
-            checkHeader(response, "Permissions-Policy", "Permissions-Policy", CWEReference.CWE_693, operation, vulns);
-            checkHeader(response, "Referrer-Policy", "Referrer-Policy", CWEReference.CWE_693, operation, vulns);
+            return Flux.merge(normalResponseMono, errorResponseMono)
+                .flatMap(response -> {
+                    List<Vulnerability> vulns = new ArrayList<>();
+                    
+                    // Only check missing security headers on the 2xx normal response to avoid false positives on error pages
+                    if (response.isSuccessful()) {
+                        checkHeader(response, "Strict-Transport-Security", "HSTS", CWEReference.CWE_693, operation, vulns);
+                        checkHeader(response, "X-Content-Type-Options", "X-Content-Type-Options", CWEReference.CWE_693, operation, vulns);
+                        checkHeader(response, "X-Frame-Options", "X-Frame-Options", CWEReference.CWE_1021, operation, vulns);
+                        checkHeader(response, "Content-Security-Policy", "CSP", CWEReference.CWE_693, operation, vulns);
+                        checkHeader(response, "Permissions-Policy", "Permissions-Policy", CWEReference.CWE_693, operation, vulns);
+                        checkHeader(response, "Referrer-Policy", "Referrer-Policy", CWEReference.CWE_693, operation, vulns);
+                    }
 
-            checkServerInfoLeakage(response, operation, vulns);
+                    // Server info leakage can happen on both normal and error responses!
+                    checkServerInfoLeakage(response, operation, vulns);
 
-            return Flux.fromIterable(vulns);
+                    return Flux.fromIterable(vulns);
+                })
+                .distinct(Vulnerability::name); // Avoid duplicate info leakage reports
         });
-            });
     }
 
     private void checkHeader(ch.nexsol.orthrusdast.http.ScanHttpResponse response, String headerName, String shortName, CWEReference cwe, Operation operation, List<Vulnerability> vulns) {

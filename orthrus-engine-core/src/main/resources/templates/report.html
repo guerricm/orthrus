@@ -289,7 +289,6 @@
             border-radius: 6px;
             margin-bottom: 25px;
             background-color: #ffffff;
-            page-break-inside: avoid;
         }
 
         .vuln-header {
@@ -768,7 +767,7 @@
     <div class="section-title" th:if="${not #lists.isEmpty(vulnerabilities)}">4. <span
             th:text="#{report.details.title}">Detailed Findings</span></div>
 
-    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break"
+    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card"
         th:style="${!stat.first} ? 'page-break-before: always;' : ''">
         <div class="vuln-header">
             <h3 class="vuln-title" th:text="${vuln.name()}">Vulnerability Title</h3>
@@ -810,7 +809,7 @@
 
         <div class="vuln-body">
             <div class="vuln-section-title" th:text="#{vuln.description}">Description</div>
-            <p th:text="${vuln.description()}">Description goes here.</p>
+            <p th:text="${vuln.cwe() != null ? (#messages.msgOrNull('desc.' + vuln.cwe().name()) ?: vuln.description()) : vuln.description()}">Description goes here.</p>
 
             <div class="vuln-section-title" th:if="${vuln.evidence() != null and !vuln.evidence().isEmpty()}"
                 th:text="#{vuln.evidence}">Evidence / Proof of Concept</div>
@@ -839,7 +838,7 @@
             </div>
 
             <div class="vuln-section-title" th:text="#{vuln.remediation}">Remediation</div>
-            <p th:text="${vuln.remediation()}">How to fix it.</p>
+            <p th:text="${vuln.cwe() != null ? (#messages.msgOrNull('rem.' + vuln.cwe().name()) ?: vuln.remediation()) : vuln.remediation()}">How to fix it.</p>
         </div>
     </div>
 

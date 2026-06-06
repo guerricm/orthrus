@@ -58,7 +58,7 @@ public class HtmlReportGenerator implements ReportGenerator {
                 Context context = new Context(locale);
 
                 // Date Formatting
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
                         .withZone(ZoneId.systemDefault());
                 context.setVariable("scanDate", formatter.format(result.scanStartTime()));
                 context.setVariable("targetUrl", result.targetUrl());
