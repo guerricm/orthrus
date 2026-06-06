@@ -22,3 +22,7 @@ spring:
     web-application-type: reactive
   codec:
     max-in-memory-size: 50MB
+
+logging:
+  level:
+    org.apache.pdfbox.pdmodel.font.PDType1Font: ERROR
