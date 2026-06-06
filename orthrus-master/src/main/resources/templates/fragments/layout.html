@@ -96,9 +96,9 @@
 
         <div class="p-3 w-100 border-top border-secondary" style="position: absolute; bottom: 0; left: 0; background-color: rgba(0,0,0,0.1);">
             <div class="d-flex align-items-center justify-content-between">
-                <div class="text-truncate me-2" style="max-width: 150px;">
-                    <small class="text-muted d-block" style="font-size: 0.75rem;">Logged in as</small>
-                    <strong class="text-light text-truncate" sec:authentication="name">User</strong>
+                <div class="text-truncate me-2" style="max-width: 150px;" th:if="${#authentication != null}">
+                    <small class="text-white-50 d-block mb-1" style="font-size: 0.85rem;">Logged in as</small>
+                    <strong class="text-light text-truncate" th:text="${#authentication.name}">User</strong>
                 </div>
                 <form th:action="@{/logout}" method="post" class="m-0">
                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Logout">

@@ -116,6 +116,25 @@ The Master node orchestrates everything and exposes the Web UI on `http://localh
 java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
 ```
 
+> **Note**: The Web UI and API are secured by default. You must log in using the default credentials:
+> - **Username**: `superadmin`
+> - **Password**: `superadmin`
+> 
+> You can change these by setting `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables.
+
+### Single Sign-On (SSO) with OAuth2 / OIDC
+Orthrus natively supports OAuth2/OIDC login via standard Spring Security configuration.
+To enable SSO (e.g., with Keycloak, Auth0, Google), simply provide the standard `spring.security.oauth2.client` properties in your `application.yml` or as environment variables before starting the Master.
+
+**Example: Generic OIDC SSO via Environment Variables**
+```bash
+export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID="orthrus-client"
+export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET="your_client_secret"
+export SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI="https://your-idp.example.com/realms/master"
+java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
+```
+When configured, the "Sign in with OpenID Connect" button will allow users to log in. Note that users logging in via OAuth2 will receive the default `ROLE_USER` role unless their token provides specific Orthrus roles mapping.
+
 ### 2. Start one or more Slaves
 Slaves will automatically connect to the Master on port 8080. You can run multiple slaves on different machines or ports.
 ```bash
@@ -196,7 +215,7 @@ java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar
 
 **Trigger a basic scan:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "well-known",
@@ -207,7 +226,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **Generate a PDF report in French with a Bearer token:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "openapi",
@@ -225,7 +244,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **Test for Cross-User BOLA (IDOR) with two distinct users via API:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "openapi",
@@ -248,7 +267,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **Automated OAuth2 Token Fetching via API:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "openapi",
@@ -265,7 +284,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **Generate a report with full execution details:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "openapi",
@@ -277,7 +296,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **List available discoverers:**
 ```bash
-curl http://localhost:8080/api/v1/scans/discoverers
+curl -u superadmin:superadmin http://localhost:8080/api/v1/scans/discoverers
 ```
 
 ## Adding Custom Scanners
