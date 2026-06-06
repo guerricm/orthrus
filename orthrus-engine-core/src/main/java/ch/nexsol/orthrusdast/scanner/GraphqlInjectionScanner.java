@@ -136,7 +136,9 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 
             return httpClient.send(testOp)
                     .flatMapMany(response -> {
-                        if (response.responseTimeMs() > 4000 && payload.contains("sleep")) {
+                        int status = response.statusCode().value();
+                        boolean isClientError = status >= 400 && status < 500;
+                        if (response.responseTimeMs() > 4000 && payload.contains("sleep") && status != 503 && status != 504 && !isClientError) {
                             Vulnerability vuln = createVulnerabilityWithTrace(
                                     "Time-Based Blind Injection in GraphQL Variable",
                                     "The endpoint might be vulnerable to Time-Based Blind Injection via the '" + varName + "' variable.",
