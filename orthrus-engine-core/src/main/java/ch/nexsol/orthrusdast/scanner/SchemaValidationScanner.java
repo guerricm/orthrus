@@ -117,10 +117,10 @@ public class SchemaValidationScanner implements SecurityScanner {
                 } else {
                     // Unbounded string test (Massive payload to test for memory exhaustion / DoS)
                     Map<String, Object> mutated = new HashMap<>(baseline);
-                    mutated.put(propName, "A".repeat(50_000_000)); // 50 MB payload
+                    mutated.put(propName, "A".repeat(50_000)); // 50 KB payload
                     scans.add(testBodyPayload(operation, mutated, "Missing Max Length (Unbounded String DoS)",
                             "The property '" + propName
-                                    + "' lacks a maxLength constraint. An abnormally large string (50 MB) was sent and caused a 2xx or 5xx response, indicating missing bounds checking and potential DoS vulnerability."));
+                                    + "' lacks a maxLength constraint. An abnormally large string (50 KB) was sent and caused a 2xx or 5xx response, indicating missing bounds checking and potential DoS vulnerability."));
                 }
                 // Min Length
                 if (propSchema.getMinLength() != null && propSchema.getMinLength() > 0) {
@@ -242,9 +242,9 @@ public class SchemaValidationScanner implements SecurityScanner {
                             "Parameter Max Length Violation",
                             "Parameter '" + pName + "' exceeded maxLength but was accepted."));
                 } else {
-                    scans.add(testOperation(mutateParameter(baseOp, param.getIn(), pName, "A".repeat(50_000_000)),
+                    scans.add(testOperation(mutateParameter(baseOp, param.getIn(), pName, "A".repeat(50_000)),
                             "Missing Parameter Max Length (Unbounded)", "Parameter '" + pName
-                                    + "' lacks a maxLength constraint. An abnormally large string (50 MB) was accepted, potential DoS."));
+                                    + "' lacks a maxLength constraint. An abnormally large string (50 KB) was accepted, potential DoS."));
                 }
                 if (pSchema.getEnum() != null && !pSchema.getEnum().isEmpty()) {
                     scans.add(testOperation(mutateParameter(baseOp, param.getIn(), pName, "ORTHRUS_INVALID_ENUM"),

@@ -88,15 +88,15 @@ public class ScanHttpClient {
                                 clientResponse.statusCode(),
                                 clientResponse.headers().asHttpHeaders(),
                                 finalBody,
-                                System.currentTimeMillis() - startTime
-                        );
+                                System.currentTimeMillis() - startTime);
                     });
         };
 
         Mono<ScanHttpResponse> resultMono;
         if (body != null && !body.isEmpty()) {
             String cType = operation.headers() != null ? operation.headers().get("Content-Type") : null;
-            if (cType == null) cType = extraHeaders.get("Content-Type");
+            if (cType == null)
+                cType = extraHeaders.get("Content-Type");
             if (cType != null) {
                 requestSpec.contentType(org.springframework.http.MediaType.parseMediaType(cType));
             }
@@ -106,18 +106,22 @@ public class ScanHttpClient {
         }
 
         return resultMono
-                .retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries 4 times with exp backoff
+                .retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries 4 times with exp
+                                                                                      // backoff
                         .filter(e -> e instanceof RateLimitException)
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> retrySignal.failure()))
                 .timeout(Duration.ofSeconds(15))
                 .onErrorResume(e -> {
-                    log.warn("HTTP request failed for {} {}: {}", operation.method(), operation.url(), e.getMessage());
+                    String logUrl = operation.url();
+                    if (logUrl != null && logUrl.length() > 100) {
+                        logUrl = logUrl.substring(0, 100) + "...[TRUNCATED]";
+                    }
+                    log.warn("HTTP request failed for {} {}: {}", operation.method(), logUrl, e.getMessage());
                     return Mono.just(new ScanHttpResponse(
                             org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
                             new HttpHeaders(),
                             "Error: " + e.getMessage(),
-                            System.currentTimeMillis() - startTime
-                    ));
+                            System.currentTimeMillis() - startTime));
                 });
     }
 
@@ -146,7 +150,8 @@ public class ScanHttpClient {
     }
 
     private java.net.URI buildUri(Operation operation) {
-        org.springframework.web.util.UriComponentsBuilder builder = org.springframework.web.util.UriComponentsBuilder.fromUriString(operation.url());
+        org.springframework.web.util.UriComponentsBuilder builder = org.springframework.web.util.UriComponentsBuilder
+                .fromUriString(operation.url());
         if (operation.queryParams() != null) {
             operation.queryParams().forEach(builder::queryParam);
         }
