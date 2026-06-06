@@ -66,7 +66,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                     List.of("CAPEC-310"),
                     4.3,
                     "Header '" + headerName + "' is missing from the response.",
-                    "Configure your web server or application framework to include the '" + headerName + "' header in all nulls.", operation, null,
+                    "Configure your web server or application framework to include the '" + headerName + "' header in all responses.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
         } else {
@@ -83,7 +83,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                             List.of("CAPEC-63"),
                             5.4,
                             "CSP value contains unsafe directives: " + headerValue,
-                            "Remove 'unsafe-inline' and 'unsafe-eval' from your CSP and use nonces or hashes instead.", operation, null,
+                            "Remove 'unsafe-inline' and 'unsafe-eval' from your CSP and use nonces or hashes instead.", operation, response,
                             "API Endpoint (Network)",
                             "Unauthorized Access / Data Exposure"));
                 }
@@ -99,7 +99,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                             List.of("CAPEC-310"),
                             4.3,
                             "HSTS value is misconfigured: " + headerValue,
-                            "Ensure HSTS has a large max-age (e.g., 31536000) and includes 'includeSubDomains'.", operation, null,
+                            "Ensure HSTS has a large max-age (e.g., 31536000) and includes 'includeSubDomains'.", operation, response,
                             "API Endpoint (Network)",
                             "Unauthorized Access / Data Exposure"));
                 }
@@ -127,7 +127,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
                         List.of("CAPEC-118"),
                         3.7,
                         "Header '" + header + "' reveals: " + value,
-                        "Configure your web server to remove or mask the '" + header + "' header.", operation, null,
+                        "Configure your web server to remove or mask the '" + header + "' header.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
             }

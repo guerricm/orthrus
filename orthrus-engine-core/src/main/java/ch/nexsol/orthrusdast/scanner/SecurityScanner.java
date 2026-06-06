@@ -70,12 +70,20 @@ public interface SecurityScanner {
 
     private String formatRequest(Operation op) {
         StringBuilder sb = new StringBuilder();
-        sb.append(op.method()).append(" ").append(op.url());
+        String url = op.url();
+        if (url != null && url.length() > 200) {
+            url = url.substring(0, 200) + "...[TRUNCATED]";
+        }
+        sb.append(op.method()).append(" ").append(url);
         
         // Append query params if they aren't already in the URL
-        if (op.queryParams() != null && !op.queryParams().isEmpty() && !op.url().contains("?")) {
+        if (op.queryParams() != null && !op.queryParams().isEmpty() && op.url() != null && !op.url().contains("?")) {
             sb.append("?");
-            op.queryParams().forEach((k, v) -> sb.append(k).append("=").append(v).append("&"));
+            op.queryParams().forEach((k, v) -> {
+                String val = v;
+                if (val != null && val.length() > 100) val = val.substring(0, 100) + "...[TRUNCATED]";
+                sb.append(k).append("=").append(val).append("&");
+            });
             sb.setLength(sb.length() - 1); // remove last &
         }
         sb.append("\n");
@@ -85,7 +93,7 @@ public interface SecurityScanner {
         }
         sb.append("\n");
         if (op.body() != null && !op.body().isEmpty()) {
-            sb.append(op.body());
+            sb.append(op.body().length() > 1000 ? op.body().substring(0, 1000) + "... [TRUNCATED]" : op.body());
         }
         return sb.toString();
     }

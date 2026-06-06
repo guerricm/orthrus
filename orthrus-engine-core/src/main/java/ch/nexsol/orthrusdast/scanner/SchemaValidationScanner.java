@@ -378,10 +378,10 @@ public class SchemaValidationScanner implements SecurityScanner {
 
     private Flux<Vulnerability> testOperation(Operation testOp, String testName, String description) {
         return httpClient.send(testOp).flatMapMany(response -> {
-            // A well-implemented API should return 4xx (Client Error) for schema
-            // violations.
-            // If it returns 2xx (Success) or 5xx (Server Crash), it indicates improper
-            // input validation.
+            List<Vulnerability> vulns = new ArrayList<>();
+
+            // A well-implemented API should return 4xx (Client Error) for schema violations.
+            // If it returns 2xx (Success) or 5xx (Server Crash), it indicates improper input validation.
             if (response.statusCode().is2xxSuccessful() || response.statusCode().is5xxServerError()) {
                 Vulnerability vuln = createVulnerabilityWithTrace(
                         "Improper Input Validation (" + testName + ")",
@@ -398,9 +398,34 @@ public class SchemaValidationScanner implements SecurityScanner {
                         testOp, response,
                         "API Endpoint (Network)",
                         "Unauthorized Access / Data Exposure");
-                return Flux.just(vuln);
+                vulns.add(vuln);
             }
-            return Flux.empty();
+
+            if (response.statusCode().value() != 401 && response.statusCode().value() != 403) {
+                String actualContentType = response.getHeader("Content-Type");
+                if (actualContentType != null && testOp.expectedContentTypes() != null && !testOp.expectedContentTypes().isEmpty()) {
+                    boolean match = testOp.expectedContentTypes().stream()
+                            .anyMatch(expected -> actualContentType.toLowerCase().contains(expected.toLowerCase()));
+                    if (!match) {
+                        vulns.add(createVulnerabilityWithTrace(
+                                "Unexpected Content-Type (" + testName + ")",
+                                "The API responded with an undocumented Content-Type ('" + actualContentType + "') instead of the expected format(s): " + testOp.expectedContentTypes() + ". This often indicates an unhandled exception or bypass of the framework's standard error handler.",
+                                RiskLevel.LOW,
+                                Vulnerability.Confidence.HIGH,
+                                testOp,
+                                CWEReference.CWE_20,
+                                List.of("CAPEC-3"),
+                                3.7,
+                                "Response Content-Type is: " + actualContentType,
+                                "Ensure that all API responses, including error messages (4xx/5xx), conform to the expected Content-Type (e.g., application/json). Check exception handlers to avoid returning raw text.",
+                                testOp, response,
+                                "API Endpoint (Network)",
+                                "Unauthorized Access / Data Exposure"));
+                    }
+                }
+            }
+
+            return Flux.fromIterable(vulns);
         });
     }
 }

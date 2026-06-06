@@ -33,9 +33,11 @@ public class ScanEngine {
 
     private static final Logger log = LoggerFactory.getLogger(ScanEngine.class);
     private final List<SecurityScanner> allScanners;
+    private final ch.nexsol.orthrusdast.http.ScanHttpClient httpClient;
 
-    public ScanEngine(List<SecurityScanner> scanners) {
+    public ScanEngine(List<SecurityScanner> scanners, ch.nexsol.orthrusdast.http.ScanHttpClient httpClient) {
         this.allScanners = scanners;
+        this.httpClient = httpClient;
     }
 
     public List<SecurityScanner> getAllScanners() {
@@ -77,29 +79,44 @@ public class ScanEngine {
 
     private Flux<ScanAttempt> scanOperation(Operation operation, List<SecurityScanner> scanners, ScanConfiguration config) {
         log.debug("Scanning operation: {} {}", operation.method(), operation.url());
-        return Flux.fromIterable(scanners)
-                .flatMap(scanner -> scanner.scan(operation, config)
-                        .collectList()
-                        .map(vulns -> new ScanAttempt(
+        return httpClient.send(operation).flatMapMany(response -> {
+            if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
+                log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method(), operation.url(), response.statusCode().value());
+                return Flux.fromIterable(scanners)
+                        .map(scanner -> new ScanAttempt(
                                 scanner.getId(), 
                                 scanner.getName(), 
                                 operation.method(), 
                                 operation.url(), 
-                                vulns.isEmpty(), 
-                                vulns
-                        ))
-                        .onErrorResume(e -> {
-                            log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(), e.getMessage());
-                            return Mono.just(new ScanAttempt(
+                                ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR, 
+                                List.of()
+                        ));
+            }
+
+            return Flux.fromIterable(scanners)
+                    .flatMap(scanner -> scanner.scan(operation, config)
+                            .collectList()
+                            .map(vulns -> new ScanAttempt(
                                     scanner.getId(), 
                                     scanner.getName(), 
                                     operation.method(), 
                                     operation.url(), 
-                                    false, 
-                                    List.of()
-                            ));
-                        })
-                );
+                                    vulns.isEmpty() ? ch.nexsol.orthrusdast.model.AttemptStatus.PASSED : ch.nexsol.orthrusdast.model.AttemptStatus.FAILED, 
+                                    vulns
+                            ))
+                            .onErrorResume(e -> {
+                                log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(), e.getMessage());
+                                return Mono.just(new ScanAttempt(
+                                        scanner.getId(), 
+                                        scanner.getName(), 
+                                        operation.method(), 
+                                        operation.url(), 
+                                        ch.nexsol.orthrusdast.model.AttemptStatus.ERROR, 
+                                        List.of()
+                                ));
+                            })
+                    );
+        });
     }
     
 

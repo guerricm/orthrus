@@ -806,11 +806,19 @@
             </h3>
             <p style="margin-top: 0; font-size: 9pt; color: #777;">
                 <span th:text="#{report.tests.executed}">Tests Executed:</span> <span
-                    th:text="${group.passed() + group.failed()}"></span>
+                    th:text="${group.passed() + group.failed() + group.authError() + group.error()}"></span>
                 | <span class="attempt-pass"><span th:text="#{report.execution.passed}">Passed</span>: <span
                         th:text="${group.passed()}"></span></span>
                 | <span class="attempt-fail"><span th:text="#{report.execution.failed}">Failed</span>: <span
                         th:text="${group.failed()}"></span></span>
+                <span th:if="${group.authError() > 0}">
+                | <span style="color: #f39c12; font-weight: bold;"><span th:text="#{report.execution.authError}">Auth Error</span>: <span
+                        th:text="${group.authError()}"></span></span>
+                </span>
+                <span th:if="${group.error() > 0}">
+                | <span style="color: #7f8c8d; font-weight: bold;"><span th:text="#{report.execution.error}">Error</span>: <span
+                        th:text="${group.error()}"></span></span>
+                </span>
             </p>
 
             <table class="attempt-table">
@@ -829,10 +837,14 @@
                                 style="background-color: transparent; color: #333;"></code>
                         </td>
                         <td>
-                            <span th:if="${attempt.passed()}" class="attempt-pass"
+                            <span th:if="${attempt.status().name() == 'PASSED'}" class="attempt-pass"
                                 th:text="#{report.execution.passed}">PASSED</span>
-                            <span th:if="${!attempt.passed()}" class="attempt-fail"
+                            <span th:if="${attempt.status().name() == 'FAILED'}" class="attempt-fail"
                                 th:text="#{report.execution.failed}">FAILED</span>
+                            <span th:if="${attempt.status().name() == 'AUTH_ERROR'}" style="color: #f39c12; font-weight: bold;"
+                                th:text="#{report.execution.authError}">AUTH ERROR</span>
+                            <span th:if="${attempt.status().name() == 'ERROR'}" style="color: #7f8c8d; font-weight: bold;"
+                                th:text="#{report.execution.error}">ERROR</span>
                         </td>
                     </tr>
                 </tbody>

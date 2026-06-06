@@ -105,13 +105,13 @@ public class PdfReportGenerator implements ReportGenerator {
                     }
 
                     java.util.List<ch.nexsol.orthrusdast.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
-                    for (java.util.Map.Entry<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> entry : grouped
-                            .entrySet()) {
-                        long passed = entry.getValue().stream().filter(ch.nexsol.orthrusdast.model.ScanAttempt::passed)
-                                .count();
-                        long failed = entry.getValue().size() - passed;
+                    for (java.util.Map.Entry<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> entry : grouped.entrySet()) {
+                        long passed = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.PASSED == a.status()).count();
+                        long failed = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.FAILED == a.status()).count();
+                        long authError = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR == a.status()).count();
+                        long error = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.ERROR == a.status()).count();
                         attemptGroupsList.add(new ch.nexsol.orthrusdast.model.EndpointAttemptGroup(entry.getKey(),
-                                entry.getValue(), passed, failed));
+                                entry.getValue(), passed, failed, authError, error));
                     }
                     context.setVariable("attemptGroups", attemptGroupsList);
                 }

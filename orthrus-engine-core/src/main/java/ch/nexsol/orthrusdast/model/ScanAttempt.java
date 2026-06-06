@@ -10,7 +10,10 @@ public record ScanAttempt(
         String scannerName,
         String operationMethod,
         String operationUrl,
-        boolean passed,
+        AttemptStatus status,
         List<Vulnerability> vulnerabilities
 ) {
+    public boolean passed() {
+        return status == AttemptStatus.PASSED;
+    }
 }

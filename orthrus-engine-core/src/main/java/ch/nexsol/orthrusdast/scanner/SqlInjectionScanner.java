@@ -85,7 +85,8 @@ public class SqlInjectionScanner implements SecurityScanner {
         return httpClient.send(testOp)
                 .flatMapMany(response -> {
                     // Time-Based Blind Detection (Duration > 4000ms)
-                    if (response.responseTimeMs() > 4000) {
+                    boolean isTimeBasedPayload = payload.toLowerCase().contains("sleep") || payload.toLowerCase().contains("waitfor");
+                    if (isTimeBasedPayload && response.responseTimeMs() > 4000 && response.statusCode().value() != 503) {
                         Vulnerability vuln = createVulnerabilityWithTrace(
                             "Time-Based Blind SQL Injection",
                             "The endpoint took " + response.responseTimeMs() + "ms to respond, indicating a potential Time-Based Blind SQL Injection in " + injectionPoint + ".",
