@@ -76,7 +76,8 @@ public class ScanController {
                             request.includePassed() != null ? request.includePassed() : false,
                             GatewayType.AUTO,
                             null,
-                            null
+                            null,
+                            request.oauth2()
                     );
 
                     return Mono.fromCallable(() -> objectMapper.writeValueAsString(config))

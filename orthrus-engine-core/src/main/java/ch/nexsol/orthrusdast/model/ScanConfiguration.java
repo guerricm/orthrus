@@ -19,7 +19,8 @@ public record ScanConfiguration(
         boolean includePassed,
         GatewayType gatewayType,
         String appUrl,
-        String k8sToken
+        String k8sToken,
+        OAuth2Config oauth2Config
 ) {
 
     public static ScanConfiguration defaults() {
@@ -36,6 +37,7 @@ public record ScanConfiguration(
                 "en",
                 false,
                 GatewayType.AUTO,
+                null,
                 null,
                 null
         );

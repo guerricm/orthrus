@@ -2,6 +2,24 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - New Scan')}">
 <body>
 <main>
+    <style>
+        .form-control, .form-select {
+            background-color: var(--bs-gray-900) !important;
+            color: #fff !important;
+            border-color: var(--bs-gray-700) !important;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: var(--bs-gray-800) !important;
+            color: #fff !important;
+        }
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
+            opacity: 1; /* Firefox */
+        }
+        .text-muted {
+            color: rgba(255, 255, 255, 0.65) !important;
+        }
+    </style>
     <div class="row justify-content-center">
         <div class="col-lg-10 mb-5">
             <h2 class="mb-4">Launch a New Scan</h2>
@@ -64,7 +82,7 @@
                                     <div class="col-md-8">
                                         <label for="appUrl" class="form-label">Public App URL (Optional)</label>
                                         <input type="url" class="form-control" id="appUrl" name="appUrl" placeholder="https://public-api.example.com">
-                                        <div class="form-text text-muted">Use if the Admin API port differs from the public App port.</div>
+                                        <div class="form-text text-white-50">Use if the Admin API port differs from the public App port.</div>
                                     </div>
                                     <div class="col-md-12" id="k8s-token-container" style="display: none;">
                                         <label for="k8sToken" class="form-label">Kubernetes ServiceAccount Token</label>
@@ -99,12 +117,12 @@
                                         <div class="col-md-6">
                                             <label for="bearerToken" class="form-label">Primary Bearer Token</label>
                                             <input type="password" class="form-control" id="bearerToken" name="bearerToken" placeholder="eyJhbGciOiJIUzI1NiIs...">
-                                            <div class="form-text text-muted">Injected in all standard requests.</div>
+                                            <div class="form-text text-white-50">Injected in all standard requests.</div>
                                         </div>
                                         <div class="col-md-6">
                                             <label for="bearerTokenSecondary" class="form-label">Secondary Bearer Token</label>
                                             <input type="password" class="form-control" id="bearerTokenSecondary" name="bearerTokenSecondary" placeholder="Secondary token">
-                                            <div class="form-text text-muted">For BOLA / Cross-User testing.</div>
+                                            <div class="form-text text-white-50">For BOLA / Cross-User testing.</div>
                                         </div>
                                     </div>
 
@@ -138,7 +156,7 @@
                                         <div class="col-md-12">
                                             <label for="oauth2Creds" class="form-label">OAuth2 Credentials (for Password Grant)</label>
                                             <input type="text" class="form-control" id="oauth2Creds" name="oauth2Creds" placeholder="user1:pass1,user2:pass2">
-                                            <div class="form-text text-muted">Comma-separated list of username:password</div>
+                                            <div class="form-text text-white-50">Comma-separated list of username:password</div>
                                         </div>
                                     </div>
 
@@ -153,7 +171,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="form-text text-muted mt-2">Uncheck the scanners you want to skip. By default, all scanners are executed.</div>
+                                            <div class="form-text text-white-50 mt-2">Uncheck the scanners you want to skip. By default, all scanners are executed.</div>
                                         </div>
                                     </div>
 
@@ -162,7 +180,7 @@
                                         <div class="col-md-12">
                                             <label for="concurrency" class="form-label">Scan Concurrency: <span id="concurrencyValue">10</span></label>
                                             <input type="range" class="form-range" min="1" max="100" step="1" id="concurrency" name="concurrency" value="10" oninput="document.getElementById('concurrencyValue').innerText = this.value">
-                                            <div class="form-text text-muted">Higher values scan faster but generate more traffic on the target server. Reduce this if the API drops requests.</div>
+                                            <div class="form-text text-white-50">Higher values scan faster but generate more traffic on the target server. Reduce this if the API drops requests.</div>
                                         </div>
                                     </div>
                                 </div>

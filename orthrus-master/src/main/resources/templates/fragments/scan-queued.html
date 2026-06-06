@@ -214,6 +214,30 @@
                     </div>
                 </div>
 
+                <!-- Configuration Details -->
+                <div th:if="${config != null}" class="mb-4">
+                    <h5 class="text-secondary border-bottom border-secondary pb-2 mb-3">Scan Configuration</h5>
+                    <div class="row text-light">
+                        <div class="col-md-6 mb-2">
+                            <strong>Concurrency:</strong> <span th:text="${config.concurrency}"></span>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Gateway Type:</strong> <span th:text="${config.gatewayType}"></span>
+                        </div>
+                        <div class="col-md-6 mb-2" th:if="${config.authScheme != null and config.oauth2Config == null}">
+                            <strong>Authentication:</strong> <span class="badge bg-info text-dark">Static Token</span>
+                        </div>
+                        <div class="col-md-12 mb-2" th:if="${config.oauth2Config != null}">
+                            <strong>Authentication:</strong> <span class="badge bg-primary">Dynamic OAuth2</span>
+                            <div class="card bg-dark border-secondary mt-2 p-3">
+                                <div><small class="text-muted">OAuth2 URL:</small> <span th:text="${config.oauth2Config.url}"></span></div>
+                                <div><small class="text-muted">Grant Type:</small> <span th:text="${config.oauth2Config.grantType}"></span></div>
+                                <div><small class="text-muted">Client ID:</small> <span th:text="${config.oauth2Config.clientId}"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Results (hidden until completed) -->
                 <div th:id="'scan-results-' + ${jobId}"
                     th:style="${status == 'COMPLETED' ? 'display: block;' : 'display: none;'}">

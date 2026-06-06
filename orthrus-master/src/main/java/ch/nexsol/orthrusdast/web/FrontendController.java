@@ -101,6 +101,42 @@ public class FrontendController {
     public Mono<String> restartJob(@org.springframework.web.bind.annotation.PathVariable Long id) {
         return scanJobRepository.findById(id)
                 .flatMap(job -> {
+                    try {
+                        ch.nexsol.orthrusdast.model.ScanConfiguration oldConfig = objectMapper.readValue(job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                        if (oldConfig.oauth2Config() != null) {
+                            return tokenFetcher.fetchTokens(oldConfig.oauth2Config())
+                                .defaultIfEmpty(java.util.List.of())
+                                .flatMap(fetchedTokens -> {
+                                    ch.nexsol.orthrusdast.model.SecurityScheme authScheme = oldConfig.authScheme();
+                                    ch.nexsol.orthrusdast.model.SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
+                                    if (!fetchedTokens.isEmpty()) {
+                                        authScheme = fetchedTokens.get(0);
+                                        if (fetchedTokens.size() > 1) {
+                                            secondaryAuthScheme = fetchedTokens.get(1);
+                                        }
+                                    }
+                                    ch.nexsol.orthrusdast.model.ScanConfiguration updatedConfig = new ch.nexsol.orthrusdast.model.ScanConfiguration(
+                                        oldConfig.includeScanners(), oldConfig.excludeScanners(), oldConfig.concurrency(),
+                                        oldConfig.httpConnectTimeoutMs(), oldConfig.httpReadTimeoutMs(), oldConfig.ignoreSslErrors(),
+                                        oldConfig.reportFormat(), authScheme, secondaryAuthScheme, oldConfig.language(),
+                                        oldConfig.includePassed(), oldConfig.gatewayType(), oldConfig.appUrl(), oldConfig.k8sToken(),
+                                        oldConfig.oauth2Config()
+                                    );
+                                    try {
+                                        String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
+                                        ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+                                                job.getDiscovererId(), job.getTarget(), updatedConfigJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING
+                                        );
+                                        return scanJobRepository.save(newJob);
+                                    } catch (Exception e) {
+                                        return Mono.error(e);
+                                    }
+                                });
+                        }
+                    } catch (Exception e) {
+                        // fallback
+                    }
+
                     ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
                             job.getDiscovererId(),
                             job.getTarget(),
@@ -109,6 +145,7 @@ public class FrontendController {
                     );
                     return scanJobRepository.save(newJob);
                 })
+                .doOnNext(newJob -> jobEventPublisher.emit(newJob.getId(), JobEvent.queued(newJob.getId(), newJob.getTarget())))
                 .thenReturn("redirect:/scans/all");
     }
 
@@ -291,6 +328,10 @@ public class FrontendController {
                     for (ch.nexsol.orthrusdast.entity.ScanJobEntity job : history) {
                         java.util.Map<String, Object> map = new java.util.HashMap<>();
                         map.put("job", job);
+                        try {
+                            ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                            map.put("config", conf);
+                        } catch(Exception e) {}
 
                         if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.COMPLETED
                                 && job.getResultId() != null) {
@@ -443,7 +484,9 @@ public class FrontendController {
                         oauth2Creds);
             }
 
-            return Mono.justOrEmpty(oauth2Config)
+            final OAuth2Config finalOauth2Config = oauth2Config;
+
+            return Mono.justOrEmpty(finalOauth2Config)
                     .flatMap(config -> tokenFetcher.fetchTokens(config))
                     .defaultIfEmpty(List.of())
                     .flatMap(fetchedTokens -> {
@@ -464,12 +507,12 @@ public class FrontendController {
                             }
                         }
 
-                        ScanConfiguration config = new ScanConfiguration(
+                        ScanConfiguration scanConfig = new ScanConfiguration(
                                 includeScanners, excludeScanners, concurrency, 5000, 10000, false, "html", authScheme,
                                 secondaryAuthScheme, "en", includePassed, GatewayType.fromString(gatewayType), appUrl,
-                                k8sToken);
+                                k8sToken, finalOauth2Config);
 
-                        return Mono.fromCallable(() -> objectMapper.writeValueAsString(config))
+                        return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig))
                                 .flatMap(configJson -> {
                                     ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
                                             discovererId, target, configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING);

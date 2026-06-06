@@ -62,7 +62,7 @@ class ApiGatewayDiscovererTest {
         });
 
         ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.KONG, null, null
+                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.KONG, null, null, null
         );
 
         StepVerifier.create(discoverer.discover(url, null, config))
@@ -90,7 +90,7 @@ class ApiGatewayDiscovererTest {
         });
 
         ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.TRAEFIK, "api.traefik.internal", null
+                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.TRAEFIK, "api.traefik.internal", null, null
         );
 
         StepVerifier.create(discoverer.discover(url, null, config))
@@ -125,7 +125,7 @@ class ApiGatewayDiscovererTest {
         });
 
         ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.K8S, null, "test-k8s-token"
+                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.K8S, null, "test-k8s-token", null
         );
 
         StepVerifier.create(discoverer.discover(url, null, config))

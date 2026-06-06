@@ -68,7 +68,7 @@ class ScanEngineTest {
 
         // Concurrency set to 5
         ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 5, 5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null
+                List.of(), List.of(), 5, 5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null
         );
 
         ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer mockDiscoverer = new ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer() {

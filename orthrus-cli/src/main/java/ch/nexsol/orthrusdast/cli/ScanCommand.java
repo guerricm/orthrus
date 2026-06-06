@@ -116,9 +116,10 @@ public class ScanCommand implements Callable<Integer> {
         }
 
         // Handle OAuth2 automated token fetching
+        OAuth2Config oauth2Config = null;
         if (oauth2Url != null && oauth2Grant != null) {
             log.info("Fetching OAuth2 tokens from {}", oauth2Url);
-            OAuth2Config oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds);
+            oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds);
             List<SecurityScheme> fetchedTokens = tokenFetcher.fetchTokens(oauth2Config).block();
             
             if (fetchedTokens != null && !fetchedTokens.isEmpty()) {
@@ -148,7 +149,8 @@ public class ScanCommand implements Callable<Integer> {
                 includePassed,
                 GatewayType.fromString(gatewayType),
                 appUrl,
-                k8sToken
+                k8sToken,
+                oauth2Config
         );
 
         try {
