@@ -21,4 +21,6 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
     Flux<ScanJobEntity> findAllByOrderByCreatedAtDesc(org.springframework.data.domain.Pageable pageable);
 
     reactor.core.publisher.Mono<Long> countByAssignedSlaveIdAndStatus(String assignedSlaveId, JobStatus status);
+
+    reactor.core.publisher.Mono<ScanJobEntity> findByResultId(String resultId);
 }

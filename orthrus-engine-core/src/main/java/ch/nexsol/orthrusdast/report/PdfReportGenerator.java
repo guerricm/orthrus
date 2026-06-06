@@ -4,6 +4,9 @@ import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
+import com.openhtmltopdf.extend.FSSupplier;
+import java.io.InputStream;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
@@ -62,11 +65,13 @@ public class PdfReportGenerator implements ReportGenerator {
                 Context context = new Context(locale);
 
                 // Date Formatting
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                String pattern = "fr".equalsIgnoreCase(langStr) ? "dd.MM.yyyy" : "yyyy-MM-dd";
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern)
                         .withZone(ZoneId.systemDefault());
                 context.setVariable("scanDate", formatter.format(result.scanStartTime()));
                 context.setVariable("targetUrl", result.targetUrl());
                 context.setVariable("config", result.configuration());
+                context.setVariable("discovererId", result.discovererId() != null ? result.discovererId() : "UNKNOWN");
 
                 // Vulnerabilities are already sorted by ScanEngine
                 context.setVariable("vulnerabilities", result.vulnerabilities());
@@ -124,6 +129,21 @@ public class PdfReportGenerator implements ReportGenerator {
 
                 // 6. Generate PDF
                 PdfRendererBuilder builder = new PdfRendererBuilder();
+                
+                builder.useFont(new FSSupplier<InputStream>() {
+                    @Override
+                    public InputStream supply() {
+                        return PdfReportGenerator.class.getResourceAsStream("/fonts/Roboto-Regular.ttf");
+                    }
+                }, "Roboto", 400, BaseRendererBuilder.FontStyle.NORMAL, true);
+                
+                builder.useFont(new FSSupplier<InputStream>() {
+                    @Override
+                    public InputStream supply() {
+                        return PdfReportGenerator.class.getResourceAsStream("/fonts/Roboto-Bold.ttf");
+                    }
+                }, "Roboto", 700, BaseRendererBuilder.FontStyle.NORMAL, true);
+
                 builder.withHtmlContent(html, "");
                 builder.toStream(outputStream);
                 builder.run();

@@ -185,7 +185,8 @@ public class ScanCommand implements Callable<Integer> {
                 riskSummary,
                 scannerSummary,
                 config,
-                attempts
+                attempts,
+                discovererId
             );
 
             ReportGenerator generator = reportGenerators.get(format.toLowerCase());

@@ -6,7 +6,7 @@
     <title th:text="#{report.title}">Orthrus DAST - Penetration Testing Report</title>
     <style>
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             color: #333;
             margin: 0;
             padding: 0;
@@ -410,16 +410,6 @@
                 <span th:text="#{report.target}">Target</span>: <br />
                 <span class="url" th:text="${targetUrl}">https://example.com</span>
             </div>
-            
-            <div th:if="${config != null and config.authScheme() != null and (config.authScheme().type().name() == 'BEARER' or config.authScheme().type().name().startsWith('OAUTH2'))}" style="margin-top: 30px; font-size: 10pt; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong style="color: #3498db;">Injected Token (Primary):</strong><br/>
-                <code style="word-break: break-all; color: #ecf0f1; font-family: monospace; font-size: 9pt;" th:text="${config.authScheme().value()}"></code>
-            </div>
-            
-            <div th:if="${config != null and config.secondaryAuthScheme() != null and (config.secondaryAuthScheme().type().name() == 'BEARER' or config.secondaryAuthScheme().type().name().startsWith('OAUTH2'))}" style="margin-top: 15px; font-size: 10pt; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong style="color: #3498db;">Injected Token (Secondary):</strong><br/>
-                <code style="word-break: break-all; color: #ecf0f1; font-family: monospace; font-size: 9pt;" th:text="${config.secondaryAuthScheme().value()}"></code>
-            </div>
         </div>
         <div class="cover-footer">
             <p><span th:text="#{report.date}">Generated on</span>: <span th:text="${scanDate}">2026-05-30</span></p>
@@ -724,9 +714,50 @@
         </p>
     </div>
 
+    <!-- Execution Conditions -->
+    <div class="page-break" th:if="${config != null}"></div>
+    <div class="section-title" th:if="${config != null}">3. <span th:text="#{report.conditions.title}">Execution Conditions</span></div>
+    
+    <div style="margin-top: 20px; font-size: 9pt;" th:if="${config != null}">
+        <table class="attempt-table" style="width: 100%;">
+            <tbody>
+                <tr>
+                    <td style="width: 30%;"><strong th:text="#{report.conditions.discoverer}">Discoverer Mode</strong></td>
+                    <td style="width: 70%;"><span style="text-transform: uppercase;" th:text="${discovererId}"></span></td>
+                </tr>
+                <tr>
+                    <td><strong th:text="#{report.conditions.concurrency}">Concurrency</strong></td>
+                    <td th:text="${config.concurrency()}"></td>
+                </tr>
+                <tr th:if="${config.gatewayType() != null}">
+                    <td><strong th:text="#{report.conditions.gateway}">Gateway Type</strong></td>
+                    <td th:text="${config.gatewayType()}"></td>
+                </tr>
+                <tr th:if="${config.authScheme() != null and config.authScheme().type() != null}">
+                    <td><strong th:text="#{report.conditions.auth}">Authentication (Primary)</strong></td>
+                    <td>
+                        <span th:text="${config.authScheme().type().name()}"></span>
+                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all; background-color: #f4f4f4; padding: 5px; border-radius: 4px;" th:if="${config.authScheme().type().name() == 'BEARER' or config.authScheme().type().name().startsWith('OAUTH2')}">
+                            <span th:text="${config.authScheme().value()}"></span>
+                        </div>
+                    </td>
+                </tr>
+                <tr th:if="${config.secondaryAuthScheme() != null and config.secondaryAuthScheme().type() != null}">
+                    <td><strong th:text="#{report.conditions.authSecondary}">Authentication (Secondary)</strong></td>
+                    <td>
+                        <span th:text="${config.secondaryAuthScheme().type().name()}"></span>
+                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all; background-color: #f4f4f4; padding: 5px; border-radius: 4px;" th:if="${config.secondaryAuthScheme().type().name() == 'BEARER' or config.secondaryAuthScheme().type().name().startsWith('OAUTH2')}">
+                            <span th:text="${config.secondaryAuthScheme().value()}"></span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
     <!-- Technical Details -->
     <div class="page-break" th:if="${not #lists.isEmpty(vulnerabilities)}"></div>
-    <div class="section-title" th:if="${not #lists.isEmpty(vulnerabilities)}">3. <span
+    <div class="section-title" th:if="${not #lists.isEmpty(vulnerabilities)}">4. <span
             th:text="#{report.details.title}">Detailed Findings</span></div>
 
     <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break" th:style="${!stat.first} ? 'page-break-before: always;' : ''">

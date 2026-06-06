@@ -231,11 +231,11 @@
                             <strong>Authentication:</strong> <span class="badge bg-info text-dark">Static Token</span>
                         </div>
                         <div class="col-md-12 mb-2" th:if="${config.oauth2Config != null}">
-                            <strong>Authentication:</strong> <span class="badge bg-primary">Dynamic OAuth2</span>
-                            <div class="card bg-dark border-secondary mt-2 p-3">
-                                <div><small class="text-muted">OAuth2 URL:</small> <span th:text="${config.oauth2Config.tokenUrl}"></span></div>
-                                <div><small class="text-muted">Grant Type:</small> <span th:text="${config.oauth2Config.grantType}"></span></div>
-                                <div><small class="text-muted">Client ID:</small> <span th:text="${config.oauth2Config.clientId}"></span></div>
+                            <strong>Authentication:</strong> <span class="badge bg-primary text-light">Dynamic OAuth2</span>
+                            <div class="card bg-transparent border-secondary mt-2 p-3 text-light">
+                                <div><small class="text-white-50">OAuth2 URL:</small> <span th:text="${config.oauth2Config.tokenUrl}"></span></div>
+                                <div><small class="text-white-50">Grant Type:</small> <span th:text="${config.oauth2Config.grantType}"></span></div>
+                                <div><small class="text-white-50">Client ID:</small> <span th:text="${config.oauth2Config.clientId}"></span></div>
                             </div>
                         </div>
                     </div>

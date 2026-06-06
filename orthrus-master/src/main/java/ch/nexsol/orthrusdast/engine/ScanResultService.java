@@ -203,7 +203,8 @@ public class ScanResultService {
                 riskSummary,
                 scannerSummary,
                 null, // configuration omitted from DB for simplicity for now
-                Collections.emptyList() // attempts omitted
+                Collections.emptyList(), // attempts omitted
+                "UNKNOWN" // discovererId omitted from DB
         );
     }
 }

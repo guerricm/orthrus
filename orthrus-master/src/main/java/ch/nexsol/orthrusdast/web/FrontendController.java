@@ -553,6 +553,18 @@ public class FrontendController {
     @GetMapping("/web/scans/{id}/pdf")
     public Mono<ResponseEntity<org.springframework.core.io.Resource>> downloadPdf(@PathVariable String id) {
         return scanResultService.findById(id)
+                .flatMap(result -> scanJobRepository.findByResultId(id)
+                        .map(job -> {
+                            try {
+                                ScanConfiguration config = objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
+                                return new ScanResult(result.id(), result.targetUrl(), result.scanStartTime(), result.scanEndTime(),
+                                        result.operationsDiscovered(), result.operationsScanned(), result.vulnerabilities(),
+                                        result.riskSummary(), result.scannerSummary(), config, result.attempts(), job.getDiscovererId());
+                            } catch (Exception e) {
+                                return result;
+                            }
+                        })
+                        .defaultIfEmpty(result))
                 .flatMap(result -> {
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
                     return pdfReportGenerator.generateReport(result, out)
