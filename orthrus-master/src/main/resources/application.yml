@@ -11,7 +11,7 @@ orthrus:
   security:
     admin:
       username: ${ADMIN_USERNAME:superadmin}
-      password: ${ADMIN_PASSWORD:superpassword}
+      password: ${ADMIN_PASSWORD:superadmin}
 
 spring:
   r2dbc:

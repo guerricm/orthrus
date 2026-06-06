@@ -69,8 +69,14 @@ public class FrontendController {
     }
 
     @GetMapping("/login")
-    public Mono<String> login(Model model) {
+    public Mono<String> login(org.springframework.web.server.ServerWebExchange exchange, Model model) {
         model.addAttribute("oauth2Enabled", clientRegistrations.getIfAvailable() != null);
+        if (exchange.getRequest().getQueryParams().containsKey("error")) {
+            model.addAttribute("loginError", true);
+        }
+        if (exchange.getRequest().getQueryParams().containsKey("logout")) {
+            model.addAttribute("logoutMessage", true);
+        }
         return Mono.just("login");
     }
 

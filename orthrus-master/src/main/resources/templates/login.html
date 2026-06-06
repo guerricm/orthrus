@@ -116,12 +116,12 @@
     </div>
 
     <!-- Error Message -->
-    <div th:if="${param.error}" class="alert alert-danger" role="alert">
+    <div th:if="${loginError}" class="alert alert-danger" role="alert">
         Invalid username or password.
     </div>
     
     <!-- Logout Message -->
-    <div th:if="${param.logout}" class="alert alert-success" role="alert">
+    <div th:if="${logoutMessage}" class="alert alert-success" role="alert">
         You have been logged out.
     </div>
 
