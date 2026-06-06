@@ -56,7 +56,7 @@ class ScanEngineTest {
         ch.nexsol.orthrusdast.http.ScanHttpClient mockHttpClient = org.mockito.Mockito.mock(ch.nexsol.orthrusdast.http.ScanHttpClient.class);
         org.mockito.Mockito.when(mockHttpClient.send(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(reactor.core.publisher.Mono.just(new ch.nexsol.orthrusdast.http.ScanHttpResponse(
-                        org.springframework.http.HttpStatus.OK, new org.springframework.http.HttpHeaders(), "")));
+                        org.springframework.http.HttpStatus.OK, new org.springframework.http.HttpHeaders(), "", 0L)));
 
         ScanEngine engine = new ScanEngine(List.of(mockScanner), mockHttpClient);
 
