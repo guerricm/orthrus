@@ -73,15 +73,34 @@ public class SecurityHeadersScanner implements SecurityScanner {
             String headerValue = response.getHeader(headerName);
             if ("Content-Security-Policy".equalsIgnoreCase(headerName)) {
                 if (headerValue != null && (headerValue.contains("unsafe-inline") || headerValue.contains("unsafe-eval"))) {
+                    boolean hasUnsafeEval = headerValue.contains("unsafe-eval");
+                    boolean hasUnsafeInlineScript = headerValue.matches("(?i).*script-src[^;]*'unsafe-inline'.*") || headerValue.matches("(?i).*default-src[^;]*'unsafe-inline'.*");
+                    boolean hasUnsafeInlineStyle = headerValue.matches("(?i).*style-src[^;]*'unsafe-inline'.*");
+                    
+                    boolean isRisky = hasUnsafeEval || hasUnsafeInlineScript || (!hasUnsafeEval && !hasUnsafeInlineScript && !hasUnsafeInlineStyle);
+                    
+                    RiskLevel risk = RiskLevel.MEDIUM;
+                    String desc = "The Content-Security-Policy header contains 'unsafe-inline' or 'unsafe-eval', which significantly reduces the protection against XSS attacks.";
+                    double cvss = 5.4;
+                    
+                    String contentType = response.getHeader("Content-Type");
+                    boolean isJson = contentType != null && contentType.toLowerCase().contains("json");
+                    
+                    if (!isRisky && hasUnsafeInlineStyle && isJson) {
+                        risk = RiskLevel.INFO;
+                        cvss = 0.0;
+                        desc = "The Content-Security-Policy header contains 'unsafe-inline' for 'style-src'. Since this API response is JSON (" + contentType + "), the risk of CSS injection is minimal. However, best practices still recommend removing it.";
+                    }
+                    
                     vulns.add(createVulnerabilityWithTrace(
                             "Weak Security Header: CSP",
-                            "The Content-Security-Policy header contains 'unsafe-inline' or 'unsafe-eval', which significantly reduces the protection against XSS attacks.",
-                            RiskLevel.MEDIUM,
+                            desc,
+                            risk,
                             Vulnerability.Confidence.HIGH,
                             operation,
                             cwe,
                             List.of("CAPEC-63"),
-                            5.4,
+                            cvss,
                             "CSP value contains unsafe directives: " + headerValue,
                             "Remove 'unsafe-inline' and 'unsafe-eval' from your CSP and use nonces or hashes instead.", operation, response,
                             "API Endpoint (Network)",
