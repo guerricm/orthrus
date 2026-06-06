@@ -21,6 +21,7 @@
             <span th:if="${scan.testsCount == null}" class="text-muted">-</span>
         </td>
         
+        <td class="bg-transparent border-secondary text-end" style="padding: 1rem; vertical-align: middle;">
             <button th:if="${scan.resultId != null}" th:data-pdf-url="@{/web/scans/{id}/pdf(id=${scan.resultId})}"
                     onclick="window.downloadPdf(this, this.getAttribute('data-pdf-url'), event);"
                     class="btn btn-sm btn-outline-info" title="Download PDF Report">
