@@ -66,6 +66,7 @@ public class PdfReportGenerator implements ReportGenerator {
                         .withZone(ZoneId.systemDefault());
                 context.setVariable("scanDate", formatter.format(result.scanStartTime()));
                 context.setVariable("targetUrl", result.targetUrl());
+                context.setVariable("config", result.configuration());
 
                 // Vulnerabilities are already sorted by ScanEngine
                 context.setVariable("vulnerabilities", result.vulnerabilities());

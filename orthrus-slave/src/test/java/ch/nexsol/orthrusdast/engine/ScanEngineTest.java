@@ -53,10 +53,15 @@ class ScanEngineTest {
             }
         };
 
-        ScanEngine engine = new ScanEngine(List.of(mockScanner));
+        ch.nexsol.orthrusdast.http.ScanHttpClient mockHttpClient = org.mockito.Mockito.mock(ch.nexsol.orthrusdast.http.ScanHttpClient.class);
+        org.mockito.Mockito.when(mockHttpClient.send(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(reactor.core.publisher.Mono.just(new ch.nexsol.orthrusdast.http.ScanHttpResponse(
+                        org.springframework.http.HttpStatus.OK, new org.springframework.http.HttpHeaders(), "")));
+
+        ScanEngine engine = new ScanEngine(List.of(mockScanner), mockHttpClient);
 
         // Create 20 operations
-        Operation op = new Operation("http://localhost", "GET", Map.of(), Map.of(), null, List.of(), List.of(), null);
+        Operation op = new Operation("http://localhost", "GET", Map.of(), Map.of(), null, List.of(), List.of(), null, null, null);
         List<Operation> operations = java.util.stream.IntStream.range(0, 20)
                 .mapToObj(i -> op)
                 .toList();
