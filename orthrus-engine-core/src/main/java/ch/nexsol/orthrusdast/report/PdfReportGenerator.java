@@ -138,5 +138,13 @@ public class PdfReportGenerator implements ReportGenerator {
             if (text == null) return "";
             return org.springframework.web.util.HtmlUtils.htmlEscape(text).replace("\n", "<br/>");
         }
+
+        public String truncateUrl(String url) {
+            if (url == null) return "";
+            if (url.length() > 100) {
+                return url.substring(0, 100) + "...[TRUNCATED]";
+            }
+            return url;
+        }
     }
 }
