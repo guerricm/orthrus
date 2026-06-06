@@ -79,12 +79,18 @@ public class ScanHttpClient {
             }
             return clientResponse.bodyToMono(String.class)
                     .defaultIfEmpty("")
-                    .map(responseBody -> new ScanHttpResponse(
-                            clientResponse.statusCode(),
-                            clientResponse.headers().asHttpHeaders(),
-                            responseBody,
-                            System.currentTimeMillis() - startTime
-                    ));
+                    .map(responseBody -> {
+                        String finalBody = responseBody;
+                        if (finalBody.length() > 250_000) {
+                            finalBody = finalBody.substring(0, 250_000) + "\n...[TRUNCATED BY ORTHRUS DAST]...";
+                        }
+                        return new ScanHttpResponse(
+                                clientResponse.statusCode(),
+                                clientResponse.headers().asHttpHeaders(),
+                                finalBody,
+                                System.currentTimeMillis() - startTime
+                        );
+                    });
         };
 
         Mono<ScanHttpResponse> resultMono;
