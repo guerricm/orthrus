@@ -14,7 +14,7 @@
                 th:aria-controls="'collapse-' + ${jobId}">
                 <div class="d-flex align-items-center w-100 me-3">
                     <span th:id="'accordion-badge-' + ${jobId}" class="me-3 badge"
-                        th:classappend="${status == 'PENDING' ? 'bg-secondary' : (status == 'RUNNING' ? 'bg-warning text-dark' : (status == 'FAILED' ? 'bg-danger' : 'bg-success'))}"
+                        th:classappend="${status == 'PENDING' ? 'bg-secondary' : (status == 'RUNNING' ? 'bg-warning text-dark' : (status == 'FAILED' ? 'bg-danger' : (status == 'CANCELLED' ? 'bg-secondary' : 'bg-success')))}"
                         th:text="${status}">STATUS</span>
                     <strong>#<span th:text="${jobId}"></span></strong>
                     <span class="text-muted mx-2">&bull;</span>
@@ -28,6 +28,11 @@
                             th:text="${globalGrade}"
                             style="width: 28px; height: 28px; font-size: 14px; padding: 0; line-height: 1; margin: 0; display: flex !important; justify-content: center; align-items: center;">
                             A</div>
+                            
+                        <div th:if="${status == 'COMPLETED' and result != null}" class="d-flex align-items-center me-3">
+                            <span class="badge bg-secondary rounded-pill px-2 py-1 me-3"><span th:text="${result.operationsScanned()}">0</span> tests</span>
+                            <span class="badge bg-danger rounded-pill px-2 py-1"><span th:text="${result.vulnerabilities().size()}">0</span> vulns</span>
+                        </div>
                         <span th:if="${status == 'COMPLETED'}" th:data-pdf-url="@{'/web/scans/' + ${resultId} + '/pdf'}"
                             onclick="window.location.href=this.getAttribute('data-pdf-url'); event.stopPropagation();"
                             class="btn btn-sm btn-outline-info" title="Download PDF Report" style="z-index: 10;">
@@ -42,6 +47,13 @@
                             </svg>
                         </span>
                     </div>
+
+                    <span th:if="${status == 'FAILED' or status == 'COMPLETED' or status == 'CANCELLED'}"
+                          th:data-restart-url="@{'/system/jobs/' + ${jobId} + '/restart'}"
+                          onclick="event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); document.body.appendChild(f); f.submit();"
+                          class="btn btn-sm btn-outline-warning ms-2" title="Restart Scan Job" style="z-index: 10;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                    </span>
                 </div>
             </button>
         </h2>
@@ -110,7 +122,8 @@
                             <span class="ms-2">Running</span>
                         </div>
                         <div class="scan-step-line"></div>
-                        <div class="scan-step" th:classappend="${status == 'COMPLETED' ? 'done' : ''}"
+                        <div th:if="${status != 'CANCELLED' and status != 'FAILED'}" class="scan-step"
+                            th:classappend="${status == 'COMPLETED' ? 'done' : ''}"
                             th:id="'step-completed-' + ${jobId}">
                             <div class="scan-step-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
@@ -121,17 +134,78 @@
                             </div>
                             <span class="ms-2">Completed</span>
                         </div>
+                        <div th:if="${status == 'CANCELLED'}" class="scan-step done"
+                            th:id="'step-cancelled-' + ${jobId}">
+                            <div class="scan-step-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                                    class="bi bi-x-circle-fill" viewBox="0 0 16 16">
+                                    <path
+                                        d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z" />
+                                </svg>
+                            </div>
+                            <span class="ms-2">Cancelled</span>
+                        </div>
+                        <div th:if="${status == 'FAILED'}" class="scan-step done" th:id="'step-failed-' + ${jobId}">
+                            <div class="scan-step-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                                    class="bi bi-exclamation-circle-fill" viewBox="0 0 16 16">
+                                    <path
+                                        d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4m.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2" />
+                                </svg>
+                            </div>
+                            <span class="ms-2">Failed</span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Status Message -->
                 <div id="scan-message" class="text-center py-4"
-                    th:style="${status == 'COMPLETED' or status == 'FAILED' ? 'display: none;' : 'display: block;'}">
+                    th:style="${status == 'COMPLETED' or status == 'FAILED' or status == 'CANCELLED' ? 'display: none;' : 'display: block;'}">
                     <div class="custom-spinner mb-3" th:id="'scan-spinner-' + ${jobId}"></div>
                     <p class="text-light fs-5" th:id="'scan-message-text-' + ${jobId}"
                         th:text="${status == 'PENDING' ? 'Scan queued — waiting for an available slave node…' : 'Scan is currently running on a slave node…'}">
                         Scan queued — waiting for an available slave node…
                     </p>
+                </div>
+
+                <div th:if="${status == 'CANCELLED'}">
+                    <div
+                        class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+                        <div>
+                            <h3 class="mb-0 text-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                                    class="me-2" viewBox="0 0 16 16">
+                                    <path
+                                        d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z" />
+                                </svg>Scan Cancelled
+                            </h3>
+                            <p class="text-light opacity-75 mb-0"><span th:text="${target}">https://target.url</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-center py-4">
+                        <p class="text-secondary fs-5">This scan was cancelled by the user.</p>
+                    </div>
+                </div>
+
+                <div th:if="${status == 'FAILED'}">
+                    <div
+                        class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+                        <div>
+                            <h3 class="mb-0 text-danger">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                                    class="me-2" viewBox="0 0 16 16">
+                                    <path
+                                        d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+                                </svg>Scan Failed
+                            </h3>
+                            <p class="text-light opacity-75 mb-0"><span th:text="${target}">https://target.url</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-center py-4">
+                        <p class="text-danger fs-5">This scan failed due to a technical error.</p>
+                    </div>
                 </div>
 
                 <!-- Results (hidden until completed) -->

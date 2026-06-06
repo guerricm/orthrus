@@ -31,7 +31,10 @@
                         vulnerabilities such as injection flaws, broken access control, and missing security headers.
                     </p>
                     <p>
-                        The architecture is split into two phases:
+                        Orthrus is built with a <strong>distributed Master/Slave architecture</strong>. The Master Node orchestrates the UI, API, and job queue, while one or more Slave Nodes pick up pending jobs and execute the heavy security scanning, allowing for horizontally scalable testing.
+                    </p>
+                    <p>
+                        The testing process is split into two phases:
                     <ol>
                         <li><strong>Discovery Phase:</strong> The engine maps your API using specific "Discoverer"
                             modules to identify all available endpoints, HTTP methods, parameters, and authentication
@@ -185,6 +188,55 @@
                 </div>
             </div>
 
+            <!-- Section: Distributed Infrastructure -->
+            <div class="col-12 mb-4">
+                <div class="glass-card">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-server me-2 mb-1" viewBox="0 0 16 16">
+                            <path d="M1.333 2.667C1.333 1.194 4.318 0 8 0s6.667 1.194 6.667 2.667V4c0 1.473-2.985 2.667-6.667 2.667S1.333 5.473 1.333 4z"/>
+                            <path d="M1.333 6.334v3C1.333 10.805 4.318 12 8 12s6.667-1.195 6.667-2.666v-3c0 1.473-2.985 2.667-6.667 2.667S1.333 7.807 1.333 6.334"/>
+                            <path d="M1.333 11.334v3C1.333 15.805 4.318 17 8 17s6.667-1.195 6.667-2.666v-3c0 1.473-2.985 2.667-6.667 2.667S1.333 12.807 1.333 11.334"/>
+                        </svg>
+                        4. Distributed Scanning (System Overview)
+                    </h3>
+                    <p>Navigate to the <strong>System Overview</strong> dashboard to manage the Orthrus distributed infrastructure.</p>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Slave Nodes:</strong> View all connected worker nodes. You can toggle their active status to pause job processing, and adjust their <code>Max Concurrent Scans</code> to control the load on each node.
+                        </li>
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Queue Management:</strong> See which scans are queued or actively running across the fleet.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Section: Managing Scans -->
+            <div class="col-12 mb-4">
+                <div class="glass-card">
+                    <h3 class="mb-4 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-list-task me-2 mb-1" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M2 2.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5zM3 3H2v1h1z"/>
+                            <path d="M5 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M5.5 7a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1zm0 4a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1z"/>
+                            <path fill-rule="evenodd" d="M1.5 7a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5zM2 7h1v1H2zm0 3.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm1 .5H2v1h1z"/>
+                        </svg>
+                        5. Monitoring & Managing Scans
+                    </h3>
+                    <p>Navigate to the <strong>All Scans</strong> page to see real-time updates of your queued and running scans.</p>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Progress Timeline:</strong> Track the progression of your scan in real-time (Queued &rarr; Running &rarr; Completed / Failed / Cancelled).
+                        </li>
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Cancel a Scan:</strong> You can stop a running or queued scan at any time by clicking the Stop button. The job will be marked as Cancelled.
+                        </li>
+                        <li class="list-group-item bg-transparent text-light border-secondary">
+                            <strong>Restart a Scan:</strong> Found an issue or want to re-test? You can easily restart any completed, cancelled, or failed scan using the Restart button (circular arrow) located on both the <strong>All Scans</strong> and <strong>Scan History</strong> pages. This will reset the job and put it back in the pending queue.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
             <!-- Section: Results and Reporting -->
             <div class="col-12 mb-4">
                 <div class="glass-card">
@@ -196,7 +248,7 @@
                             <path
                                 d="M4.603 14.087a.8.8 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.198-.307.526-.568.897-.787a7.7 7.7 0 0 1 1.482-.645 20 20 0 0 0 1.062-2.227 7.3 7.3 0 0 1-.43-1.295c-.086-.4-.119-.796-.046-1.136.075-.354.274-.672.65-.823.192-.077.4-.12.602-.077a.7.7 0 0 1 .477.365c.088.164.12.356.127.538.007.188-.012.396-.047.614-.084.51-.27 1.134-.52 1.794a11 11 0 0 0 .98 1.686 5.8 5.8 0 0 1 1.334.05c.364.066.734.195.96.465.12.144.193.32.2.518.007.192-.047.382-.138.563a1.04 1.04 0 0 1-.354.416.86.86 0 0 1-.51.138c-.331-.014-.654-.196-.933-.417a5.7 5.7 0 0 1-.911-.95 11.6 11.6 0 0 0-1.997.406 11.3 11.3 0 0 1-1.02 1.51c-.292.35-.609.656-.927.787a.8.8 0 0 1-.58.029m1.379-1.901q-.25.115-.459.246c-.328.205-.543.411-.597.59-.017.056-.02.11-.005.157.014.045.04.087.085.122a.5.5 0 0 0 .31.1c.15-.01.32-.083.52-.224.2-.14.4-.337.58-.57.17-.22.33-.46.46-.723zM8.22 8.441a10 10 0 0 1-1.08-1.942 5 5 0 0 0-.218-1.018c-.03-.13-.06-.26-.06-.39a.5.5 0 0 1 .1-.336.5.5 0 0 1 .24-.162c.11-.035.21-.01.29.04.09.06.14.15.17.26.04.16.03.35-.01.56a8 8 0 0 1-.51 1.989m2.28 1.594a6.5 6.5 0 0 0-.913-.092 6.5 6.5 0 0 0-.913.092c.31.31.62.61.91.91.29-.3.6-.6.91-.91m1.39 1.488c.08-.06.15-.12.21-.19.06-.07.1-.14.12-.22a.3.3 0 0 0-.02-.22.3.3 0 0 0-.14-.14c-.11-.05-.25-.03-.4.02-.15.05-.31.13-.48.24q.36.26.71.51" />
                         </svg>
-                        4. Results and Reporting
+                        6. Results and Reporting
                     </h3>
                     <p>When a scan completes, the results are displayed in a comprehensive dashboard and saved to the
                         in-memory database.</p>
@@ -243,26 +295,29 @@
                             <path
                                 d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783" />
                         </svg>
-                        5. Why Orthrus?
+                        7. Why Orthrus?
                     </h3>
-                    <p>
-                        In Greek mythology, <strong>Orthrus</strong> is a two-headed dog, brother to the famous
-                        three-headed Cerberus. While Cerberus guarded the underworld, Orthrus guarded the red cattle of
-                        Geryon.
-                    </p>
-                    <p>
-                        Like its mythological namesake, <strong>Orthrus DAST</strong> is a guardian with multiple
-                        capabilities—symbolized by its two distinct operational "heads":
-                    </p>
-                    <ul>
-                        <li><strong class="text-primary">Head 1: Discovery</strong> – Systematically mapping the API
-                            surface, understanding schemas, and finding hidden endpoints.</li>
-                        <li><strong class="text-danger">Head 2: Exploitation</strong> – Aggressively testing those
-                            discovered endpoints with our 35 specialized security scanners to uncover vulnerabilities
-                            before attackers do.</li>
-                    </ul>
-                    <p class="mb-0 text-muted fst-italic">
+                    
+                    <p class="text-center fst-italic text-white mb-4 fs-5" style="opacity: 0.9;">
                         "Two heads are better than one when it comes to API security."
+                    </p>
+
+                    <p>
+                        In Greek mythology, <strong>Orthrus</strong> is a fearsome two-headed dog, brother to the famous
+                        three-headed Cerberus. While Cerberus guarded the gates of the underworld, Orthrus was entrusted with guarding the priceless red cattle of Geryon.
+                    </p>
+                    <p>
+                        Just as the mythological beast guarded its master's most valuable assets, <strong>Orthrus DAST</strong> is built to guard yours: your sensitive data, your infrastructure, and your users. In the modern web landscape, APIs are the gatekeepers to this data, and securing them requires unparalleled vigilance.
+                    </p>
+                    <p>
+                        The unique power of Orthrus lies in its duality. A traditional security scanner only has one "head"—it knows how to attack, but it struggles to understand complex modern APIs. <strong>Orthrus DAST</strong> overcomes this with its two distinct, synergistic "heads":
+                    </p>
+                    <ul class="mb-4">
+                        <li class="mb-2"><strong class="text-primary">Head 1: The Tracker (Discovery)</strong> – Like a bloodhound, it systematically maps the API surface, parses complex OpenAPI/GraphQL schemas, and sniffs out hidden endpoints that developers forgot to document.</li>
+                        <li><strong class="text-danger">Head 2: The Hunter (Exploitation)</strong> – Once the prey is found, the second head attacks. It aggressively tests the discovered endpoints using a specialized arsenal of security scanners to uncover critical vulnerabilities before malicious actors do.</li>
+                    </ul>
+                    <p>
+                        Furthermore, the distributed Master/Slave architecture of the application reflects the beast's anatomy: a single central mind (the Master Node) coordinating multiple aggressive jaws (the Slave Nodes) to devour the workload and process thousands of concurrent security tests.
                     </p>
                 </div>
             </div>

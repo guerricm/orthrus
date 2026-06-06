@@ -75,7 +75,9 @@ public class FrontendController {
         return Mono.zip(
                 scanJobRepository.findAll().collectList(),
                 slaveNodeRepository.findAll().collectList()).map(tuple -> {
-                    java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = new java.util.ArrayList<>(tuple.getT1());
+                    java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1().stream()
+                            .filter(j -> j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING || j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
+                            .collect(java.util.stream.Collectors.toList());
                     jobs.sort((j1, j2) -> Long.compare(j2.getId(), j1.getId()));
                     java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
 
@@ -106,7 +108,7 @@ public class FrontendController {
                     job.setResultId(null);
                     return scanJobRepository.save(job);
                 })
-                .thenReturn("redirect:/system");
+                .thenReturn("redirect:/scans/all");
     }
 
     @PostMapping("/system/slaves/{id}/toggle-active")
