@@ -411,13 +411,13 @@
                 <span class="url" th:text="${targetUrl}">https://example.com</span>
             </div>
             
-            <div th:if="${config != null and config.authScheme() != null and config.authScheme().type() == 'oauth2'}" style="margin-top: 30px; font-size: 10pt; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong style="color: #3498db;">OAuth2 Generated Token (Primary):</strong><br/>
+            <div th:if="${config != null and config.authScheme() != null and (config.authScheme().type().name() == 'BEARER' or config.authScheme().type().name().startsWith('OAUTH2'))}" style="margin-top: 30px; font-size: 10pt; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                <strong style="color: #3498db;">Injected Token (Primary):</strong><br/>
                 <code style="word-break: break-all; color: #ecf0f1; font-family: monospace; font-size: 9pt;" th:text="${config.authScheme().value()}"></code>
             </div>
             
-            <div th:if="${config != null and config.secondaryAuthScheme() != null and config.secondaryAuthScheme().type() == 'oauth2'}" style="margin-top: 15px; font-size: 10pt; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <strong style="color: #3498db;">OAuth2 Generated Token (Secondary):</strong><br/>
+            <div th:if="${config != null and config.secondaryAuthScheme() != null and (config.secondaryAuthScheme().type().name() == 'BEARER' or config.secondaryAuthScheme().type().name().startsWith('OAUTH2'))}" style="margin-top: 15px; font-size: 10pt; text-align: left; max-width: 800px; margin-left: auto; margin-right: auto; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                <strong style="color: #3498db;">Injected Token (Secondary):</strong><br/>
                 <code style="word-break: break-all; color: #ecf0f1; font-family: monospace; font-size: 9pt;" th:text="${config.secondaryAuthScheme().value()}"></code>
             </div>
         </div>

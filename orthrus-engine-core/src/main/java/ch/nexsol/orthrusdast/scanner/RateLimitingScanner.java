@@ -51,7 +51,7 @@ public class RateLimitingScanner implements SecurityScanner {
 
         // Send up to 50 requests to try and hit a rate limit
         return Flux.range(1, 50)
-                .concatMap(i -> httpClient.send(operation))
+                .concatMap(i -> httpClient.send(operation, false))
                 .takeUntil(response -> response.statusCode().value() == 429)
                 .last()
                 .flatMapMany(lastResponse -> {
@@ -83,7 +83,7 @@ public class RateLimitingScanner implements SecurityScanner {
                                 operation.body(), operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme()
                         );
 
-                        return httpClient.send(bypassOp).flatMapMany(bypassResp -> {
+                        return httpClient.send(bypassOp, false).flatMapMany(bypassResp -> {
                             if (bypassResp.isSuccessful() || bypassResp.statusCode().value() != 429) {
                                 Vulnerability bypassVuln = createVulnerabilityWithTrace(
                                     "Rate Limiting Bypass via IP Spoofing",

@@ -37,13 +37,27 @@ public class ScanHttpClient {
      * Send a request based on an Operation and return the captured response.
      */
     public Mono<ScanHttpResponse> send(Operation operation) {
-        return send(operation, Map.of(), null);
+        return send(operation, Map.of(), null, true);
+    }
+
+    /**
+     * Send a request based on an Operation and return the captured response, optionally handling 429s.
+     */
+    public Mono<ScanHttpResponse> send(Operation operation, boolean retryTransientErrors) {
+        return send(operation, Map.of(), null, retryTransientErrors);
     }
 
     /**
      * Send a request with extra headers (used by scanners to inject payloads).
      */
     public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride) {
+        return send(operation, extraHeaders, bodyOverride, true);
+    }
+
+    /**
+     * Send a request with extra headers, optionally handling 429s.
+     */
+    public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride, boolean retryTransientErrors) {
         long startTime = System.currentTimeMillis();
 
         HttpMethod method = HttpMethod.valueOf(operation.method().toUpperCase());
@@ -74,8 +88,9 @@ public class ScanHttpClient {
         String body = bodyOverride != null ? bodyOverride : operation.body();
 
         java.util.function.Function<ClientResponse, Mono<ScanHttpResponse>> responseHandler = clientResponse -> {
-            if (clientResponse.statusCode().value() == 429) {
-                return Mono.error(new RateLimitException("Rate limit exceeded (429)"));
+            int status = clientResponse.statusCode().value();
+            if (retryTransientErrors && (status == 429 || status == 502 || status == 503 || status == 504)) {
+                return Mono.error(new TransientHttpException("Transient HTTP error (" + status + ")"));
             }
             return clientResponse.bodyToMono(String.class)
                     .defaultIfEmpty("")
@@ -106,9 +121,8 @@ public class ScanHttpClient {
         }
 
         return resultMono
-                .retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries 4 times with exp
-                                                                                      // backoff
-                        .filter(e -> e instanceof RateLimitException)
+                .retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries 4 times with exp backoff
+                        .filter(e -> e instanceof TransientHttpException || (retryTransientErrors && isTransientNetworkError(e)))
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> retrySignal.failure()))
                 .timeout(Duration.ofSeconds(15))
                 .onErrorResume(e -> {
@@ -176,8 +190,20 @@ public class ScanHttpClient {
         // Query param auth is handled in buildUri
     }
 
-    private static class RateLimitException extends RuntimeException {
-        public RateLimitException(String message) {
+    private boolean isTransientNetworkError(Throwable e) {
+        if (e == null) return false;
+        if (e instanceof java.io.IOException || e instanceof java.util.concurrent.TimeoutException || e.getClass().getName().contains("TimeoutException") || e.getClass().getName().contains("PrematureCloseException")) {
+            return true;
+        }
+        Throwable cause = e.getCause();
+        if (cause != null && cause != e) {
+            return isTransientNetworkError(cause);
+        }
+        return false;
+    }
+
+    private static class TransientHttpException extends RuntimeException {
+        public TransientHttpException(String message) {
             super(message);
         }
     }
