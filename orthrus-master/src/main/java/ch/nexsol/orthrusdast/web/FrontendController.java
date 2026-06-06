@@ -101,12 +101,13 @@ public class FrontendController {
     public Mono<String> restartJob(@org.springframework.web.bind.annotation.PathVariable Long id) {
         return scanJobRepository.findById(id)
                 .flatMap(job -> {
-                    job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.PENDING);
-                    job.setStartedAt(null);
-                    job.setCompletedAt(null);
-                    job.setAssignedSlaveId(null);
-                    job.setResultId(null);
-                    return scanJobRepository.save(job);
+                    ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+                            job.getDiscovererId(),
+                            job.getTarget(),
+                            job.getScanConfigurationJson(),
+                            ch.nexsol.orthrusdast.model.JobStatus.PENDING
+                    );
+                    return scanJobRepository.save(newJob);
                 })
                 .thenReturn("redirect:/scans/all");
     }
