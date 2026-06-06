@@ -27,9 +27,15 @@ jobs:
         server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
         settings-path: ${{ github.workspace }} # location for the settings.xml file
         
+    - name: Extract Version
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=revision -q -DforceStdout)
+        echo "CLEAN_VERSION=${VERSION%-SNAPSHOT}" >> $GITHUB_ENV
+
     - name: Build with Maven
       run: |
         mvn clean package spring-boot:build-image \
+          -Drevision=${{ env.CLEAN_VERSION }}-${{ github.run_number }} \
           -Dspring-boot.build-image.publish=true \
           -DCI_REGISTRY_USER=${{ secrets.DOCKERHUB_USER }} \
           -DCI_REGISTRY_PASSWORD=${{ secrets.DOCKERHUB_PASSWORD }} \
