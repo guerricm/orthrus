@@ -116,11 +116,17 @@ public class ScanHttpClient {
                     if (logUrl != null && logUrl.length() > 100) {
                         logUrl = logUrl.substring(0, 100) + "...[TRUNCATED]";
                     }
-                    log.warn("HTTP request failed for {} {}: {}", operation.method(), logUrl, e.getMessage());
+                    
+                    String errorMsg = e.getMessage();
+                    if (e instanceof java.util.concurrent.TimeoutException) {
+                        errorMsg = "Request timed out after 15 seconds";
+                    }
+                    
+                    log.warn("HTTP request failed for {} {}: {}", operation.method(), logUrl, errorMsg);
                     return Mono.just(new ScanHttpResponse(
                             org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
                             new HttpHeaders(),
-                            "Error: " + e.getMessage(),
+                            "Error: " + errorMsg,
                             System.currentTimeMillis() - startTime));
                 });
     }
