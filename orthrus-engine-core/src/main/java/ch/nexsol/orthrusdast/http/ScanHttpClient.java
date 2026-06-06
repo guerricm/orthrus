@@ -121,10 +121,10 @@ public class ScanHttpClient {
         }
 
         return resultMono
-                .retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries 4 times with exp backoff
+                .retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries 4 times with exp backoff (1s, 2s, 4s, 8s)
                         .filter(e -> e instanceof TransientHttpException || (retryTransientErrors && isTransientNetworkError(e)))
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> retrySignal.failure()))
-                .timeout(Duration.ofSeconds(15))
+                .timeout(Duration.ofSeconds(30))
                 .onErrorResume(e -> {
                     String logUrl = operation.url();
                     if (logUrl != null && logUrl.length() > 100) {
