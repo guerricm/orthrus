@@ -238,6 +238,19 @@
             // Initial call
             updateVisibility();
 
+            // Clear hidden advanced options on submit to prevent browser autofill issues
+            document.querySelector('form').addEventListener('submit', function() {
+                var advancedOptions = document.getElementById('advancedOptions');
+                if (!advancedOptions.classList.contains('show')) {
+                    document.getElementById('bearerToken').value = '';
+                    document.getElementById('bearerTokenSecondary').value = '';
+                    document.getElementById('oauth2Url').value = '';
+                    document.getElementById('oauth2ClientId').value = '';
+                    document.getElementById('oauth2ClientSecret').value = '';
+                    document.getElementById('oauth2Grant').value = '';
+                    document.getElementById('oauth2Creds').value = '';
+                }
+            });
         });
     </script>
 </main>

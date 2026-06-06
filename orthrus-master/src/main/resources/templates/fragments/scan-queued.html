@@ -227,7 +227,7 @@
                         <div class="col-md-6 mb-2" th:if="${discovererId == 'gateway'}">
                             <strong>Gateway Type:</strong> <span th:text="${config.gatewayType}"></span>
                         </div>
-                        <div class="col-md-6 mb-2" th:if="${config.authScheme != null and config.oauth2Config == null}">
+                        <div class="col-md-6 mb-2" th:if="${config.authScheme != null and config.authScheme?.type != null and config.oauth2Config == null}">
                             <strong>Authentication:</strong> <span class="badge bg-info text-dark">Static Token</span>
                         </div>
                         <div class="col-md-12 mb-2" th:if="${config.oauth2Config != null}">

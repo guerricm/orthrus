@@ -52,6 +52,8 @@ public class SecurityConfig {
             .authorizeExchange(exchanges -> exchanges
                 // Public paths
                 .pathMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/favicon.ico", "/login**").permitAll()
+                // Internal API for slaves (Secured manually by InternalApiSecurityWebFilter)
+                .pathMatchers("/api/internal/**").permitAll()
                 // System configuration requires ADMIN
                 .pathMatchers("/system/**").hasRole("ADMIN")
                 // Everything else requires USER or ADMIN
