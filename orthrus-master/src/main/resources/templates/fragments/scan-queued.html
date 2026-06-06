@@ -18,7 +18,7 @@
                         th:text="${status}">STATUS</span>
                     <strong>#<span th:text="${jobId}"></span></strong>
                     <span class="text-muted mx-2">&bull;</span>
-                    <span class="text-light" th:text="${discovererId != null ? discovererId : 'openapi'}">openapi</span>
+                    <span class="badge bg-secondary text-light text-uppercase" th:text="${discovererId != null ? discovererId : 'openapi'}">openapi</span>
                     <span class="mx-2">&mdash;</span>
                     <span th:text="${target}"></span>
 
@@ -222,6 +222,9 @@
                             <strong>Concurrency:</strong> <span th:text="${config.concurrency}"></span>
                         </div>
                         <div class="col-md-6 mb-2">
+                            <strong>Discoverer Mode:</strong> <span class="badge bg-secondary text-light text-uppercase" th:text="${discovererId}"></span>
+                        </div>
+                        <div class="col-md-6 mb-2" th:if="${discovererId == 'gateway'}">
                             <strong>Gateway Type:</strong> <span th:text="${config.gatewayType}"></span>
                         </div>
                         <div class="col-md-6 mb-2" th:if="${config.authScheme != null and config.oauth2Config == null}">
