@@ -49,8 +49,8 @@ public class RateLimitingScanner implements SecurityScanner {
             return Flux.empty();
         }
 
-        // Send up to 50 requests to try and hit a rate limit
-        return Flux.range(1, 50)
+        // Send up to 250 requests to try and hit a rate limit
+        return Flux.range(1, 250)
                 .concatMap(i -> httpClient.send(operation, false))
                 .takeUntil(response -> response.statusCode().value() == 429)
                 .last()
@@ -58,15 +58,15 @@ public class RateLimitingScanner implements SecurityScanner {
                     if (lastResponse.statusCode().value() != 429) {
                          Vulnerability vuln = createVulnerabilityWithTrace(
                                 "Missing Rate Limiting",
-                                "The endpoint does not seem to enforce rate limiting. 50 rapid requests were sent without receiving a 429 Too Many Requests response.",
+                                "The endpoint does not seem to enforce rate limiting. 250 rapid requests were sent without receiving a 429 Too Many Requests response.",
                                 RiskLevel.MEDIUM,
                                 Vulnerability.Confidence.LOW,
                                 operation,
                                 CWEReference.CWE_799,
                                 List.of("CAPEC-115"),
                                 5.3,
-                                "After 50 requests, the server returned status " + lastResponse.statusCode().value() + " instead of 429.",
-                                "Implement rate limiting using a gateway, WAF, or application logic (e.g. token bucket algorithm).", operation, null,
+                                "After 250 requests, the server returned status " + lastResponse.statusCode().value() + " instead of 429.",
+                                "Implement rate limiting using a gateway, WAF, or application logic (e.g. token bucket algorithm).", operation, lastResponse,
                                 "API Endpoint (Network)",
                                 "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);

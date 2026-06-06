@@ -68,7 +68,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     List.of("CAPEC-31"),
                     5.3,
                     "Set-Cookie header found without 'Secure' flag: " + cookie,
-                    "Always set the 'Secure' flag for sensitive cookies so they are only transmitted over HTTPS.", operation, null,
+                    "Always set the 'Secure' flag for sensitive cookies so they are only transmitted over HTTPS.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
         }
@@ -84,7 +84,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     List.of("CAPEC-31"),
                     5.3,
                     "Set-Cookie header found without 'HttpOnly' flag: " + cookie,
-                    "Always set the 'HttpOnly' flag for session identifiers and sensitive cookies to prevent access from JavaScript.", operation, null,
+                    "Always set the 'HttpOnly' flag for session identifiers and sensitive cookies to prevent access from JavaScript.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
         }
@@ -100,7 +100,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     List.of("CAPEC-62"),
                     4.3,
                     "Set-Cookie header found without 'SameSite' attribute: " + cookie,
-                    "Configure the cookie with 'SameSite=Lax' or 'SameSite=Strict' to restrict cross-site sharing.", operation, null,
+                    "Configure the cookie with 'SameSite=Lax' or 'SameSite=Strict' to restrict cross-site sharing.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
         } else if (lowerCookie.contains("samesite=none") && !lowerCookie.contains("secure")) {
@@ -114,7 +114,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     List.of("CAPEC-31"),
                     5.3,
                     "Set-Cookie header has 'SameSite=None' but lacks 'Secure': " + cookie,
-                    "Always set the 'Secure' flag when using 'SameSite=None'.", operation, null,
+                    "Always set the 'Secure' flag when using 'SameSite=None'.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
         }
@@ -132,7 +132,7 @@ public class CookieSecurityScanner implements SecurityScanner {
                     List.of("CAPEC-31"),
                     3.1,
                     "Cookie sets Domain=" + domain,
-                    "Scope cookies to specific hostnames rather than broad wildcard domains where possible.", operation, null,
+                    "Scope cookies to specific hostnames rather than broad wildcard domains where possible.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure"));
             }

@@ -79,7 +79,7 @@ public class CrossUserBolaScanner implements SecurityScanner {
                                 List.of("CAPEC-17"),
                                 7.5,
                                 "Server returned " + response.statusCode() + " OK when requesting User A's resource using User B's authentication token.",
-                                "Verify ownership of the requested resource. Ensure the authenticated user has explicit permission to access this specific object ID.", operation, null,
+                                "Verify ownership of the requested resource. Ensure the authenticated user has explicit permission to access this specific object ID.", operation, response,
                                     "API Endpoint (Network)",
                                     "Unauthorized Access / Data Exposure");
                         return Flux.just(vuln);

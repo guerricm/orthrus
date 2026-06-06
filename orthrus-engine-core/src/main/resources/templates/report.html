@@ -729,7 +729,7 @@
     <div class="section-title" th:if="${not #lists.isEmpty(vulnerabilities)}">3. <span
             th:text="#{report.details.title}">Detailed Findings</span></div>
 
-    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break">
+    <div th:each="vuln, stat : ${vulnerabilities}" class="vuln-card no-break" th:style="${!stat.first} ? 'page-break-before: always;' : ''">
         <div class="vuln-header">
             <h3 class="vuln-title" th:text="${vuln.name()}">Vulnerability Title</h3>
             <table class="vuln-meta">

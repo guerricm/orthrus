@@ -90,7 +90,7 @@ public class CorsScanner implements SecurityScanner {
                             List.of("CAPEC-63"),
                             5.3,
                             evidence,
-                            "Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly. Use strict string matching (not startsWith or endsWith).", operation, null,
+                            "Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly. Use strict string matching (not startsWith or endsWith).", operation, response,
                                         "API Endpoint (Network)",
                                         "Unauthorized Access / Data Exposure");
                     return Flux.just(vuln);
