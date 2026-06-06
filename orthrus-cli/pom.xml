@@ -5,7 +5,8 @@
     <parent>
         <groupId>ch.nexsol.security</groupId>
         <artifactId>orthrus-dast-parent</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>orthrus-cli</artifactId>
@@ -16,7 +17,6 @@
         <dependency>
             <groupId>ch.nexsol.security</groupId>
             <artifactId>orthrus-engine-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -25,12 +25,10 @@
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
-            <version>4.7.5</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli-spring-boot-starter</artifactId>
-            <version>4.7.5</version>
         </dependency>
     </dependencies>
     

@@ -11,7 +11,7 @@
 
     <groupId>ch.nexsol.security</groupId>
     <artifactId>orthrus-dast-parent</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
     <name>Orthrus DAST Parent</name>
     <description>Orthrus Dynamic Application Security Testing (V2 Multi-Module)</description>
@@ -24,10 +24,16 @@
     </modules>
 
     <properties>
+        <revision>0.0.1-SNAPSHOT</revision>
         <java.version>25</java.version>
-        <swagger-parser.version>2.1.22</swagger-parser.version>
-        <jjwt.version>0.12.6</jjwt.version>
-        <picocli.version>4.7.6</picocli.version>
+        <swagger-parser.version>2.1.43</swagger-parser.version>
+        <jjwt.version>0.13.0</jjwt.version>
+        <picocli.version>4.7.7</picocli.version>
+        <jsoup.version>1.22.2</jsoup.version>
+        <datafaker.version>2.5.4</datafaker.version>
+        <openhtmltopdf.version>1.1.37</openhtmltopdf.version>
+        <mockwebserver.version>5.3.2</mockwebserver.version>
+        <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -65,14 +71,14 @@
             <dependency>
                 <groupId>org.jsoup</groupId>
                 <artifactId>jsoup</artifactId>
-                <version>1.17.2</version>
+                <version>${jsoup.version}</version>
             </dependency>
 
             <!-- Datafaker for generating mock payloads -->
             <dependency>
                 <groupId>net.datafaker</groupId>
                 <artifactId>datafaker</artifactId>
-                <version>2.1.0</version>
+                <version>${datafaker.version}</version>
             </dependency>
 
             <!-- JWT Processing -->
@@ -95,26 +101,31 @@
             <!-- Picocli for CLI -->
             <dependency>
                 <groupId>info.picocli</groupId>
+                <artifactId>picocli</artifactId>
+                <version>${picocli.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>info.picocli</groupId>
                 <artifactId>picocli-spring-boot-starter</artifactId>
                 <version>${picocli.version}</version>
             </dependency>
 
             <!-- OpenHTMLToPDF for PDF generation -->
             <dependency>
-                <groupId>com.openhtmltopdf</groupId>
+                <groupId>io.github.openhtmltopdf</groupId>
                 <artifactId>openhtmltopdf-pdfbox</artifactId>
-                <version>1.0.10</version>
+                <version>${openhtmltopdf.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.openhtmltopdf</groupId>
+                <groupId>io.github.openhtmltopdf</groupId>
                 <artifactId>openhtmltopdf-slf4j</artifactId>
-                <version>1.0.10</version>
+                <version>${openhtmltopdf.version}</version>
             </dependency>
             
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>mockwebserver</artifactId>
-                <version>4.12.0</version>
+                <version>${mockwebserver.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -197,7 +208,7 @@
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>2.8.0</version>
+                <version>${cyclonedx-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
