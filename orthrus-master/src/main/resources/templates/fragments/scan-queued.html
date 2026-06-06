@@ -72,6 +72,12 @@
                             <span th:text="${status == 'PENDING' ? 'Scan Queued' : 'Scan Running...'}">Scan
                                 Queued</span>
                         </h3>
+                        <small th:if="${assignedSlaveId != null}" class="text-muted mt-1 d-block">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-hdd-network me-1" viewBox="0 0 16 16">
+                                <path d="M4.5 5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M3 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m2 7a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m-2.5.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
+                                <path d="M2 2a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h5.5v3A1.5 1.5 0 0 0 6 11.5H.5a.5.5 0 0 0 0 1H6A1.5 1.5 0 0 0 7.5 14h1a1.5 1.5 0 0 0 1.5-1.5h5.5a.5.5 0 0 0 0-1H10A1.5 1.5 0 0 0 8.5 10V7H14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 1h12a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm13 7.5v1a.5.5 0 0 1-.5.5h-2v-2h2a.5.5 0 0 1 .5.5z"/>
+                            </svg> Assigned to Slave: <span th:text="${assignedSlaveId}"></span>
+                        </small>
                     </div>
                     <div class="d-flex align-items-center">
                         <div th:id="'scan-actions-' + ${jobId}" style="display: none;">

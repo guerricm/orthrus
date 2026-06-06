@@ -56,9 +56,9 @@ public class SlaveApiController {
                                 return masterApiClient.completeJob(request.jobId(), startTime);
                             }))
                             .doOnError(e -> {
-                                masterApiClient.setStatus(NodeStatus.IDLE);
                                 org.slf4j.LoggerFactory.getLogger(SlaveApiController.class)
                                         .error("Error executing scan job", e);
+                                masterApiClient.failJob(request.jobId(), "Slave encountered an error: " + e.getMessage()).subscribe();
                             })
                             .doFinally(signalType -> activeJobs.remove(request.jobId()))
                             .subscribeOn(Schedulers.boundedElastic())

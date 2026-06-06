@@ -47,10 +47,22 @@ public class MasterInternalApiController {
                 .flatMap(existing -> slaveNodeRepository
                         .updateSlaveNodeUrlStatusAndLastSeenAt(node.getId(), node.getUrl(), node.getStatus().name(),
                                 node.getLastSeenAt())
+                        .then(failZombieScansForSlave(node.getId()))
                         .thenReturn(ResponseEntity.ok(node)))
                 .switchIfEmpty(Mono.defer(() -> slaveNodeRepository
                         .insertSlaveNode(node.getId(), node.getUrl(), node.getStatus(), node.getLastSeenAt())
                         .thenReturn(ResponseEntity.ok(node))));
+    }
+
+    private Mono<Void> failZombieScansForSlave(String slaveId) {
+        return scanJobRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING)
+                .flatMap(job -> {
+                    System.out.println("Failing zombie job " + job.getId() + " because slave " + slaveId + " re-registered.");
+                    job.setStatus(JobStatus.FAILED);
+                    return scanJobRepository.save(job)
+                            .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), JobEvent.failed(j.getId(), j.getTarget(), "Slave node restarted")));
+                })
+                .then();
     }
 
     /**
@@ -154,6 +166,34 @@ public class MasterInternalApiController {
                                             .subscribe();
                                     }
                                 }));
+                })
+                .map(j -> ResponseEntity.ok().<Void>build())
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    record FailJobRequest(String reason) {}
+
+    @PostMapping("/jobs/{id}/fail")
+    public Mono<ResponseEntity<Void>> postJobFail(@PathVariable Long id, @RequestBody FailJobRequest request) {
+        return scanJobRepository.findById(id)
+                .flatMap(job -> {
+                    job.setStatus(JobStatus.FAILED);
+                    return scanJobRepository.save(job)
+                            .doOnSuccess(j -> {
+                                jobEventPublisher.emit(id, JobEvent.failed(id, job.getTarget(), request.reason()));
+                                jobEventPublisher.complete(id);
+                                if (job.getAssignedSlaveId() != null) {
+                                    slaveNodeRepository.findById(job.getAssignedSlaveId())
+                                            .flatMap(slave -> scanJobRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
+                                                    .flatMap(runningCount -> {
+                                                        if (runningCount < slave.getMaxConcurrentScans()) {
+                                                            return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.IDLE.name(), slave.getLastSeenAt());
+                                                        }
+                                                        return Mono.empty();
+                                                    }))
+                                            .subscribe();
+                                }
+                            });
                 })
                 .map(j -> ResponseEntity.ok().<Void>build())
                 .defaultIfEmpty(ResponseEntity.notFound().build());

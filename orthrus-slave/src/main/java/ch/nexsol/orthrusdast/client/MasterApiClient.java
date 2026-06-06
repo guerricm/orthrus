@@ -129,6 +129,21 @@ public class MasterApiClient {
                 });
     }
 
+    public Mono<Void> failJob(Long jobId, String reason) {
+        String payload = String.format("{\"reason\": \"%s\"}", reason.replace("\"", "\\\""));
+        return webClient.post()
+                .uri(masterUrl + "/api/internal/jobs/" + jobId + "/fail")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(payload)
+                .retrieve()
+                .bodyToMono(Void.class)
+                .doOnSuccess(v -> setStatus(NodeStatus.IDLE))
+                .doOnError(e -> {
+                    log.error("Failed to send fail job to master: {}", e.getMessage());
+                    setStatus(NodeStatus.IDLE);
+                });
+    }
+
     public void setStatus(NodeStatus status) {
         this.currentStatus = status;
     }
