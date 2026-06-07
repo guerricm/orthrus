@@ -5,6 +5,7 @@ import ch.nexsol.orthrusdast.engine.ScanResultService;
 // ch.nexsol.orthrusdast.engine.ScanService removed
 import ch.nexsol.orthrusdast.engine.StatisticsService;
 import ch.nexsol.orthrusdast.report.PdfReportGenerator;
+import ch.nexsol.orthrusdast.report.HtmlReportGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
@@ -21,6 +22,9 @@ class FrontendControllerTest {
 
     @org.mockito.Mock
     private PdfReportGenerator pdfReportGenerator;
+
+    @org.mockito.Mock
+    private HtmlReportGenerator htmlReportGenerator;
 
     @org.mockito.Mock
     private ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher tokenFetcher;
@@ -46,7 +50,7 @@ class FrontendControllerTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        controller = new FrontendController(scanResultService, pdfReportGenerator, tokenFetcher, statisticsService,
+        controller = new FrontendController(scanResultService, pdfReportGenerator, htmlReportGenerator, tokenFetcher, statisticsService,
                 scanJobRepository, slaveNodeRepository, objectMapper, jobEventPublisher, clientRegistrations);
     }
 

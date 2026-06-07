@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.report.PdfReportGenerator;
+import ch.nexsol.orthrusdast.report.HtmlReportGenerator;
 import ch.nexsol.orthrusdast.repository.ScanResultRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
@@ -40,6 +41,7 @@ public class FrontendController {
 
     private final ScanResultService scanResultService;
     private final PdfReportGenerator pdfReportGenerator;
+    private final HtmlReportGenerator htmlReportGenerator;
     private final OAuth2TokenFetcher tokenFetcher;
     private final StatisticsService statisticsService;
     private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
@@ -49,7 +51,7 @@ public class FrontendController {
     private final JobEventPublisher jobEventPublisher;
     private final org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations;
 
-    public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator,
+    public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator, HtmlReportGenerator htmlReportGenerator,
             OAuth2TokenFetcher tokenFetcher, StatisticsService statisticsService,
             ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
             ch.nexsol.orthrusdast.repository.SlaveNodeRepository slaveNodeRepository,
@@ -58,6 +60,7 @@ public class FrontendController {
             org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations) {
         this.scanResultService = scanResultService;
         this.pdfReportGenerator = pdfReportGenerator;
+        this.htmlReportGenerator = htmlReportGenerator;
         this.tokenFetcher = tokenFetcher;
         this.statisticsService = statisticsService;
         this.scanJobRepository = scanJobRepository;
@@ -244,6 +247,67 @@ public class FrontendController {
             model.addAttribute("totalVulns", totalVulns);
             return "home";
         });
+    }
+
+
+    @GetMapping("/scans/{id}/details")
+    public Mono<String> scanDetails(@PathVariable Long id, Model model) {
+        return scanJobRepository.findById(id).flatMap(job -> {
+            if (job.getResultId() != null) {
+                return scanResultService.findById(job.getResultId()).flatMap(result -> {
+                    model.addAttribute("scanId", job.getId());
+                    model.addAttribute("resultId", job.getResultId());
+                    model.addAttribute("targetUrl", result.targetUrl());
+                    model.addAttribute("config", result.configuration());
+                    model.addAttribute("vulnerabilities", result.vulnerabilities());
+                    
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(java.time.ZoneId.systemDefault());
+                    model.addAttribute("scanDate", formatter.format(result.scanStartTime()));
+                    
+                    long critical = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.CRITICAL, 0L);
+                    long high = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.HIGH, 0L);
+                    long medium = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.MEDIUM, 0L);
+                    long low = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.LOW, 0L);
+                    long info = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);
+                    
+                    model.addAttribute("totalVulns", result.vulnerabilities().size());
+                    model.addAttribute("countCritical", critical);
+                    model.addAttribute("countHigh", high);
+                    model.addAttribute("countMedium", medium);
+                    model.addAttribute("countLow", low);
+                    model.addAttribute("countInfo", info);
+                    
+                    String grade = "A";
+                    if (critical > 0) grade = "F";
+                    else if (high > 0) grade = "D";
+                    else if (medium > 0) grade = "C";
+                    else if (low > 0) grade = "B";
+                    model.addAttribute("globalGrade", grade);
+                    
+                    if (result.attempts() != null && !result.attempts().isEmpty()) {
+                        java.util.LinkedHashMap<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> grouped = new java.util.LinkedHashMap<>();
+                        for (ch.nexsol.orthrusdast.model.ScanAttempt a : result.attempts()) {
+                            String key = a.operationMethod() + " " + a.operationUrl();
+                            grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
+                        }
+
+                        java.util.List<ch.nexsol.orthrusdast.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
+                        for (java.util.Map.Entry<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> entry : grouped.entrySet()) {
+                            long passed = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.PASSED == a.status()).count();
+                            long failed = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.FAILED == a.status()).count();
+                            long authError = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR == a.status()).count();
+                            long error = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.ERROR == a.status()).count();
+                            attemptGroupsList.add(new ch.nexsol.orthrusdast.model.EndpointAttemptGroup(entry.getKey(),
+                                    entry.getValue(), passed, failed, authError, error));
+                        }
+                        model.addAttribute("attemptGroups", attemptGroupsList);
+                    }
+                    
+                    return Mono.just("scans/details");
+                });
+            }
+            return Mono.just("redirect:/scans");
+        }).switchIfEmpty(Mono.just("redirect:/scans"));
     }
 
     @GetMapping("/scans/new")
@@ -562,6 +626,32 @@ public class FrontendController {
             model.addAttribute("error", "Scan failed: " + e.getMessage());
             return Mono.just("fragments/results :: errorPanel");
         });
+    }
+
+
+    @GetMapping(value = "/web/scans/{id}/html", produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
+    public Mono<Void> getHtmlReport(@PathVariable String id, 
+            @RequestParam(defaultValue = "true") boolean includePassed,
+            org.springframework.web.server.ServerWebExchange exchange) {
+        return scanResultService.findById(id).flatMap(result -> {
+            exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.OK);
+            return exchange.getResponse().writeWith(
+                Mono.create(sink -> {
+                    try {
+                        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                        htmlReportGenerator.generateReport(result, out, includePassed)
+                            .doOnSuccess(v -> {
+                                org.springframework.core.io.buffer.DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(out.toByteArray());
+                                sink.success(buffer);
+                            })
+                            .doOnError(sink::error)
+                            .subscribe();
+                    } catch (Exception e) {
+                        sink.error(e);
+                    }
+                })
+            );
+        }).then();
     }
 
     @GetMapping("/web/scans/{id}/pdf")
