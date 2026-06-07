@@ -99,9 +99,10 @@ public class XssScanner implements SecurityScanner {
                             return Flux.empty();
                         }
 
-                        RiskLevel risk = isHtml ? RiskLevel.HIGH : RiskLevel.MEDIUM;
+                        boolean isJson = contentType != null && contentType.toLowerCase().contains("application/json");
+                        RiskLevel risk = isHtml ? RiskLevel.HIGH : (isJson ? RiskLevel.LOW : RiskLevel.MEDIUM);
                         String severityContext = isHtml ? "The response is served as HTML, meaning a browser will execute this script directly." 
-                                                      : "The response is not HTML, so the script won't execute directly in modern browsers, but could be dangerous if a frontend incorrectly inserts this JSON data into the DOM.";
+                                                      : (isJson ? "The response is served as JSON. Modern browsers will not execute scripts in JSON, but it may pose a risk if the frontend incorrectly parses and renders this data into the DOM." : "The response is not HTML, so the script won't execute directly in modern browsers, but could be dangerous if a frontend incorrectly inserts this data into the DOM.");
                         
                         Vulnerability vuln = createVulnerabilityWithTrace(
                                 "Reflected Cross-Site Scripting (XSS)",

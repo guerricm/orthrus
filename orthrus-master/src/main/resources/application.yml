@@ -26,6 +26,8 @@ spring:
     web-application-type: reactive
   codec:
     max-in-memory-size: 50MB
+  messages:
+    fallback-to-system-locale: false
 
 logging:
   level:

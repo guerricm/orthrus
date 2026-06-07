@@ -50,27 +50,36 @@ public class SensitiveQueryScanner implements SecurityScanner {
 
         if ("GET".equals(operation.method().toUpperCase())) {
             // Passive check: Check if any query parameter name matches a sensitive keyword
+            String paramMatch = null;
             for (String paramName : operation.queryParams().keySet()) {
                 String lowerParam = paramName.toLowerCase();
                 for (String keyword : SENSITIVE_KEYWORDS) {
                     if (lowerParam.contains(keyword)) {
-                        Vulnerability vuln = createVulnerabilityWithTrace(
-                                "Sensitive Information in Query String (Passive)",
-                                "The endpoint accepts a parameter named '" + paramName + "' in the URL query string. Query strings are logged by reverse proxies, web servers, and browser histories, leading to sensitive data exposure.",
-                                RiskLevel.MEDIUM,
-                                Vulnerability.Confidence.HIGH,
-                                operation,
-                                CWEReference.CWE_598,
-                                List.of("CAPEC-87"),
-                                6.5,
-                                "Parameter '" + paramName + "' found in GET request.",
-                                "Move sensitive data from the query string to HTTP Headers (e.g., Authorization header) or the request body (e.g., POST request).", operation, null,
-                                        "API Endpoint (Network)",
-                                        "Unauthorized Access / Data Exposure");
-                        passiveVulns = Flux.just(vuln);
+                        paramMatch = paramName;
                         break;
                     }
                 }
+                if (paramMatch != null) break;
+            }
+            
+            if (paramMatch != null) {
+                final String matchedParam = paramMatch;
+                passiveVulns = httpClient.send(operation).flatMapMany(response -> {
+                    Vulnerability vuln = createVulnerabilityWithTrace(
+                            "Sensitive Information in Query String (Passive)",
+                            "The endpoint accepts a parameter named '" + matchedParam + "' in the URL query string. Query strings are logged by reverse proxies, web servers, and browser histories, leading to sensitive data exposure.",
+                            RiskLevel.MEDIUM,
+                            Vulnerability.Confidence.HIGH,
+                            operation,
+                            CWEReference.CWE_598,
+                            List.of("CAPEC-87"),
+                            6.5,
+                            "Parameter '" + matchedParam + "' found in GET request.",
+                            "Move sensitive data from the query string to HTTP Headers (e.g., Authorization header) or the request body (e.g., POST request).", operation, response,
+                                    "API Endpoint (Network)",
+                                    "Unauthorized Access / Data Exposure");
+                    return Flux.just(vuln);
+                });
             }
         } else if (List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
             // Active check: Try moving JSON body fields to Query String (Parameter Binding abuse)

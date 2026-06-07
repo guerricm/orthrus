@@ -258,8 +258,27 @@ public class FrontendController {
                     model.addAttribute("scanId", job.getId());
                     model.addAttribute("resultId", job.getResultId());
                     model.addAttribute("targetUrl", result.targetUrl());
-                    model.addAttribute("config", result.configuration());
-                    model.addAttribute("vulnerabilities", result.vulnerabilities());
+                    model.addAttribute("discovererId", job.getDiscovererId());
+                    try {
+                        ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(
+                                job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                        model.addAttribute("config", conf);
+                    } catch (Exception e) {
+                        model.addAttribute("config", result.configuration());
+                    }
+                    java.util.List<ch.nexsol.orthrusdast.model.Vulnerability> sortedVulns = new java.util.ArrayList<>(result.vulnerabilities());
+                    sortedVulns.sort((v1, v2) -> {
+                        int riskCompare = Integer.compare(v2.riskLevel().ordinal(), v1.riskLevel().ordinal());
+                        if (riskCompare != 0) return riskCompare;
+                        String cwe1 = v1.cwe() != null ? v1.cwe().name() : "";
+                        String cwe2 = v2.cwe() != null ? v2.cwe().name() : "";
+                        int cweCompare = cwe1.compareTo(cwe2);
+                        if (cweCompare != 0) return cweCompare;
+                        String name1 = v1.name() != null ? v1.name() : "";
+                        String name2 = v2.name() != null ? v2.name() : "";
+                        return name1.compareTo(name2);
+                    });
+                    model.addAttribute("vulnerabilities", sortedVulns);
                     
                     java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(java.time.ZoneId.systemDefault());
                     model.addAttribute("scanDate", formatter.format(result.scanStartTime()));

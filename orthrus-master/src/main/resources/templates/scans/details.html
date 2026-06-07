@@ -22,6 +22,32 @@
                         <p class="mb-0"><strong>Date:</strong> <span th:text="${scanDate}"></span></p>
                     </div>
                 </div>
+                
+                <div th:if="${config != null}" class="mt-4">
+                    <h5 class="text-secondary border-bottom border-secondary pb-2 mb-3">Scan Configuration</h5>
+                    <div class="row text-light">
+                        <div class="col-md-6 mb-2">
+                            <strong>Concurrency:</strong> <span th:text="${config.concurrency}"></span>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Discoverer Mode:</strong> <span class="badge bg-secondary text-light text-uppercase" th:text="${discovererId}"></span>
+                        </div>
+                        <div class="col-md-6 mb-2" th:if="${discovererId == 'gateway'}">
+                            <strong>Gateway Type:</strong> <span th:text="${config.gatewayType}"></span>
+                        </div>
+                        <div class="col-md-6 mb-2" th:if="${config.authScheme != null and config.authScheme?.type != null and config.oauth2Config == null}">
+                            <strong>Authentication:</strong> <span class="badge bg-info text-dark">Static Token</span>
+                        </div>
+                        <div class="col-md-12 mb-2" th:if="${config.oauth2Config != null}">
+                            <strong>Authentication:</strong> <span class="badge bg-primary text-light">Dynamic OAuth2</span>
+                            <div class="card bg-transparent border-secondary mt-2 p-3 text-light">
+                                <div><small class="text-white-50">OAuth2 URL:</small> <span th:text="${config.oauth2Config.tokenUrl}"></span></div>
+                                <div><small class="text-white-50">Grant Type:</small> <span th:text="${config.oauth2Config.grantType}"></span></div>
+                                <div><small class="text-white-50">Client ID:</small> <span th:text="${config.oauth2Config.clientId}"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="glass-card mb-4 p-4">
@@ -74,26 +100,99 @@
                     </div>
                 </div>
                 
-                <table class="table table-dark table-hover mb-0" th:if="${vulnerabilities != null and !vulnerabilities.isEmpty()}">
-                    <thead>
-                        <tr>
-                            <th class="bg-transparent border-secondary">Risk</th>
-                            <th class="bg-transparent border-secondary">Vulnerability</th>
-                            <th class="bg-transparent border-secondary">Endpoint</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="v : ${vulnerabilities}">
-                            <td class="bg-transparent border-secondary">
-                                <span th:class="'badge ' + (${v.riskLevel().name() == 'CRITICAL'} ? 'bg-danger' : (${v.riskLevel().name() == 'HIGH'} ? 'bg-warning text-dark' : (${v.riskLevel().name() == 'MEDIUM'} ? 'bg-primary' : (${v.riskLevel().name() == 'LOW'} ? 'bg-info text-dark' : 'bg-secondary'))))" th:text="${v.riskLevel()}"></span>
-                            </td>
-                            <td class="bg-transparent border-secondary" th:text="${v.name()}"></td>
-                            <td class="bg-transparent border-secondary" style="word-break: break-all;" th:text="${v.operationUrl()}"></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div th:if="${vulnerabilities == null or vulnerabilities.isEmpty()}" class="alert alert-success bg-transparent border-success text-success mt-3">
-                    No vulnerabilities found!
+                <div class="row">
+                    <!-- Left column: Table -->
+                    <div class="col-lg-5">
+                        <table class="table table-dark table-hover mb-0" th:if="${vulnerabilities != null and !vulnerabilities.isEmpty()}">
+                            <thead>
+                                <tr>
+                                    <th class="bg-transparent border-secondary">Risk</th>
+                                    <th class="bg-transparent border-secondary">Vulnerability</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="v, stat : ${vulnerabilities}" th:id="'row-vuln-' + ${stat.index}" style="cursor: pointer;" th:onclick="|showVulnerabilityDetails('vuln-${stat.index}')|">
+                                    <td class="bg-transparent border-secondary">
+                                        <span th:class="'badge ' + (${v.riskLevel().name() == 'CRITICAL'} ? 'bg-danger' : (${v.riskLevel().name() == 'HIGH'} ? 'bg-warning text-dark' : (${v.riskLevel().name() == 'MEDIUM'} ? 'bg-primary' : (${v.riskLevel().name() == 'LOW'} ? 'bg-info text-dark' : 'bg-secondary'))))" th:text="${v.riskLevel()}"></span>
+                                    </td>
+                                    <td class="bg-transparent border-secondary" th:text="${v.name()}"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div th:if="${vulnerabilities == null or vulnerabilities.isEmpty()}" class="alert alert-success bg-transparent border-success text-success mt-3">
+                            No vulnerabilities found!
+                        </div>
+                    </div>
+                    
+                    <!-- Right column: Details Pane -->
+                    <div class="col-lg-7 mt-4 mt-lg-0">
+                        <div class="sticky-top" style="top: 2rem; max-height: calc(100vh - 4rem); overflow-y: auto;">
+                        <!-- Placeholder -->
+                        <div id="vuln-placeholder" class="text-center py-5 text-secondary border border-secondary rounded" th:if="${vulnerabilities != null and !vulnerabilities.isEmpty()}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-info-circle mb-3 opacity-50" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+                            <h5>Select a vulnerability</h5>
+                            <p class="mb-0 text-white-50">Click on a row in the list to view its complete details.</p>
+                        </div>
+                        
+                        <!-- Details Cards -->
+                        <div th:each="v, stat : ${vulnerabilities}" th:id="'vuln-' + ${stat.index}" class="vuln-detail-card border border-secondary rounded p-4 mb-3 bg-dark" style="display: none;">
+                            <h4 class="text-light mb-4" th:text="${v.name()}">Vulnerability Title</h4>
+                            
+                            <div class="row mb-4">
+                                <div class="col-md-6 mb-3">
+                                    <strong class="text-secondary d-block mb-1">Severity:</strong>
+                                    <span th:class="'badge ' + (${v.riskLevel().name() == 'CRITICAL'} ? 'bg-danger' : (${v.riskLevel().name() == 'HIGH'} ? 'bg-warning text-dark' : (${v.riskLevel().name() == 'MEDIUM'} ? 'bg-primary' : (${v.riskLevel().name() == 'LOW'} ? 'bg-info text-dark' : 'bg-secondary'))))" th:text="${v.riskLevel()}"></span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong class="text-secondary d-block mb-1">CVSS Score:</strong>
+                                    <span class="text-light fw-bold" th:text="${v.cvssScore() != null ? v.cvssScore() : 'N/A'}"></span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong class="text-secondary d-block mb-1">CWE:</strong>
+                                    <span class="text-light" th:text="${v.cwe() != null ? v.cwe().name() : 'N/A'}"></span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong class="text-secondary d-block mb-1">CAPEC:</strong>
+                                    <span class="text-light" th:text="${v.capecs() != null and !v.capecs().isEmpty() ? #strings.listJoin(v.capecs(), ', ') : 'N/A'}"></span>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <strong class="text-secondary d-block mb-1">OWASP:</strong>
+                                    <span class="text-light" th:text="${v.owaspCategory() != null ? v.owaspCategory().getCode() + ' - ' + v.owaspCategory().getName() : 'N/A'}"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4 p-3 bg-black rounded border border-secondary">
+                                <strong class="text-secondary d-block mb-2">Endpoint:</strong>
+                                <code class="text-info d-block fs-6" style="word-break: break-all;" th:text="${(v.operationMethod() != null ? v.operationMethod() + ' ' : '') + v.operationUrl()}"></code>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h6 class="text-info border-bottom border-secondary pb-2 mb-3">Description</h6>
+                                <p class="text-light mb-0" th:text="${v.cwe() != null ? @messageSource.getMessage('desc.' + v.cwe().name(), null, v.description(), new java.util.Locale('en')) : v.description()}"></p>
+                            </div>
+                            
+                            <div class="mb-4" th:if="${v.evidence() != null and !v.evidence().isEmpty()}">
+                                <h6 class="text-warning border-bottom border-secondary pb-2 mb-3">Evidence / Proof of Concept</h6>
+                                <p class="text-light mb-0" th:text="${v.evidence()}"></p>
+                            </div>
+                            
+                            <div class="mb-4" th:if="${v.requestDetails() != null and !v.requestDetails().isEmpty()}">
+                                <h6 class="text-info border-bottom border-secondary pb-2 mb-3">Request Payload</h6>
+                                <pre class="bg-black p-3 rounded text-light border border-secondary" style="font-size: 0.85em; white-space: pre-wrap; word-wrap: break-word;" th:text="${v.requestDetails()}"></pre>
+                            </div>
+                            
+                            <div class="mb-4" th:if="${v.responseDetails() != null and !v.responseDetails().isEmpty()}">
+                                <h6 class="text-info border-bottom border-secondary pb-2 mb-3">Response</h6>
+                                <pre class="bg-black p-3 rounded text-light border border-secondary" style="font-size: 0.85em; white-space: pre-wrap; word-wrap: break-word;" th:text="${v.responseDetails()}"></pre>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6 class="text-success border-bottom border-success pb-2 mb-3">Remediation</h6>
+                                <p class="text-light mb-0" th:text="${v.cwe() != null ? @messageSource.getMessage('rem.' + v.cwe().name(), null, v.remediation(), new java.util.Locale('en')) : v.remediation()}"></p>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -133,6 +232,35 @@
 
         </div>
     </div>
+    
+    <script>
+        function showVulnerabilityDetails(vulnId) {
+            var placeholder = document.getElementById('vuln-placeholder');
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            var cards = document.querySelectorAll('.vuln-detail-card');
+            cards.forEach(function(card) {
+                card.style.display = 'none';
+            });
+            
+            var rows = document.querySelectorAll('tr[id^="row-vuln-"]');
+            rows.forEach(function(row) {
+                row.classList.remove('table-active');
+            });
+            
+            var selectedCard = document.getElementById(vulnId);
+            if (selectedCard) {
+                selectedCard.style.display = 'block';
+            }
+            
+            var selectedRow = document.getElementById('row-' + vulnId);
+            if (selectedRow) {
+                selectedRow.classList.add('table-active');
+            }
+        }
+    </script>
 </main>
 </body>
 </html>
