@@ -26,7 +26,9 @@ public class ScanController {
     private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
     private final tools.jackson.databind.ObjectMapper objectMapper;
 
-    public ScanController(OAuth2TokenFetcher tokenFetcher, ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository, tools.jackson.databind.ObjectMapper objectMapper) {
+    public ScanController(OAuth2TokenFetcher tokenFetcher,
+            ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
+            tools.jackson.databind.ObjectMapper objectMapper) {
         this.tokenFetcher = tokenFetcher;
         this.scanJobRepository = scanJobRepository;
         this.objectMapper = objectMapper;
@@ -42,8 +44,10 @@ public class ScanController {
 
     /**
      * Trigger a new scan.
-     * Note: In a real production app, this would likely enqueue the scan and return an ID,
-     * but for this v1 we'll block the connection and return the result directly (since we don't have a DB).
+     * Note: In a real production app, this would likely enqueue the scan and return
+     * an ID,
+     * but for this v1 we'll block the connection and return the result directly
+     * (since we don't have a DB).
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<ScanResult>> triggerScan(@RequestBody ScanRequest request) {
@@ -77,24 +81,24 @@ public class ScanController {
                             GatewayType.AUTO,
                             null,
                             null,
-                            request.oauth2()
-                    );
+                            request.oauth2(),
+                            request.overrideHost());
 
                     return Mono.fromCallable(() -> objectMapper.writeValueAsString(config))
                             .flatMap(configJson -> {
                                 ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                        request.discovererId(), request.target(), configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING
-                                );
+                                        request.discovererId(), request.target(), configJson,
+                                        ch.nexsol.orthrusdast.model.JobStatus.PENDING);
                                 return scanJobRepository.save(job);
                             })
-                            .map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need a DTO or just return job ID
+                            .map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need a DTO or just
+                                                                                                // return job ID
                             .doOnError(e -> org.slf4j.LoggerFactory.getLogger(ScanController.class)
                                     .error("Failed to create or save scan job for target: {}", request.target(), e));
                 })
-                .onErrorResume(IllegalArgumentException.class, e ->
-                        Mono.just(ResponseEntity.badRequest().build()))
-                .onErrorResume(Exception.class, e ->
-                        Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
+                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()))
+                .onErrorResume(Exception.class,
+                        e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
     }
 
     // DTO for incoming requests
@@ -110,6 +114,6 @@ public class ScanController {
             SecurityScheme secondaryAuthScheme,
             OAuth2Config oauth2,
             String language,
-            Boolean includePassed
-    ) {}
+            Boolean includePassed) {
+    }
 }

@@ -44,7 +44,7 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+    public Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
         ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         int maxDepth = properties.getDiscovery().getBlackboxMaxDepth();
         log.info("Starting black-box discovery from: {} (Max Depth: {})", target, maxDepth);

@@ -39,7 +39,7 @@ public class SlaveApiController {
                     java.util.concurrent.atomic.AtomicInteger testsCount = new java.util.concurrent.atomic.AtomicInteger();
                     java.util.concurrent.atomic.AtomicInteger vulnsCount = new java.util.concurrent.atomic.AtomicInteger();
                     
-                    reactor.core.Disposable disposable = scanService.executeScan(request.discovererId(), request.target(), null, config)
+                    reactor.core.Disposable disposable = scanService.executeScan(request.discovererId(), request.target(), config)
                             .bufferTimeout(10, java.time.Duration.ofSeconds(1))
                             .flatMap(batch -> {
                                 testsCount.addAndGet(batch.size());

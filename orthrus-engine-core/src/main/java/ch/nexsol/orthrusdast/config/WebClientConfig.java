@@ -9,6 +9,7 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 import java.time.Duration;
 
@@ -30,7 +31,15 @@ public class WebClientConfig {
         int readTimeout = properties.getHttp().getReadTimeoutMs();
         boolean ignoreSslErrors = properties.getHttp().isIgnoreSslErrors();
 
-        HttpClient httpClient = HttpClient.create()
+        ConnectionProvider provider = ConnectionProvider.builder("orthrus-dast-pool")
+                .maxConnections(500)
+                .maxIdleTime(Duration.ofSeconds(20))
+                .maxLifeTime(Duration.ofSeconds(60))
+                .pendingAcquireTimeout(Duration.ofSeconds(30))
+                .evictInBackground(Duration.ofSeconds(40))
+                .build();
+
+        HttpClient httpClient = HttpClient.create(provider)
                 .responseTimeout(Duration.ofMillis(readTimeout))
                 .followRedirect(true);
 

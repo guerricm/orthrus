@@ -21,7 +21,7 @@ class GraphqlDiscovererTest {
             .thenReturn(reactor.core.publisher.Mono.just(new ch.nexsol.orthrusdast.http.ScanHttpResponse(org.springframework.http.HttpStatus.NOT_FOUND, new org.springframework.http.HttpHeaders(), "", 0L)));
             
         GraphqlDiscoverer discoverer = new GraphqlDiscoverer(mockClient);
-        StepVerifier.create(discoverer.discover("http://invalid-url:9999/graphql", null, null))
+        StepVerifier.create(discoverer.discover("http://invalid-url:9999/graphql", null))
             .assertNext(ops -> org.junit.jupiter.api.Assertions.assertTrue(ops.isEmpty()))
             .verifyComplete();
     }

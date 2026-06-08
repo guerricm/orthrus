@@ -8,6 +8,10 @@ orthrus:
     slave-timeout-seconds: 30
   slave:
     advertised-url: http://not-used
+  security:
+    admin:
+      username: ${ADMIN_USERNAME:superadmin}
+      password: ${ADMIN_PASSWORD:superadmin}
 
 spring:
   r2dbc:
@@ -22,6 +26,8 @@ spring:
     web-application-type: reactive
   codec:
     max-in-memory-size: 50MB
+  messages:
+    fallback-to-system-locale: false
 
 logging:
   level:

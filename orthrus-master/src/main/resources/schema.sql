@@ -7,6 +7,17 @@ CREATE TABLE IF NOT EXISTS "scan_results" (
     operations_scanned INT
 );
 
+CREATE TABLE IF NOT EXISTS "scan_attempts" (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    scan_result_id VARCHAR(255),
+    scanner_id VARCHAR(100),
+    scanner_name VARCHAR(100),
+    operation_method VARCHAR(20),
+    operation_url VARCHAR(2048),
+    status VARCHAR(50),
+    FOREIGN KEY (scan_result_id) REFERENCES "scan_results"(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS "vulnerabilities" (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     scan_result_id VARCHAR(255),

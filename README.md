@@ -1,15 +1,33 @@
 # Orthrus DAST
 
 <p align="center">
-  <img src="orthrus-master/src/main/resources/static/images/logo.png" alt="Orthrus DAST Logo" width="300"/>
+  <img src="orthrus-master/src/main/resources/static/images/orthrus_logo.png" alt="Orthrus DAST Logo" width="300"/>
 </p>
 
-Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot 4 and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
+Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
 
 ## Features
 
-- **Reactive Engine**: Highly concurrent scanning engine built on Spring WebFlux.
-- **36 Specialized Scanners**:
+### Discovery Modes
+Orthrus supports 5 discovery modes to map your API surface:
+- `openapi`: Parses OpenAPI v3 specifications (JSON/YAML)
+- `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.
+- `blackbox`: Crawls and fuzzes a target URL to discover endpoints dynamically.
+- `gateway`: Connects to API Gateways (Traefik, Kong, Spring Cloud, HAProxy, K8s) to extract routing rules dynamically.
+- `curl`: Reads cURL commands from a file.
+- `well-known`: Scans for standard sensitive files (e.g. `/.env`, `/.git/config`).
+
+#### Gateway Mode Details
+The `gateway` mode probes the Gateway's Admin API to read its actual routing tables and automatically fuzzes the underlying routes.
+
+**Supported Gateways:**
+- Traefik (`/api/http/routers`)
+- Spring Cloud Gateway (`/actuator/gateway/routes`)
+- Kong API Gateway (`/routes`)
+- HAProxy (`/v2/services/haproxy/configuration/acls`)
+- Kubernetes Ingress (`/apis/networking.k8s.io/v1/ingresses`)
+
+### 36 Specialized Scanners
 
 | Scanner ID | Description | Associated CWE |
 | --- | --- | --- |
@@ -49,49 +67,15 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
 | `verbose-error` | Leaks of stack traces or sensitive errors | CWE-209 (Generation of Error Message Containing Sensitive Information) |
 | `xss` | Reflected Cross-Site Scripting via query params, JSON bodies, and headers | CWE-79 (Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')) |
 | `xxe-injection` | Injects malicious DTDs referencing external files like /etc/passwd | CWE-611 (Improper Restriction of XML External Entity Reference) |
-- **5 Discovery Modes**:
-  - `openapi`: Parses OpenAPI v3 specifications (JSON/YAML)
-  - `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.
-  - `blackbox`: Crawls and fuzzes a target URL to discover endpoints dynamically
-  - `gateway`: Connects to API Gateways (Traefik, Kong, Spring Cloud, HAProxy, K8s) to extract routing rules dynamically
-  - `curl`: Reads cURL commands from a file
-  - `well-known`: Scans for standard sensitive files (e.g. `/.env`, `/.git/config`)
 
-### Gateway Mode Details
-The `gateway` mode is an incredibly powerful feature for DevSecOps. It probes the Gateway's Admin API to read its actual routing tables (e.g. `PathPrefix('/api')`), and automatically fuzzes the underlying routes.
+## Getting Started
 
-**Supported Gateways:**
-- Traefik (`/api/http/routers`)
-- Spring Cloud Gateway (`/actuator/gateway/routes`)
-- Kong API Gateway (`/routes`)
-- HAProxy (`/v2/services/haproxy/configuration/acls`)
-- Kubernetes Ingress (`/apis/networking.k8s.io/v1/ingresses`)
-
-**Gateway Flags:**
-- `--gateway-type`: `auto` (default), `traefik`, `spring-cloud-gateway`, `kong`, `haproxy`, `k8s`.
-- `--app-url`: If the Admin API (e.g., port 8080) is on a different port than the public app (e.g., port 80), specify the public URL to attack with `--app-url=http://myapp.com`.
-- `--k8s-token`: Provide your Kubernetes ServiceAccount token for K8s discovery (or use the `K8S_TOKEN` environment variable). Note: K8s is not auto-detected for security reasons, it must be explicitly specified with `--gateway-type=k8s`.
-
-### Authentication
-- **Reporting**: JSON, SARIF (for GitHub Advanced Security), HTML, PDF, and Console formats.
-- **API & CLI**: Run as a command-line tool or as a long-running REST API service.
-
-## Architecture (Orthrus V2)
-
-Orthrus V2 introduces a highly scalable **Master-Slave** architecture:
-- **Master (`orthrus-master`)**: Coordinates the scan jobs, exposes a Web UI on port 8080, and maintains a database (H2 by default) of registered Slaves and Scan Jobs.
-- **Slave (`orthrus-slave`)**: Connects to the Master to retrieve jobs, executes the actual high-concurrency scans, and reports results back.
-- **CLI (`orthrus-cli`)**: A lightweight wrapper for the Engine providing a CLI interface for local execution or CI/CD integration without a Master.
-- **Engine Core (`orthrus-engine-core`)**: Shared execution engine containing the models, discoverers, scanners, and report generators used by all components.
-
-## Prerequisites
-
+### Prerequisites
 - Java 25 or higher
 - Maven 3.8+
 - Docker (optional, for containerized deployments)
 
-## Building
-
+### Building the Project
 Compile and package the entire multi-module application:
 ```bash
 ./mvnw clean package -DskipTests
@@ -108,31 +92,61 @@ mvn spring-boot:build-image -pl orthrus-slave
 mvn spring-boot:build-image -pl orthrus-cli
 ```
 
-## Usage (Distributed Mode)
+## Running the Application
 
-### 1. Start the Master
-The Master node orchestrates everything and exposes the Web UI on `http://localhost:8080`.
+### Using Docker Compose (Recommended)
+You can quickly start a Master and Slave node using the provided `docker-compose.yml`:
 ```bash
+docker-compose up -d
+```
+
+### Running Manually (Java)
+1. **Start the Master node** (orchestrates scans and provides the Web UI):
+   ```bash
+   java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
+   ```
+2. **Start one or more Slave nodes** (executes the actual high-concurrency scans):
+   ```bash
+   java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar --server.port=8081
+   ```
+
+### Security & Authentication
+> **Note**: The Web UI and API are secured by default. You must log in using the default credentials:
+> - **Username**: `superadmin`
+> - **Password**: `superadmin`
+> 
+> You can change these by setting `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables.
+
+#### Single Sign-On (SSO) with OAuth2 / OIDC
+Orthrus natively supports OAuth2/OIDC login via standard Spring Security configuration.
+To enable SSO (e.g., with Keycloak, Auth0, Google), simply provide the standard `spring.security.oauth2.client` properties in your `application.yml` or as environment variables before starting the Master.
+
+**Example: Generic OIDC SSO via Environment Variables**
+```bash
+export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID="orthrus-client"
+export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET="your_client_secret"
+export SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI="https://your-idp.example.com/realms/master"
+export SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="https://your-idp.example.com/realms/master"
 java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
 ```
+When configured, the "Sign in with OpenID Connect" button will allow users to log in. Note that users logging in via OAuth2 will receive the default `ROLE_USER` role unless their token provides specific Orthrus roles mapping.
 
-### 2. Start one or more Slaves
-Slaves will automatically connect to the Master on port 8080. You can run multiple slaves on different machines or ports.
-```bash
-java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar --server.port=8081
-```
+## Using the Web Interface
+Once the Master is running, navigate to `http://localhost:8080` to access the Web UI.
 
-Once running, navigate to `http://localhost:8080` to launch scans via the interface. You can view connected slaves and active jobs in the **System / Slaves** tab.
+- **Interactive Dashboard**: View statistics and a history of all executed scans.
+- **Easy Configuration**: A "New Scan" form lets you select discovery modules, target URLs, and authentication methods.
+- **Live Execution & Reporting**: See scan progress in real-time, view detailed findings with their respective risk grades (A to F), and export results directly as a **PDF**.
+- **Integrated User Manual**: A detailed guide is accessible directly from the interface (`/manual`) explaining discovery modes and security grading.
 
-## Usage (Standalone CLI Mode)
 
-If you just want to run a scan from your terminal without spinning up the Master/UI infrastructure, you can use the CLI JAR autonomously.
+
+## Using the Standalone CLI
+If you want to run a scan from your terminal without spinning up the Master/UI infrastructure, use the CLI JAR autonomously.
 
 ```bash
 java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 ```
-
-### CLI Examples
 
 **Generate a professional PDF report in French:**
 ```bash
@@ -140,7 +154,6 @@ java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https:
 ```
 
 **Automated OAuth2 Token Fetching for Cross-User BOLA (IDOR):**
-Automatically fetch tokens for two users to test for BOLA across boundaries:
 ```bash
 java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
   --oauth2-url "https://keycloak.example.com/realms/master/protocol/openid-connect/token" \
@@ -149,54 +162,12 @@ java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https:
   --oauth2-creds "alice:pwd123,bob:pwd456"
 ```
 
-**Crawl a website (Blackbox):**
-```bash
-java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d blackbox -t https://example.com --out report.json -f json
-```
-
-### CLI Options
-- `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`, `gateway`).
-- `-t, --target`: Target URL or Spec path.
-- `-c, --concurrency`: Number of concurrent threads to use during the scan (default: 10). Increase for massive APIs to speed up execution.
-- `--host`: Override the host URL for the target endpoints.
-- `-f, --format`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
-- `--lang`: Report language when using PDF or HTML format (`en`, `fr`). Default is `en`.
-- `-o, --out`: Output file path. If not provided, prints to standard output.
-- `--auth-bearer`: Provide a Bearer token to inject into all requests (Primary User).
-- `--auth-bearer-secondary`: Provide a secondary Bearer token for Cross-User BOLA testing (Secondary User).
-- `--oauth2-url`: OAuth2 token endpoint URL.
-- `--oauth2-client-id`: OAuth2 Client ID.
-- `--oauth2-client-secret`: OAuth2 Client Secret.
-- `--oauth2-grant`: OAuth2 Grant Type (`password` or `client_credentials`).
-- `--oauth2-creds`: Comma-separated list of `username:password` credentials (for `password` grant).
-- `--include`: Comma-separated list of scanner IDs to run exclusively.
-- `--exclude`: Comma-separated list of scanner IDs to skip.
-- `--include-passed`: Include all executed tests (passed and failed) in the report. Adds an "Execution Details" section to HTML, PDF, JSON, and SARIF reports.
-- `--gateway-type`: Gateway type: `auto`, `traefik`, `kong`, `spring-cloud-gateway`, `haproxy`, `k8s` (default: `auto`).
-- `--app-url`: Public Application URL for Gateway Discovery (e.g. http://myapp.com) if different from the admin interface.
-- `--k8s-token`: Kubernetes ServiceAccount Token (or set K8S_TOKEN env var).
-
-The Web UI provides a user-friendly, responsive experience with the following features:
-- **Interactive Dashboard**: View statistics and a history of all executed scans.
-- **Easy Configuration**: A "New Scan" form that lets you easily select discovery modules, target URLs, and authentication methods.
-- **Advanced Options**: Fully integrates the advanced CLI flags through an intuitive UI:
-  - Configure **OAuth2** (URL, Client ID, Secret, Grant Type) for dynamic token fetching.
-  - Provide a **Secondary Bearer Token** for automated Cross-User BOLA testing.
-  - Checkboxes to easily select or deselect which specific scanners to run.
-- **Live Execution & Reporting**: See scan progress in real-time, view detailed findings with their respective risk grades (A to F), and export results directly as a **PDF**.
-- **Integrated User Manual**: A detailed, built-in guide accessible directly from the interface (`/manual`) explaining discovery modes and security grading.
-
-## Usage (REST API Mode)
-
-If you run the application without CLI arguments, it starts a Spring WebFlux server exposing a REST API.
-
-```bash
-java -jar target/orthrus-dast-0.0.1-SNAPSHOT.jar
-```
+## Using the REST API
+The Master node exposes a comprehensive REST API to trigger and manage scans programmatically.
 
 **Trigger a basic scan:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "well-known",
@@ -207,7 +178,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **Generate a PDF report in French with a Bearer token:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "openapi",
@@ -225,7 +196,7 @@ curl -X POST http://localhost:8080/api/v1/scans \
 
 **Test for Cross-User BOLA (IDOR) with two distinct users via API:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/scans \
+curl -u superadmin:superadmin -X POST http://localhost:8080/api/v1/scans \
   -H "Content-Type: application/json" \
   -d '{
     "discovererId": "openapi",
@@ -246,43 +217,8 @@ curl -X POST http://localhost:8080/api/v1/scans \
   }'
 ```
 
-**Automated OAuth2 Token Fetching via API:**
-```bash
-curl -X POST http://localhost:8080/api/v1/scans \
-  -H "Content-Type: application/json" \
-  -d '{
-    "discovererId": "openapi",
-    "target": "https://api.example.com/v3/api-docs",
-    "format": "json",
-    "oauth2": {
-      "tokenUrl": "https://keycloak.example.com/realms/master/protocol/openid-connect/token",
-      "clientId": "orthrus-client",
-      "grantType": "password",
-      "credentials": ["alice:pwd123", "bob:pwd456"]
-    }
-  }'
-```
-
-**Generate a report with full execution details:**
-```bash
-curl -X POST http://localhost:8080/api/v1/scans \
-  -H "Content-Type: application/json" \
-  -d '{
-    "discovererId": "openapi",
-    "target": "https://api.example.com/v3/api-docs",
-    "format": "json",
-    "includePassed": true
-  }'
-```
-
-**List available discoverers:**
-```bash
-curl http://localhost:8080/api/v1/scans/discoverers
-```
-
 ## Adding Custom Scanners
-
-Orthrus is designed to be highly extensible. To add a new scanner, implement the `SecurityScanner` interface and annotate the class with `@Component`. The engine will automatically pick it up and include it in scans.
+Orthrus is designed to be highly extensible. To add a new scanner, implement the `SecurityScanner` interface and annotate the class with `@Component`.
 
 ```java
 import ch.nexsol.vulnapi.scanner.SecurityScanner;

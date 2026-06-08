@@ -46,7 +46,7 @@ public class JsonReportGenerator implements ReportGenerator {
      * @return a Mono signaling completion
      */
     @Override
-    public Mono<Void> generateReport(ScanResult result, OutputStream output) {
+    public Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed) {
         return Mono.fromRunnable(() -> {
             try {
                 log.debug("Generating JSON report...");

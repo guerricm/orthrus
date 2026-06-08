@@ -47,7 +47,7 @@ public class ScanEngine {
     /**
      * Runs a complete scan asynchronously.
      */
-    public Flux<ScanAttempt> runScan(EndpointDiscoverer discoverer, String targetUrl, String overrideHost, ScanConfiguration config) {
+    public Flux<ScanAttempt> runScan(EndpointDiscoverer discoverer, String targetUrl, ScanConfiguration config) {
         log.info("Starting scan engine with concurrency: {}", config.concurrency());
         Instant startTime = Instant.now();
 
@@ -58,7 +58,7 @@ public class ScanEngine {
 
         log.info("Active scanners: {}", activeScanners.stream().map(SecurityScanner::getId).toList());
 
-        return discoverer.discover(targetUrl, overrideHost, config)
+        return discoverer.discover(targetUrl, config)
                 .flatMapMany(operations -> {
                     if (operations.isEmpty()) {
                         log.error("No operations discovered. Scan cannot proceed.");

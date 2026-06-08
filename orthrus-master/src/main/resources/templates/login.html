@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orthrus DAST - Login</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-main: #c9d1d9;
+            --border-color: #30363d;
+            --card-bg: #161b22;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+
+        .login-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-logo img {
+            width: 100px;
+            margin-bottom: 1.5rem;
+            border-radius: 50%;
+            /* if it's square, a slight radius or circle looks good, but let's just make it large */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .form-control {
+            background-color: #0d1117;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .form-control:focus {
+            background-color: #0d1117;
+            color: white;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
+        }
+
+        .btn-primary {
+            background-color: #238636;
+            border-color: #238636;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+        }
+
+        .btn-oauth2 {
+            background-color: #1f6feb;
+            border-color: #1f6feb;
+            color: white;
+        }
+
+        .btn-oauth2:hover {
+            background-color: #388bfd;
+            border-color: #388bfd;
+            color: white;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.5rem 0;
+            color: #8b949e;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .divider:not(:empty)::before {
+            margin-right: .5em;
+        }
+
+        .divider:not(:empty)::after {
+            margin-left: .5em;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-card">
+        <div class="login-logo">
+            <img src="/images/orthrus_logo.png" alt="Orthrus Logo"
+                style="width: 250px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-bottom: 1.5rem;">
+            <h4>Orthrus DAST</h4>
+            <p class="text-muted">Sign in to continue</p>
+        </div>
+
+        <!-- Error Message -->
+        <div th:if="${loginError}" class="alert alert-danger" role="alert">
+            Invalid username or password.
+        </div>
+
+        <!-- Logout Message -->
+        <div th:if="${logoutMessage}" class="alert alert-success" role="alert">
+            You have been logged out.
+        </div>
+
+        <!-- SSO / OAuth2 Login -->
+        <div th:if="${oauth2Enabled}">
+            <a href="/oauth2/authorization/oidc"
+                class="btn btn-oauth2 w-100 mb-3 d-flex align-items-center justify-content-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                    class="bi bi-key-fill me-2" viewBox="0 0 16 16">
+                    <path
+                        d="M3.5 11.5a3.5 3.5 0 1 1 3.163-5H14L15.5 8 14 9.5l-1-1-1 1-1-1-1 1-1-1-1 1H6.663a3.5 3.5 0 0 1-3.163 2zM2.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z" />
+                </svg>
+                Sign in with OpenID Connect
+            </a>
+            <div class="divider">or</div>
+        </div>
+
+        <!-- Form Login -->
+        <form th:action="@{/login}" method="post" autocomplete="off">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" autocomplete="new-password" required autofocus>
+            </div>
+            <div class="mb-4">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Sign in</button>
+        </form>
+    </div>
+
+</body>
+
+</html>

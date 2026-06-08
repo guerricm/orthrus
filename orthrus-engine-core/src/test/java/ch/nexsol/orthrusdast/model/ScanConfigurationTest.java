@@ -33,7 +33,7 @@ class ScanConfigurationTest {
                 List.of("sql-injection", "xss"),
                 List.of(),
                 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null
-        );
+        , null);
 
         assertTrue(configWithIncludes.shouldRunScanner("sql-injection"));
         assertTrue(configWithIncludes.shouldRunScanner("xss"));
@@ -43,7 +43,7 @@ class ScanConfigurationTest {
                 List.of(),
                 List.of("csrf", "ssti"),
                 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null
-        );
+        , null);
 
         assertTrue(configWithExcludes.shouldRunScanner("sql-injection"));
         assertFalse(configWithExcludes.shouldRunScanner("csrf"));
@@ -53,7 +53,7 @@ class ScanConfigurationTest {
                 List.of("sql-injection", "csrf"),
                 List.of("csrf"),
                 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null
-        );
+        , null);
 
         // Excludes take precedence over includes
         assertFalse(configWithBoth.shouldRunScanner("csrf"));

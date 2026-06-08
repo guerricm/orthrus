@@ -37,7 +37,7 @@ public class ScanService {
     /**
      * Execute a scan based on a target and a specific discoverer ID.
      */
-    public Flux<ScanAttempt> executeScan(String discovererId, String target, String overrideHost, ScanConfiguration config) {
+    public Flux<ScanAttempt> executeScan(String discovererId, String target, ScanConfiguration config) {
         EndpointDiscoverer discoverer = discoverers.get(discovererId);
         if (discoverer == null) {
             return Flux.error(new IllegalArgumentException("Unknown discoverer ID: " + discovererId));
@@ -45,7 +45,7 @@ public class ScanService {
 
         log.info("Executing scan with discoverer '{}' on target '{}'", discovererId, target);
         
-        return scanEngine.runScan(discoverer, target, overrideHost, config);
+        return scanEngine.runScan(discoverer, target, config);
     }
     
     /**

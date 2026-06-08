@@ -41,7 +41,7 @@ public class SarifReportGenerator implements ReportGenerator {
      * @return a Mono signaling completion
      */
     @Override
-    public Mono<Void> generateReport(ScanResult result, OutputStream output) {
+    public Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed) {
          return Mono.fromRunnable(() -> {
             try {
                 ObjectNode root = mapper.createObjectNode();

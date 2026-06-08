@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.report.PdfReportGenerator;
+import ch.nexsol.orthrusdast.report.HtmlReportGenerator;
 import ch.nexsol.orthrusdast.repository.ScanResultRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
@@ -40,6 +41,7 @@ public class FrontendController {
 
     private final ScanResultService scanResultService;
     private final PdfReportGenerator pdfReportGenerator;
+    private final HtmlReportGenerator htmlReportGenerator;
     private final OAuth2TokenFetcher tokenFetcher;
     private final StatisticsService statisticsService;
     private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
@@ -47,15 +49,18 @@ public class FrontendController {
     private final tools.jackson.databind.ObjectMapper objectMapper;
     private final org.springframework.web.reactive.function.client.WebClient webClient;
     private final JobEventPublisher jobEventPublisher;
+    private final org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations;
 
-    public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator,
+    public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator, HtmlReportGenerator htmlReportGenerator,
             OAuth2TokenFetcher tokenFetcher, StatisticsService statisticsService,
             ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
             ch.nexsol.orthrusdast.repository.SlaveNodeRepository slaveNodeRepository,
             tools.jackson.databind.ObjectMapper objectMapper,
-            JobEventPublisher jobEventPublisher) {
+            JobEventPublisher jobEventPublisher,
+            org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations) {
         this.scanResultService = scanResultService;
         this.pdfReportGenerator = pdfReportGenerator;
+        this.htmlReportGenerator = htmlReportGenerator;
         this.tokenFetcher = tokenFetcher;
         this.statisticsService = statisticsService;
         this.scanJobRepository = scanJobRepository;
@@ -63,6 +68,19 @@ public class FrontendController {
         this.objectMapper = objectMapper;
         this.webClient = org.springframework.web.reactive.function.client.WebClient.builder().build();
         this.jobEventPublisher = jobEventPublisher;
+        this.clientRegistrations = clientRegistrations;
+    }
+
+    @GetMapping("/login")
+    public Mono<String> login(org.springframework.web.server.ServerWebExchange exchange, Model model) {
+        model.addAttribute("oauth2Enabled", clientRegistrations.getIfAvailable() != null);
+        if (exchange.getRequest().getQueryParams().containsKey("error")) {
+            model.addAttribute("loginError", true);
+        }
+        if (exchange.getRequest().getQueryParams().containsKey("logout")) {
+            model.addAttribute("logoutMessage", true);
+        }
+        return Mono.just("login");
     }
 
     @GetMapping("/manual")
@@ -76,7 +94,8 @@ public class FrontendController {
                 scanJobRepository.findAll().collectList(),
                 slaveNodeRepository.findAll().collectList()).map(tuple -> {
                     java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1().stream()
-                            .filter(j -> j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING || j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
+                            .filter(j -> j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING
+                                    || j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
                             .collect(java.util.stream.Collectors.toList());
                     jobs.sort((j1, j2) -> Long.compare(j2.getId(), j1.getId()));
                     java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
@@ -102,36 +121,42 @@ public class FrontendController {
         return scanJobRepository.findById(id)
                 .flatMap(job -> {
                     try {
-                        ch.nexsol.orthrusdast.model.ScanConfiguration oldConfig = objectMapper.readValue(job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                        ch.nexsol.orthrusdast.model.ScanConfiguration oldConfig = objectMapper.readValue(
+                                job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
                         if (oldConfig.oauth2Config() != null) {
                             return tokenFetcher.fetchTokens(oldConfig.oauth2Config())
-                                .defaultIfEmpty(java.util.List.of())
-                                .flatMap(fetchedTokens -> {
-                                    ch.nexsol.orthrusdast.model.SecurityScheme authScheme = oldConfig.authScheme();
-                                    ch.nexsol.orthrusdast.model.SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
-                                    if (!fetchedTokens.isEmpty()) {
-                                        authScheme = fetchedTokens.get(0);
-                                        if (fetchedTokens.size() > 1) {
-                                            secondaryAuthScheme = fetchedTokens.get(1);
+                                    .defaultIfEmpty(java.util.List.of())
+                                    .flatMap(fetchedTokens -> {
+                                        ch.nexsol.orthrusdast.model.SecurityScheme authScheme = oldConfig.authScheme();
+                                        ch.nexsol.orthrusdast.model.SecurityScheme secondaryAuthScheme = oldConfig
+                                                .secondaryAuthScheme();
+                                        if (!fetchedTokens.isEmpty()) {
+                                            authScheme = fetchedTokens.get(0);
+                                            if (fetchedTokens.size() > 1) {
+                                                secondaryAuthScheme = fetchedTokens.get(1);
+                                            }
                                         }
-                                    }
-                                    ch.nexsol.orthrusdast.model.ScanConfiguration updatedConfig = new ch.nexsol.orthrusdast.model.ScanConfiguration(
-                                        oldConfig.includeScanners(), oldConfig.excludeScanners(), oldConfig.concurrency(),
-                                        oldConfig.httpConnectTimeoutMs(), oldConfig.httpReadTimeoutMs(), oldConfig.ignoreSslErrors(),
-                                        oldConfig.reportFormat(), authScheme, secondaryAuthScheme, oldConfig.language(),
-                                        oldConfig.includePassed(), oldConfig.gatewayType(), oldConfig.appUrl(), oldConfig.k8sToken(),
-                                        oldConfig.oauth2Config()
-                                    );
-                                    try {
-                                        String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
-                                        ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                                job.getDiscovererId(), job.getTarget(), updatedConfigJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING
-                                        );
-                                        return scanJobRepository.save(newJob);
-                                    } catch (Exception e) {
-                                        return Mono.error(e);
-                                    }
-                                });
+                                        ch.nexsol.orthrusdast.model.ScanConfiguration updatedConfig = new ch.nexsol.orthrusdast.model.ScanConfiguration(
+                                                oldConfig.includeScanners(), oldConfig.excludeScanners(),
+                                                oldConfig.concurrency(),
+                                                oldConfig.httpConnectTimeoutMs(), oldConfig.httpReadTimeoutMs(),
+                                                oldConfig.ignoreSslErrors(),
+                                                oldConfig.reportFormat(), authScheme, secondaryAuthScheme,
+                                                oldConfig.language(),
+                                                oldConfig.includePassed(), oldConfig.gatewayType(), oldConfig.appUrl(),
+                                                oldConfig.k8sToken(),
+                                                oldConfig.oauth2Config(),
+                                                oldConfig.openapiOverrideHost());
+                                        try {
+                                            String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
+                                            ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+                                                    job.getDiscovererId(), job.getTarget(), updatedConfigJson,
+                                                    ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+                                            return scanJobRepository.save(newJob);
+                                        } catch (Exception e) {
+                                            return Mono.error(e);
+                                        }
+                                    });
                         }
                     } catch (Exception e) {
                         // fallback
@@ -141,11 +166,11 @@ public class FrontendController {
                             job.getDiscovererId(),
                             job.getTarget(),
                             job.getScanConfigurationJson(),
-                            ch.nexsol.orthrusdast.model.JobStatus.PENDING
-                    );
+                            ch.nexsol.orthrusdast.model.JobStatus.PENDING);
                     return scanJobRepository.save(newJob);
                 })
-                .doOnNext(newJob -> jobEventPublisher.emit(newJob.getId(), JobEvent.queued(newJob.getId(), newJob.getTarget())))
+                .doOnNext(newJob -> jobEventPublisher.emit(newJob.getId(),
+                        JobEvent.queued(newJob.getId(), newJob.getTarget())))
                 .thenReturn("redirect:/scans/all");
     }
 
@@ -224,58 +249,138 @@ public class FrontendController {
         });
     }
 
+
+    @GetMapping("/scans/{id}/details")
+    public Mono<String> scanDetails(@PathVariable Long id, Model model) {
+        return scanJobRepository.findById(id).flatMap(job -> {
+            if (job.getResultId() != null) {
+                return scanResultService.findById(job.getResultId()).flatMap(result -> {
+                    model.addAttribute("scanId", job.getId());
+                    model.addAttribute("resultId", job.getResultId());
+                    model.addAttribute("targetUrl", result.targetUrl());
+                    model.addAttribute("discovererId", job.getDiscovererId());
+                    try {
+                        ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(
+                                job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                        model.addAttribute("config", conf);
+                    } catch (Exception e) {
+                        model.addAttribute("config", result.configuration());
+                    }
+                    java.util.List<ch.nexsol.orthrusdast.model.Vulnerability> sortedVulns = new java.util.ArrayList<>(result.vulnerabilities());
+                    sortedVulns.sort((v1, v2) -> {
+                        int riskCompare = Integer.compare(v2.riskLevel().ordinal(), v1.riskLevel().ordinal());
+                        if (riskCompare != 0) return riskCompare;
+                        String cwe1 = v1.cwe() != null ? v1.cwe().name() : "";
+                        String cwe2 = v2.cwe() != null ? v2.cwe().name() : "";
+                        int cweCompare = cwe1.compareTo(cwe2);
+                        if (cweCompare != 0) return cweCompare;
+                        String name1 = v1.name() != null ? v1.name() : "";
+                        String name2 = v2.name() != null ? v2.name() : "";
+                        return name1.compareTo(name2);
+                    });
+                    model.addAttribute("vulnerabilities", sortedVulns);
+                    
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(java.time.ZoneId.systemDefault());
+                    model.addAttribute("scanDate", formatter.format(result.scanStartTime()));
+                    
+                    long critical = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.CRITICAL, 0L);
+                    long high = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.HIGH, 0L);
+                    long medium = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.MEDIUM, 0L);
+                    long low = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.LOW, 0L);
+                    long info = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);
+                    
+                    model.addAttribute("totalVulns", result.vulnerabilities().size());
+                    model.addAttribute("countCritical", critical);
+                    model.addAttribute("countHigh", high);
+                    model.addAttribute("countMedium", medium);
+                    model.addAttribute("countLow", low);
+                    model.addAttribute("countInfo", info);
+                    
+                    String grade = "A";
+                    if (critical > 0) grade = "F";
+                    else if (high > 0) grade = "D";
+                    else if (medium > 0) grade = "C";
+                    else if (low > 0) grade = "B";
+                    model.addAttribute("globalGrade", grade);
+                    
+                    if (result.attempts() != null && !result.attempts().isEmpty()) {
+                        java.util.LinkedHashMap<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> grouped = new java.util.LinkedHashMap<>();
+                        for (ch.nexsol.orthrusdast.model.ScanAttempt a : result.attempts()) {
+                            String key = a.operationMethod() + " " + a.operationUrl();
+                            grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
+                        }
+
+                        java.util.List<ch.nexsol.orthrusdast.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
+                        for (java.util.Map.Entry<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> entry : grouped.entrySet()) {
+                            long passed = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.PASSED == a.status()).count();
+                            long failed = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.FAILED == a.status()).count();
+                            long authError = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR == a.status()).count();
+                            long error = entry.getValue().stream().filter(a -> ch.nexsol.orthrusdast.model.AttemptStatus.ERROR == a.status()).count();
+                            attemptGroupsList.add(new ch.nexsol.orthrusdast.model.EndpointAttemptGroup(entry.getKey(),
+                                    entry.getValue(), passed, failed, authError, error));
+                        }
+                        model.addAttribute("attemptGroups", attemptGroupsList);
+                    }
+                    
+                    return Mono.just("scans/details");
+                });
+            }
+            return Mono.just("redirect:/scans");
+        }).switchIfEmpty(Mono.just("redirect:/scans"));
+    }
+
     @GetMapping("/scans/new")
     public Mono<String> newScan(Model model) {
         return Mono.zip(
                 scanJobRepository.findAll().collectList(),
-                slaveNodeRepository.findAll().collectList()
-        ).flatMap(tuple -> {
-            java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1();
-            java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
+                slaveNodeRepository.findAll().collectList()).flatMap(tuple -> {
+                    java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1();
+                    java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
 
-            long totalCapacity = 0;
-            long activeJobsTotal = 0;
-            long availableCapacity = 0;
+                    long totalCapacity = 0;
+                    long activeJobsTotal = 0;
+                    long availableCapacity = 0;
 
-            for (ch.nexsol.orthrusdast.entity.SlaveNodeEntity slave : slaves) {
-                if (slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
-                    totalCapacity += slave.getMaxConcurrentScans();
-                    long activeJobs = jobs.stream()
-                            .filter(j -> slave.getId().equals(j.getAssignedSlaveId()) && j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
-                            .count();
-                    activeJobsTotal += activeJobs;
-                    availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
-                }
-            }
-            model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
-            model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
+                    for (ch.nexsol.orthrusdast.entity.SlaveNodeEntity slave : slaves) {
+                        if (slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
+                            totalCapacity += slave.getMaxConcurrentScans();
+                            long activeJobs = jobs.stream()
+                                    .filter(j -> slave.getId().equals(j.getAssignedSlaveId())
+                                            && j.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING)
+                                    .count();
+                            activeJobsTotal += activeJobs;
+                            availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
+                        }
+                    }
+                    model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
+                    model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
 
-            ch.nexsol.orthrusdast.entity.SlaveNodeEntity activeSlave = slaves.stream()
-                    .filter(s -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE)
-                    .findFirst().orElse(null);
+                    ch.nexsol.orthrusdast.entity.SlaveNodeEntity activeSlave = slaves.stream()
+                            .filter(s -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE)
+                            .findFirst().orElse(null);
 
-            if (activeSlave != null) {
-                return webClient.get().uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
-                        .retrieve()
-                        .bodyToMono(CapabilitiesResponse.class)
-                        .map(caps -> {
-                            model.addAttribute("discoverers", caps.discoverers());
-                            model.addAttribute("scanners", caps.scanners());
-                            return "scans/new";
-                        })
-                        .onErrorResume(e -> {
-                            model.addAttribute("discoverers", java.util.List.of());
-                            model.addAttribute("scanners", java.util.List.of());
-                            model.addAttribute("error",
-                                    "Failed to fetch capabilities from active slave: " + e.getMessage());
-                            return Mono.just("scans/new");
-                        });
-            } else {
-                model.addAttribute("discoverers", java.util.List.of());
-                model.addAttribute("scanners", java.util.List.of());
-                return Mono.just("scans/new");
-            }
-        });
+                    if (activeSlave != null) {
+                        return webClient.get().uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
+                                .retrieve()
+                                .bodyToMono(CapabilitiesResponse.class)
+                                .map(caps -> {
+                                    model.addAttribute("discoverers", caps.discoverers());
+                                    model.addAttribute("scanners", caps.scanners());
+                                    return "scans/new";
+                                })
+                                .onErrorResume(e -> {
+                                    model.addAttribute("discoverers", java.util.List.of());
+                                    model.addAttribute("scanners", java.util.List.of());
+                                    model.addAttribute("error",
+                                            "Failed to fetch capabilities from active slave: " + e.getMessage());
+                                    return Mono.just("scans/new");
+                                });
+                    } else {
+                        model.addAttribute("discoverers", java.util.List.of());
+                        model.addAttribute("scanners", java.util.List.of());
+                        return Mono.just("scans/new");
+                    }
+                });
     }
 
     @PostMapping("/scans/{id}/cancel")
@@ -285,11 +390,14 @@ public class FrontendController {
                     if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.PENDING) {
                         job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.CANCELLED);
                         return scanJobRepository.save(job)
-                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")));
+                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent
+                                        .failed(j.getId(), j.getTarget(), "Scan cancelled by user")));
                     } else if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.RUNNING) {
                         job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.CANCELLED);
                         return scanJobRepository.save(job)
-                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")))
+                                .doOnSuccess(j -> jobEventPublisher.emit(j.getId(),
+                                        ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(), j.getTarget(),
+                                                "Scan cancelled by user")))
                                 .flatMap(j -> {
                                     if (job.getAssignedSlaveId() != null) {
                                         return slaveNodeRepository.findById(job.getAssignedSlaveId())
@@ -297,8 +405,7 @@ public class FrontendController {
                                                         .uri(slave.getUrl() + "/api/v1/slave/scans/" + id)
                                                         .retrieve()
                                                         .bodyToMono(Void.class)
-                                                        .onErrorResume(e -> Mono.empty())
-                                                );
+                                                        .onErrorResume(e -> Mono.empty()));
                                     }
                                     return Mono.empty();
                                 });
@@ -329,9 +436,12 @@ public class FrontendController {
                         java.util.Map<String, Object> map = new java.util.HashMap<>();
                         map.put("job", job);
                         try {
-                            ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(job.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+                            ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(
+                                    job.getScanConfigurationJson(),
+                                    ch.nexsol.orthrusdast.model.ScanConfiguration.class);
                             map.put("config", conf);
-                        } catch(Exception e) {}
+                        } catch (Exception e) {
+                        }
 
                         if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.COMPLETED
                                 && job.getResultId() != null) {
@@ -455,6 +565,7 @@ public class FrontendController {
             String gatewayType = formData.getFirst("gatewayType");
             String appUrl = formData.getFirst("appUrl");
             String k8sToken = formData.getFirst("k8sToken");
+            String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
 
             List<String> rawIncludeScanners = formData.get("includeScanners");
             final List<String> includeScanners = (rawIncludeScanners == null) ? List.of() : rawIncludeScanners;
@@ -510,12 +621,13 @@ public class FrontendController {
                         ScanConfiguration scanConfig = new ScanConfiguration(
                                 includeScanners, excludeScanners, concurrency, 5000, 10000, false, "html", authScheme,
                                 secondaryAuthScheme, "en", includePassed, GatewayType.fromString(gatewayType), appUrl,
-                                k8sToken, finalOauth2Config);
+                                k8sToken, finalOauth2Config, openapiOverrideHost);
 
                         return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig))
                                 .flatMap(configJson -> {
                                     ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                            discovererId, target, configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+                                            discovererId, target, configJson,
+                                            ch.nexsol.orthrusdast.model.JobStatus.PENDING);
                                     return scanJobRepository.save(job);
                                 })
                                 .doOnSuccess(savedJob -> {
@@ -535,12 +647,54 @@ public class FrontendController {
         });
     }
 
+
+    @GetMapping(value = "/web/scans/{id}/html", produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
+    public Mono<Void> getHtmlReport(@PathVariable String id, 
+            @RequestParam(defaultValue = "true") boolean includePassed,
+            org.springframework.web.server.ServerWebExchange exchange) {
+        return scanResultService.findById(id).flatMap(result -> {
+            exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.OK);
+            return exchange.getResponse().writeWith(
+                Mono.create(sink -> {
+                    try {
+                        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                        htmlReportGenerator.generateReport(result, out, includePassed)
+                            .doOnSuccess(v -> {
+                                org.springframework.core.io.buffer.DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(out.toByteArray());
+                                sink.success(buffer);
+                            })
+                            .doOnError(sink::error)
+                            .subscribe();
+                    } catch (Exception e) {
+                        sink.error(e);
+                    }
+                })
+            );
+        }).then();
+    }
+
     @GetMapping("/web/scans/{id}/pdf")
-    public Mono<ResponseEntity<org.springframework.core.io.Resource>> downloadPdf(@PathVariable String id) {
+    public Mono<ResponseEntity<org.springframework.core.io.Resource>> downloadPdf(@PathVariable String id, @RequestParam(defaultValue = "false") boolean includePassed) {
         return scanResultService.findById(id)
+                .flatMap(result -> scanJobRepository.findByResultId(id)
+                        .map(job -> {
+                            try {
+                                ScanConfiguration config = objectMapper.readValue(job.getScanConfigurationJson(),
+                                        ScanConfiguration.class);
+                                return new ScanResult(result.id(), result.targetUrl(), result.scanStartTime(),
+                                        result.scanEndTime(),
+                                        result.operationsDiscovered(), result.operationsScanned(),
+                                        result.vulnerabilities(),
+                                        result.riskSummary(), result.scannerSummary(), config, result.attempts(),
+                                        job.getDiscovererId());
+                            } catch (Exception e) {
+                                return result;
+                            }
+                        })
+                        .defaultIfEmpty(result))
                 .flatMap(result -> {
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    return pdfReportGenerator.generateReport(result, out)
+                    return pdfReportGenerator.generateReport(result, out, includePassed)
                             .then(Mono.fromCallable(
                                     () -> new org.springframework.core.io.ByteArrayResource(out.toByteArray())));
                 })

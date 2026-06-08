@@ -18,7 +18,8 @@ public record ScanResult(
         Map<RiskLevel, Long> riskSummary,
         Map<String, Integer> scannerSummary,
         ScanConfiguration configuration,
-        List<ScanAttempt> attempts
+        List<ScanAttempt> attempts,
+        String discovererId
 ) {
     public String formattedDuration() {
         if (scanStartTime == null || scanEndTime == null) return "0s";

@@ -381,8 +381,14 @@ public class SchemaValidationScanner implements SecurityScanner {
             List<Vulnerability> vulns = new ArrayList<>();
 
             // A well-implemented API should return 4xx (Client Error) for schema violations.
-            // If it returns 2xx (Success) or 5xx (Server Crash), it indicates improper input validation.
-            if (response.statusCode().is2xxSuccessful() || response.statusCode().is5xxServerError()) {
+            // If it returns 2xx (Success) or 500 (Server Crash), it indicates improper input validation.
+            // We ignore 502/503/504 as they are usually API Gateway/Load Balancer responses.
+            boolean isAppCrash = response.statusCode().is5xxServerError()
+                    && response.statusCode().value() != 502
+                    && response.statusCode().value() != 503
+                    && response.statusCode().value() != 504;
+
+            if (response.statusCode().is2xxSuccessful() || isAppCrash) {
                 Vulnerability vuln = createVulnerabilityWithTrace(
                         "Improper Input Validation (" + testName + ")",
                         description,

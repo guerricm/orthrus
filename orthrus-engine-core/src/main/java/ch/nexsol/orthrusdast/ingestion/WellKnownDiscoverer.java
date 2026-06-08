@@ -48,7 +48,7 @@ public class WellKnownDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String targetUrl, String overrideHost, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+    public Mono<List<Operation>> discover(String targetUrl, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
         ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Starting well-known path discovery for base URL: {}", targetUrl);
         

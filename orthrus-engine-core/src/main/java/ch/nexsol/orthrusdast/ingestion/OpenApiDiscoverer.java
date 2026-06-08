@@ -32,31 +32,34 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
     }
 
     @Override
-    public Mono<List<Operation>> discover(String target, String overrideHost, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+    public Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
         ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         log.info("Parsing OpenAPI spec from: {}", target);
-        
-        // Parsing OpenAPI can be blocking, so we wrap it in Mono.fromCallable and subscribe on bounded elastic
-        return Mono.fromCallable(() -> parseSpec(target, overrideHost, authScheme))
-                   .subscribeOn(Schedulers.boundedElastic());
+
+        // Parsing OpenAPI can be blocking, so we wrap it in Mono.fromCallable and
+        // subscribe on bounded elastic
+        return Mono.fromCallable(() -> parseSpec(target, config))
+                .subscribeOn(Schedulers.boundedElastic());
     }
-    
-    private List<Operation> parseSpec(String specUrl, String overrideHost, SecurityScheme authScheme) {
+
+    private List<Operation> parseSpec(String specUrl, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+        ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
         List<Operation> endpoints = new ArrayList<>();
-        
+
         OpenAPI openAPI = new OpenAPIV3Parser().read(specUrl);
         if (openAPI == null) {
             log.error("Failed to parse OpenAPI specification from {}", specUrl);
-            throw new IllegalArgumentException("Failed to parse OpenAPI specification from " + specUrl + ". Please ensure it is a valid OpenAPI v3 JSON/YAML file.");
+            throw new IllegalArgumentException("Failed to parse OpenAPI specification from " + specUrl
+                    + ". Please ensure it is a valid OpenAPI v3 JSON/YAML file.");
         }
 
         String baseUrl = "";
-        if (overrideHost != null && !overrideHost.isEmpty()) {
-            baseUrl = overrideHost;
+        if (config != null && config.openapiOverrideHost() != null && !config.openapiOverrideHost().isEmpty()) {
+            baseUrl = config.openapiOverrideHost();
         } else if (openAPI.getServers() != null && !openAPI.getServers().isEmpty()) {
             baseUrl = openAPI.getServers().get(0).getUrl();
         }
-        
+
         // Strip trailing slash if present
         if (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
@@ -67,20 +70,27 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
                 String path = entry.getKey();
                 PathItem pathItem = entry.getValue();
 
-                if (pathItem.getGet() != null) endpoints.add(buildOperation(baseUrl, path, "GET", pathItem.getGet(), openAPI, authScheme));
-                if (pathItem.getPost() != null) endpoints.add(buildOperation(baseUrl, path, "POST", pathItem.getPost(), openAPI, authScheme));
-                if (pathItem.getPut() != null) endpoints.add(buildOperation(baseUrl, path, "PUT", pathItem.getPut(), openAPI, authScheme));
-                if (pathItem.getDelete() != null) endpoints.add(buildOperation(baseUrl, path, "DELETE", pathItem.getDelete(), openAPI, authScheme));
-                if (pathItem.getPatch() != null) endpoints.add(buildOperation(baseUrl, path, "PATCH", pathItem.getPatch(), openAPI, authScheme));
-                if (pathItem.getOptions() != null) endpoints.add(buildOperation(baseUrl, path, "OPTIONS", pathItem.getOptions(), openAPI, authScheme));
+                if (pathItem.getGet() != null)
+                    endpoints.add(buildOperation(baseUrl, path, "GET", pathItem.getGet(), openAPI, authScheme));
+                if (pathItem.getPost() != null)
+                    endpoints.add(buildOperation(baseUrl, path, "POST", pathItem.getPost(), openAPI, authScheme));
+                if (pathItem.getPut() != null)
+                    endpoints.add(buildOperation(baseUrl, path, "PUT", pathItem.getPut(), openAPI, authScheme));
+                if (pathItem.getDelete() != null)
+                    endpoints.add(buildOperation(baseUrl, path, "DELETE", pathItem.getDelete(), openAPI, authScheme));
+                if (pathItem.getPatch() != null)
+                    endpoints.add(buildOperation(baseUrl, path, "PATCH", pathItem.getPatch(), openAPI, authScheme));
+                if (pathItem.getOptions() != null)
+                    endpoints.add(buildOperation(baseUrl, path, "OPTIONS", pathItem.getOptions(), openAPI, authScheme));
             }
         }
-        
+
         log.info("Discovered {} endpoints from OpenAPI spec", endpoints.size());
         return endpoints;
     }
 
-    private Operation buildOperation(String baseUrl, String path, String method, io.swagger.v3.oas.models.Operation operation, OpenAPI openAPI, SecurityScheme authScheme) {
+    private Operation buildOperation(String baseUrl, String path, String method,
+            io.swagger.v3.oas.models.Operation operation, OpenAPI openAPI, SecurityScheme authScheme) {
         Map<String, String> queryParams = new HashMap<>();
         Map<String, String> headers = new HashMap<>();
         String actualPath = path;
@@ -128,10 +138,9 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
                 expectedContentTypes,
                 authScheme,
                 baseUrl + path,
-                operation
-        );
+                operation);
     }
-    
+
     private String generateMockValue(Parameter param) {
         if (param.getSchema() != null && param.getSchema().getType() != null) {
             return switch (param.getSchema().getType()) {

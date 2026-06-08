@@ -18,7 +18,8 @@
                         th:text="${status}">STATUS</span>
                     <strong>#<span th:text="${jobId}"></span></strong>
                     <span class="text-muted mx-2">&bull;</span>
-                    <span class="badge bg-secondary text-light text-uppercase" th:text="${discovererId != null ? discovererId : 'openapi'}">openapi</span>
+                    <span class="badge bg-secondary text-light text-uppercase"
+                        th:text="${discovererId != null ? discovererId : 'openapi'}">openapi</span>
                     <span class="mx-2">&mdash;</span>
                     <span th:text="${target}"></span>
 
@@ -28,10 +29,12 @@
                             th:text="${globalGrade}"
                             style="width: 28px; height: 28px; font-size: 14px; padding: 0; line-height: 1; margin: 0; display: flex !important; justify-content: center; align-items: center;">
                             A</div>
-                            
+
                         <div th:if="${status == 'COMPLETED' and result != null}" class="d-flex align-items-center me-3">
-                            <span class="badge bg-secondary rounded-pill px-2 py-1 me-3"><span th:text="${result.operationsScanned()}">0</span> tests</span>
-                            <span class="badge bg-danger rounded-pill px-2 py-1"><span th:text="${result.vulnerabilities().size()}">0</span> vulns</span>
+                            <span class="badge bg-secondary rounded-pill px-2 py-1 me-3"><span
+                                    th:text="${result.operationsScanned()}">0</span> tests</span>
+                            <span class="badge bg-danger rounded-pill px-2 py-1"><span
+                                    th:text="${result.vulnerabilities().size()}">0</span> vulns</span>
                         </div>
                         <span th:if="${status == 'COMPLETED'}" th:data-pdf-url="@{'/web/scans/' + ${resultId} + '/pdf'}"
                             onclick="window.downloadPdf(this, this.getAttribute('data-pdf-url'), event);"
@@ -49,10 +52,16 @@
                     </div>
 
                     <span th:if="${status == 'FAILED' or status == 'COMPLETED' or status == 'CANCELLED'}"
-                          th:data-restart-url="@{'/system/jobs/' + ${jobId} + '/restart'}"
-                          onclick="event.preventDefault(); event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); document.body.appendChild(f); f.submit();"
-                          class="btn btn-sm btn-outline-warning ms-2" title="Restart Scan Job" style="z-index: 10;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                        th:data-restart-url="@{'/system/jobs/' + ${jobId} + '/restart'}"
+                        onclick="event.preventDefault(); event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); document.body.appendChild(f); f.submit();"
+                        class="btn btn-sm btn-outline-warning ms-2" title="Restart Scan Job" style="z-index: 10;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
+                            <path
+                                d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z" />
+                        </svg>
                     </span>
                 </div>
             </button>
@@ -73,9 +82,12 @@
                                 Queued</span>
                         </h3>
                         <small th:if="${assignedSlaveId != null}" class="text-muted mt-1 d-block">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-hdd-network me-1" viewBox="0 0 16 16">
-                                <path d="M4.5 5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M3 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m2 7a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m-2.5.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
-                                <path d="M2 2a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h5.5v3A1.5 1.5 0 0 0 6 11.5H.5a.5.5 0 0 0 0 1H6A1.5 1.5 0 0 0 7.5 14h1a1.5 1.5 0 0 0 1.5-1.5h5.5a.5.5 0 0 0 0-1H10A1.5 1.5 0 0 0 8.5 10V7H14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 1h12a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm13 7.5v1a.5.5 0 0 1-.5.5h-2v-2h2a.5.5 0 0 1 .5.5z"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor"
+                                class="bi bi-hdd-network me-1" viewBox="0 0 16 16">
+                                <path
+                                    d="M4.5 5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M3 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m2 7a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0m-2.5.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1" />
+                                <path
+                                    d="M2 2a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h5.5v3A1.5 1.5 0 0 0 6 11.5H.5a.5.5 0 0 0 0 1H6A1.5 1.5 0 0 0 7.5 14h1a1.5 1.5 0 0 0 1.5-1.5h5.5a.5.5 0 0 0 0-1H10A1.5 1.5 0 0 0 8.5 10V7H14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 1h12a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm13 7.5v1a.5.5 0 0 1-.5.5h-2v-2h2a.5.5 0 0 1 .5.5z" />
                             </svg> Assigned to Slave: <span th:text="${assignedSlaveId}"></span>
                         </small>
                     </div>
@@ -222,20 +234,26 @@
                             <strong>Concurrency:</strong> <span th:text="${config.concurrency}"></span>
                         </div>
                         <div class="col-md-6 mb-2">
-                            <strong>Discoverer Mode:</strong> <span class="badge bg-secondary text-light text-uppercase" th:text="${discovererId}"></span>
+                            <strong>Discoverer Mode:</strong> <span class="badge bg-secondary text-light text-uppercase"
+                                th:text="${discovererId}"></span>
                         </div>
                         <div class="col-md-6 mb-2" th:if="${discovererId == 'gateway'}">
                             <strong>Gateway Type:</strong> <span th:text="${config.gatewayType}"></span>
                         </div>
-                        <div class="col-md-6 mb-2" th:if="${config.authScheme != null and config.oauth2Config == null}">
+                        <div class="col-md-6 mb-2"
+                            th:if="${config.authScheme != null and config.authScheme?.type != null and config.oauth2Config == null}">
                             <strong>Authentication:</strong> <span class="badge bg-info text-dark">Static Token</span>
                         </div>
                         <div class="col-md-12 mb-2" th:if="${config.oauth2Config != null}">
-                            <strong>Authentication:</strong> <span class="badge bg-primary">Dynamic OAuth2</span>
-                            <div class="card bg-dark border-secondary mt-2 p-3">
-                                <div><small class="text-muted">OAuth2 URL:</small> <span th:text="${config.oauth2Config.tokenUrl}"></span></div>
-                                <div><small class="text-muted">Grant Type:</small> <span th:text="${config.oauth2Config.grantType}"></span></div>
-                                <div><small class="text-muted">Client ID:</small> <span th:text="${config.oauth2Config.clientId}"></span></div>
+                            <strong>Authentication:</strong> <span class="badge bg-primary text-light">Dynamic
+                                OAuth2</span>
+                            <div class="card bg-transparent border-secondary mt-2 p-3 text-light">
+                                <div><small class="text-white-50">OAuth2 URL:</small> <span
+                                        th:text="${config.oauth2Config.tokenUrl}"></span></div>
+                                <div><small class="text-white-50">Grant Type:</small> <span
+                                        th:text="${config.oauth2Config.grantType}"></span></div>
+                                <div><small class="text-white-50">Client ID:</small> <span
+                                        th:text="${config.oauth2Config.clientId}"></span></div>
                             </div>
                         </div>
                     </div>

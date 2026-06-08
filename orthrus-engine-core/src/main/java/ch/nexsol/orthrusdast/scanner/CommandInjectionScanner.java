@@ -96,7 +96,9 @@ public class CommandInjectionScanner implements SecurityScanner {
         return httpClient.send(testOp)
                 .flatMapMany(response -> {
                     // Time-Based Blind Detection (Duration > 4500ms)
-                    if (response.responseTimeMs() > 4500 && payload.contains("sleep") && response.statusCode().value() != 503) {
+                    int status = response.statusCode().value();
+                    boolean isClientError = status >= 400 && status < 500;
+                    if (response.responseTimeMs() > 4500 && payload.contains("sleep") && status != 503 && status != 504 && !isClientError) {
                          Vulnerability vuln = createVulnerabilityWithTrace(
                             "Time-Based Blind OS Command Injection",
                             "The endpoint took " + response.responseTimeMs() + "ms to respond, indicating a potential Time-Based Blind Command Injection in " + injectionPoint + ".",

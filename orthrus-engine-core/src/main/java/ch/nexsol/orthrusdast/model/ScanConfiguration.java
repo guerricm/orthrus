@@ -20,10 +20,10 @@ public record ScanConfiguration(
         GatewayType gatewayType,
         String appUrl,
         String k8sToken,
-        OAuth2Config oauth2Config
-) {
+        OAuth2Config oauth2Config,
+        String openapiOverrideHost) {
 
-    public static ScanConfiguration defaults() {
+        public static ScanConfiguration defaults() {
         return new ScanConfiguration(
                 List.of(),
                 List.of(),
@@ -39,8 +39,8 @@ public record ScanConfiguration(
                 GatewayType.AUTO,
                 null,
                 null,
-                null
-        );
+                null,
+                null);
     }
 
     /**
