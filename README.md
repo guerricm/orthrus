@@ -147,6 +147,23 @@ If you want to run a scan from your terminal without spinning up the Master/UI i
 ```bash
 java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 ```
+### CLI Options
+- `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
+- `-t, --target`: Target URL or Spec path.
+- `-c, --concurrency`: Number of concurrent threads to use during the scan (default: 10). Increase for massive APIs to speed up execution.
+- `--host`: Override the host URL for the target endpoints.
+- `-f, --format`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
+- `--lang`: Report language when using PDF or HTML format (`en`, `fr`). Default is `en`.
+- `-o, --out`: Output file path. If not provided, prints to standard output.
+- `--auth-bearer`: Provide a Bearer token to inject into all requests (Primary User).
+- `--auth-bearer-secondary`: Provide a secondary Bearer token for Cross-User BOLA testing (Secondary User).
+- `--oauth2-url`: OAuth2 token endpoint URL (e.g., Keycloak token endpoint).
+- `--oauth2-client-id`: OAuth2 Client ID.
+- `--oauth2-client-secret`: OAuth2 Client Secret.
+- `--oauth2-grant`: OAuth2 Grant Type (`password` or `client_credentials`).
+- `--oauth2-creds`: Comma-separated list of `username:password` credentials (for `password` grant).
+- `--include`: Comma-separated list of scanner IDs to run exclusively.
+- `--exclude`: Comma-separated list of scanner IDs to skip.
 
 **Generate a professional PDF report in French:**
 ```bash
