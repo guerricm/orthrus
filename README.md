@@ -145,34 +145,58 @@ Once the Master is running, navigate to `http://localhost:8080` to access the We
 If you want to run a scan from your terminal without spinning up the Master/UI infrastructure, use the CLI JAR autonomously.
 
 ```bash
-java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
+docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 ```
 ### CLI Options
-- `-d, --discoverer`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`).
-- `-t, --target`: Target URL or Spec path.
-- `-c, --concurrency`: Number of concurrent threads to use during the scan (default: 10). Increase for massive APIs to speed up execution.
-- `--host`: Override the host URL for the target endpoints.
-- `-f, --format`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
-- `--lang`: Report language when using PDF or HTML format (`en`, `fr`). Default is `en`.
-- `-o, --out`: Output file path. If not provided, prints to standard output.
-- `--auth-bearer`: Provide a Bearer token to inject into all requests (Primary User).
-- `--auth-bearer-secondary`: Provide a secondary Bearer token for Cross-User BOLA testing (Secondary User).
-- `--oauth2-url`: OAuth2 token endpoint URL (e.g., Keycloak token endpoint).
-- `--oauth2-client-id`: OAuth2 Client ID.
-- `--oauth2-client-secret`: OAuth2 Client Secret.
-- `--oauth2-grant`: OAuth2 Grant Type (`password` or `client_credentials`).
-- `--oauth2-creds`: Comma-separated list of `username:password` credentials (for `password` grant).
-- `--include`: Comma-separated list of scanner IDs to run exclusively.
-- `--exclude`: Comma-separated list of scanner IDs to skip.
+- `-d, --discoverer=<discovererId>`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`, `gateway`).
+- `-t, --target=<target>`: Target URL or Spec path.
+- `-c, --concurrency=<concurrency>`: Number of concurrent threads for scanning (default: 10).
+- `-f, --format=<format>`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
+- `-o, --out=<outputFile>`: Output file path (default: stdout).
+- `--lang=<language>`: Report language (`en`, `fr`).
+- `--include-passed`: Include passed tests in the report.
+- `--app-url=<appUrl>`: Public Application URL for Gateway Discovery (e.g. `http://myapp.com`).
+- `--gateway-type=<gatewayType>`: Gateway type: `auto`, `traefik`, `kong`, `spring-cloud-gateway`, `k8s`.
+- `--host=<overrideHost>`: Override host URL.
+- `--k8s-token=<k8sToken>`: Kubernetes ServiceAccount Token (or set K8S_TOKEN env var).
+- `--auth-bearer=<bearerToken>`: Bearer token for API authentication (User A).
+- `--auth-bearer-secondary=<secondaryBearerToken>`: Secondary Bearer token for Cross-User BOLA testing (User B).
+- `--oauth2-url=<oauth2Url>`: OAuth2 token endpoint URL.
+- `--oauth2-client-id=<oauth2ClientId>`: OAuth2 Client ID.
+- `--oauth2-client-secret=<oauth2ClientSecret>`: OAuth2 Client Secret.
+- `--oauth2-grant=<oauth2Grant>`: OAuth2 Grant Type (`password`, `client_credentials`).
+- `--oauth2-creds=<oauth2Creds>`: Comma-separated list of `user:pass` credentials.
+- `--include=<includeScanners>`: Comma-separated list of scanners to include.
+- `--exclude=<excludeScanners>`: Comma-separated list of scanners to exclude.
+- `-h, --help`: Show help message and exit.
+- `-V, --version`: Print version information and exit.
+
+### Docker Examples
+
+When running the CLI via Docker, use a volume mount (`-v`) so the generated report file is saved to your host machine instead of disappearing inside the container.
+
+**Generate a PDF report using Docker:**
+```bash
+docker run --rm -v $(pwd):/reports orthrus-cli:latest \
+  -d openapi -t https://api.example.com/v3/api-docs \
+  -f pdf --lang fr -o /reports/rapport_securite.pdf
+```
+
+**Generate an HTML report using Docker:**
+```bash
+docker run --rm -v $(pwd):/reports orthrus-cli:latest \
+  -d blackbox -t https://api.example.com/ \
+  -f html -o /reports/audit_report.html
+```
 
 **Generate a professional PDF report in French:**
 ```bash
-java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o rapport_securite.pdf
+docker run --rm -v $(pwd):/reports orthrus-cli:latest -d openapi -t https://api.example.com/v3/api-docs -f pdf --lang fr -o /reports/rapport_securite.pdf
 ```
 
 **Automated OAuth2 Token Fetching for Cross-User BOLA (IDOR):**
 ```bash
-java -jar orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar -d openapi -t https://api.example.com/v3/api-docs \
+docker run --rm orthrus-cli:latest -d openapi -t https://api.example.com/v3/api-docs \
   --oauth2-url "https://keycloak.example.com/realms/master/protocol/openid-connect/token" \
   --oauth2-grant "password" \
   --oauth2-client-id "orthrus-client" \

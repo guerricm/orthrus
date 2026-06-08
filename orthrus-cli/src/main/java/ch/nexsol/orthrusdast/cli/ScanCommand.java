@@ -25,7 +25,7 @@ import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.model.OAuth2Config;
 
 @Component
-@Command(name = "scan", description = "Run a VulnAPI security scan", mixinStandardHelpOptions = true)
+@Command(name = "scan", description = "Run a VulnAPI security scan", mixinStandardHelpOptions = true, version = "Orthrus DAST CLI 0.0.4-SNAPSHOT")
 public class ScanCommand implements Callable<Integer> {
 
     private static final Logger log = LoggerFactory.getLogger(ScanCommand.class);
