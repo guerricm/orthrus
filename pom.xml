@@ -18,8 +18,8 @@
 
     <modules>
         <module>orthrus-engine-core</module>
-        <module>orthrus-slave</module>
-        <module>orthrus-master</module>
+        <module>orthrus-worker</module>
+        <module>orthrus-manager</module>
         <module>orthrus-cli</module>
     </modules>
 
@@ -49,12 +49,12 @@
             </dependency>
             <dependency>
                 <groupId>ch.nexsol.security</groupId>
-                <artifactId>orthrus-slave</artifactId>
+                <artifactId>orthrus-worker</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>ch.nexsol.security</groupId>
-                <artifactId>orthrus-master</artifactId>
+                <artifactId>orthrus-manager</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

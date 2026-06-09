@@ -1,7 +1,7 @@
 # Orthrus DAST
 
 <p align="center">
-  <img src="orthrus-master/src/main/resources/static/images/orthrus_logo.png" alt="Orthrus DAST Logo" width="300"/>
+  <img src="orthrus-manager/src/main/resources/static/images/orthrus_logo.png" alt="Orthrus DAST Logo" width="300"/>
 </p>
 
 Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
@@ -81,14 +81,14 @@ Compile and package the entire multi-module application:
 ./mvnw clean package -DskipTests
 ```
 This generates three executable JARs:
-- `orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar`
-- `orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar`
+- `orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar`
+- `orthrus-worker/target/orthrus-worker-0.0.1-SNAPSHOT.jar`
 - `orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar`
 
 You can also build Docker images locally:
 ```bash
-mvn spring-boot:build-image -pl orthrus-master
-mvn spring-boot:build-image -pl orthrus-slave
+mvn spring-boot:build-image -pl orthrus-manager
+mvn spring-boot:build-image -pl orthrus-worker
 mvn spring-boot:build-image -pl orthrus-cli
 ```
 
@@ -103,11 +103,11 @@ docker-compose up -d
 ### Running Manually (Java)
 1. **Start the Master node** (orchestrates scans and provides the Web UI):
    ```bash
-   java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
+   java -jar orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar
    ```
 2. **Start one or more Slave nodes** (executes the actual high-concurrency scans):
    ```bash
-   java -jar orthrus-slave/target/orthrus-slave-0.0.1-SNAPSHOT.jar --server.port=8081
+   java -jar orthrus-worker/target/orthrus-worker-0.0.1-SNAPSHOT.jar --server.port=8081
    ```
 
 ### Security & Authentication
@@ -127,7 +127,7 @@ export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID="orthrus-client
 export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET="your_client_secret"
 export SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI="https://your-idp.example.com/realms/master"
 export SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="https://your-idp.example.com/realms/master"
-java -jar orthrus-master/target/orthrus-master-0.0.1-SNAPSHOT.jar
+java -jar orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar
 ```
 When configured, the "Sign in with OpenID Connect" button will allow users to log in. Note that users logging in via OAuth2 will receive the default `ROLE_USER` role unless their token provides specific Orthrus roles mapping.
 
