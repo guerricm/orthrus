@@ -16,17 +16,20 @@
 
 package ch.nexsol.orthrusdast.report;
 
-import ch.nexsol.orthrusdast.model.ScanResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.io.OutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.OutputStream;
+import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
  * Generates a detailed JSON report.
@@ -67,9 +70,9 @@ public class JsonReportGenerator implements ReportGenerator {
 				log.debug("Generating JSON report...");
 				objectMapper.writeValue(output, result);
 			}
-			catch (Exception e) {
-				log.error("Failed to generate JSON report", e);
-				throw new RuntimeException("JSON generation failed", e);
+			catch (Exception ex) {
+				log.error("Failed to generate JSON report", ex);
+				throw new RuntimeException("JSON generation failed", ex);
 			}
 		}).subscribeOn(Schedulers.boundedElastic()).then();
 	}

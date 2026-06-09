@@ -18,12 +18,13 @@ package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
 
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import reactor.core.publisher.Flux;
+
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
+import ch.nexsol.orthrusdast.model.CWEReference;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Interface for all security scanners.
@@ -53,12 +54,27 @@ public interface SecurityScanner {
 	/**
 	 * Executes the scan on the given operation.
 	 * @param operation the operation to scan
+	 * @param confidence the confidence
+	 * @param originalOp the originalOp
+	 * @param cwe the cwe
+	 * @param capecs the capecs
+	 * @param name the name
+	 * @param description the description
+	 * @param riskLevel the riskLevel
 	 * @return a Flux of found vulnerabilities
+	 * @return the result
 	 */
 	Flux<Vulnerability> scan(Operation operation);
 
 	/**
 	 * Helper to create a Vulnerability with formatted HTTP traces.
+	 * @param attackVector the attackVector
+	 * @param technicalImpact the technicalImpact
+	 * @param cvssScore the cvssScore
+	 * @param evidence the evidence
+	 * @param remediation the remediation
+	 * @param testOp the testOp
+	 * @param response the response
 	 */
 	default Vulnerability createVulnerabilityWithTrace(String name, String description, RiskLevel riskLevel,
 			Vulnerability.Confidence confidence, Operation originalOp, CWEReference cwe, List<String> capecs,
@@ -101,7 +117,7 @@ public interface SecurityScanner {
 				}
 			}
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			// Ignore URI parsing errors
 		}
 
@@ -130,7 +146,7 @@ public interface SecurityScanner {
 
 		sb.append("\n");
 		if (op.body() != null && !op.body().isEmpty()) {
-			sb.append(op.body().length() > 1000 ? op.body().substring(0, 1000) + "... [TRUNCATED]" : op.body());
+			sb.append((op.body().length() > 1000) ? op.body().substring(0, 1000) + "... [TRUNCATED]" : op.body());
 		}
 		return sb.toString();
 	}
@@ -145,7 +161,7 @@ public interface SecurityScanner {
 		}
 		sb.append("\n");
 		if (res.body() != null) {
-			sb.append(res.body().length() > 1000 ? res.body().substring(0, 1000) + "... [TRUNCATED]" : res.body());
+			sb.append((res.body().length() > 1000) ? res.body().substring(0, 1000) + "... [TRUNCATED]" : res.body());
 		}
 		return sb.toString();
 	}

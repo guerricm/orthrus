@@ -16,18 +16,20 @@
 
 package ch.nexsol.orthrusdast.report;
 
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.ScanResult;
-import org.springframework.stereotype.Component;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
-import reactor.core.publisher.Mono;
-
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+
+import org.springframework.stereotype.Component;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import reactor.core.publisher.Mono;
+
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
  * Generates an HTML report using Thymeleaf.
@@ -94,14 +96,18 @@ public class HtmlReportGenerator implements ReportGenerator {
 
 				// 3. Calculate Global Grade
 				String grade = "A";
-				if (critical > 0)
+				if (critical > 0) {
 					grade = "F";
-				else if (high > 0)
+				}
+				else if (high > 0) {
 					grade = "D";
-				else if (medium > 0)
+				}
+				else if (medium > 0) {
 					grade = "C";
-				else if (low > 0)
+				}
+				else if (low > 0) {
 					grade = "B";
+				}
 				context.setVariable("globalGrade", grade);
 
 				// 4. Execution Details (if --include-passed)
@@ -147,8 +153,8 @@ public class HtmlReportGenerator implements ReportGenerator {
 				output.flush();
 
 			}
-			catch (Exception e) {
-				throw new RuntimeException("Failed to generate HTML report", e);
+			catch (Exception ex) {
+				throw new RuntimeException("Failed to generate HTML report", ex);
 			}
 		});
 	}

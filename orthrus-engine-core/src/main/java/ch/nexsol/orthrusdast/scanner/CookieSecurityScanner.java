@@ -16,17 +16,19 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Scans for missing security attributes in cookies (Secure, HttpOnly, SameSite).

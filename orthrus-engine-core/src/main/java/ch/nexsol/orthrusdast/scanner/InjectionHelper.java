@@ -16,16 +16,18 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
-import ch.nexsol.orthrusdast.model.Operation;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import reactor.core.publisher.Flux;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import reactor.core.publisher.Flux;
+
+import ch.nexsol.orthrusdast.model.Operation;
 
 /**
  * Utility class to assist with injecting payloads into Operations. Generates test
@@ -83,7 +85,7 @@ public class InjectionHelper {
 					}
 				}
 			}
-			catch (Exception e) {
+			catch (Exception ex) {
 				// Ignore body parsing errors
 			}
 		}

@@ -16,21 +16,24 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Scans GraphQL Operations for Injection Vulnerabilities (SQLi, XSS, CmdInj) by injecting
@@ -123,8 +126,8 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 								"API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
 
 				}
-				catch (Exception e) {
-					log.warn("Failed to parse GraphQL body for injection scanning: {}", e.getMessage());
+				catch (Exception ex) {
+					log.warn("Failed to parse GraphQL body for injection scanning: {}", ex.getMessage());
 					return Flux.empty();
 				}
 			});
@@ -182,15 +185,16 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 				return Flux.empty();
 			});
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			return Flux.empty();
 		}
 	}
 
 	private String truncate(String text) {
-		if (text == null)
+		if (text == null) {
 			return "null";
-		return text.length() > 200 ? text.substring(0, 200) + "..." : text;
+		}
+		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

@@ -16,18 +16,20 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
-import java.util.List;
-import java.util.Map;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
 /**
  * Scans for CORS misconfigurations (CWE-346, CWE-942).
@@ -60,10 +62,11 @@ public class CorsScanner implements SecurityScanner {
 			try {
 				URI uri = new URI(operation.url());
 				targetHost = uri.getHost();
-				if (targetHost == null)
+				if (targetHost == null) {
 					targetHost = "target.com";
+				}
 			}
-			catch (URISyntaxException e) {
+			catch (URISyntaxException ex) {
 				// default
 			}
 

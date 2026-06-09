@@ -16,10 +16,10 @@
 
 package ch.nexsol.orthrusdast.scanner.oast;
 
+import java.time.Instant;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.time.Instant;
 
 public interface OastService {
 
@@ -32,11 +32,14 @@ public interface OastService {
 
 	/**
 	 * Registers a new unique domain for receiving Out-Of-Band interactions.
+	 * @return the result
 	 */
 	Mono<OastSession> createSession();
 
 	/**
 	 * Polls interactions for a specific session.
+	 * @param session the session
+	 * @return the result
 	 */
 	Flux<OastInteraction> pollInteractions(OastSession session);
 

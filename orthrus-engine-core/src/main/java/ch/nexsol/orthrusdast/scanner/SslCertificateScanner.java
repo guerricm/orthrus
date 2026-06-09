@@ -16,16 +16,6 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
-import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import javax.net.ssl.*;
 import java.net.URL;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -38,6 +28,19 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
+
+import ch.nexsol.orthrusdast.model.CWEReference;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Scans the SSL/TLS configuration and certificate of the target. Caches the results per
@@ -82,7 +85,7 @@ public class SslCertificateScanner implements SecurityScanner {
 				return scanHost(hostname, port, operation);
 
 			}
-			catch (Exception e) {
+			catch (Exception ex) {
 				log.warn("Failed to parse URL for SSL scanning: {}", operation.url());
 				return Flux.empty();
 			}
@@ -153,7 +156,7 @@ public class SslCertificateScanner implements SecurityScanner {
 									"API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
 						}
 					}
-					catch (CertificateExpiredException e) {
+					catch (CertificateExpiredException ex) {
 						vulnerabilities.add(createVulnerabilityWithTrace("Expired SSL Certificate",
 								"The SSL certificate for " + hostname + " has expired.", RiskLevel.HIGH,
 								Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298, List.of(), 7.5,
@@ -161,7 +164,7 @@ public class SslCertificateScanner implements SecurityScanner {
 								"Renew and deploy a valid SSL certificate.", operation, null, "API Endpoint (Network)",
 								"Unauthorized Access / Data Exposure"));
 					}
-					catch (CertificateNotYetValidException e) {
+					catch (CertificateNotYetValidException ex) {
 						vulnerabilities.add(createVulnerabilityWithTrace("SSL Certificate Not Yet Valid",
 								"The SSL certificate for " + hostname + " is not yet valid.", RiskLevel.MEDIUM,
 								Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298, List.of(), 5.3,
@@ -221,8 +224,8 @@ public class SslCertificateScanner implements SecurityScanner {
 				}
 			}
 		}
-		catch (Exception e) {
-			log.warn("Failed to perform SSL scan on {}: {}", hostname, e.getMessage());
+		catch (Exception ex) {
+			log.warn("Failed to perform SSL scan on {}: {}", hostname, ex.getMessage());
 		}
 
 		return Flux.fromIterable(vulnerabilities);
@@ -241,7 +244,7 @@ public class SslCertificateScanner implements SecurityScanner {
 				}
 			}
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			// Ignore
 		}
 
@@ -263,7 +266,7 @@ public class SslCertificateScanner implements SecurityScanner {
 				}
 			}
 		}
-		catch (CertificateParsingException e) {
+		catch (CertificateParsingException ex) {
 			// Ignore
 		}
 		return false;
@@ -273,7 +276,7 @@ public class SslCertificateScanner implements SecurityScanner {
 		hostname = hostname.toLowerCase();
 		pattern = pattern.toLowerCase();
 		if (pattern.startsWith("*.")) {
-			String suffix = pattern.substring(1); // e.g. .example.com
+			String suffix = pattern.substring(1); // ex.g. .example.com
 			return hostname.endsWith(suffix) && hostname.indexOf('.') == hostname.length() - suffix.length();
 		}
 		return hostname.equals(pattern);

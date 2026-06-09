@@ -16,8 +16,9 @@
 
 package ch.nexsol.orthrusdast.http;
 
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
+import java.time.Duration;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -25,10 +26,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
-import java.util.Map;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
  * Reactive HTTP client wrapper around WebClient. Centralizes all HTTP interactions for
@@ -48,6 +50,9 @@ public class ScanHttpClient {
 
 	/**
 	 * Send a request based on an Operation and return the captured response.
+	 * @param operation the operation
+	 * @param retryTransientErrors the retryTransientErrors
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation) {
 		return send(operation, Map.of(), null, true);
@@ -56,6 +61,10 @@ public class ScanHttpClient {
 	/**
 	 * Send a request based on an Operation and return the captured response, optionally
 	 * handling 429s.
+	 * @param operation the operation
+	 * @param extraHeaders the extraHeaders
+	 * @param bodyOverride the bodyOverride
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, boolean retryTransientErrors) {
 		return send(operation, Map.of(), null, retryTransientErrors);
@@ -63,6 +72,10 @@ public class ScanHttpClient {
 
 	/**
 	 * Send a request with extra headers (used by scanners to inject payloads).
+	 * @param operation the operation
+	 * @param extraHeaders the extraHeaders
+	 * @param bodyOverride the bodyOverride
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride) {
 		return send(operation, extraHeaders, bodyOverride, true);
@@ -70,6 +83,7 @@ public class ScanHttpClient {
 
 	/**
 	 * Send a request with extra headers, optionally handling 429s.
+	 * @param retryTransientErrors the retryTransientErrors
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride,
 			boolean retryTransientErrors) {
@@ -161,6 +175,8 @@ public class ScanHttpClient {
 
 	/**
 	 * Send a raw request (no Operation) — used for well-known path discovery.
+	 * @param url the url
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> sendGet(String url) {
 		return send(Operation.simple(url, "GET"));
@@ -168,6 +184,11 @@ public class ScanHttpClient {
 
 	/**
 	 * Send a raw request with custom method.
+	 * @param url the url
+	 * @param method the method
+	 * @param headers the headers
+	 * @param body the body
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> sendRaw(String url, String method, Map<String, String> headers, String body) {
 		Operation op = Operation.withHeaders(url, method, headers, body);
@@ -176,6 +197,9 @@ public class ScanHttpClient {
 
 	/**
 	 * Send the same request multiple times rapidly (for rate-limiting tests).
+	 * @param operation the operation
+	 * @param count the count
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> sendNTimes(Operation operation, int count) {
 		return Mono.defer(() -> send(operation)).repeat(count - 1).last();

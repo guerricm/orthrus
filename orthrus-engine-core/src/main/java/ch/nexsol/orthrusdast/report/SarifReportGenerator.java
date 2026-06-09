@@ -16,18 +16,21 @@
 
 package ch.nexsol.orthrusdast.report;
 
-import ch.nexsol.orthrusdast.model.ScanResult;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.OutputStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.OutputStream;
+import ch.nexsol.orthrusdast.model.ScanResult;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Generates a report in SARIF (Static Analysis Results Interchange Format) for
@@ -108,9 +111,9 @@ public class SarifReportGenerator implements ReportGenerator {
 
 				mapper.writerWithDefaultPrettyPrinter().writeValue(output, root);
 			}
-			catch (Exception e) {
-				log.error("Failed to generate SARIF report", e);
-				throw new RuntimeException("SARIF generation failed", e);
+			catch (Exception ex) {
+				log.error("Failed to generate SARIF report", ex);
+				throw new RuntimeException("SARIF generation failed", ex);
 			}
 		}).subscribeOn(Schedulers.boundedElastic()).then();
 	}

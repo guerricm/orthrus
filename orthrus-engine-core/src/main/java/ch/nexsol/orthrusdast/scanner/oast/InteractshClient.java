@@ -16,13 +16,14 @@
 
 package ch.nexsol.orthrusdast.scanner.oast;
 
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.UUID;
 
 /**
  * Mock implementation of OAST service for development. In a real production deployment,

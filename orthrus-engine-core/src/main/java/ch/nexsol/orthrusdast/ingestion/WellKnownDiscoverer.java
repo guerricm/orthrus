@@ -16,16 +16,18 @@
 
 package ch.nexsol.orthrusdast.ingestion;
 
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
  * Discovers endpoints by checking standard well-known paths.

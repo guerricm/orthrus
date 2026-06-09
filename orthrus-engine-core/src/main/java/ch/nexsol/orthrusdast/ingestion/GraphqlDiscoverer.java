@@ -16,21 +16,24 @@
 
 package ch.nexsol.orthrusdast.ingestion;
 
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.http.ScanHttpResponse;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import reactor.core.publisher.Mono;
+
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 @Component
 public class GraphqlDiscoverer implements EndpointDiscoverer {
@@ -110,8 +113,8 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 			}
 			log.info("Discovered {} GraphQL operations.", operations.size());
 		}
-		catch (Exception e) {
-			log.error("Error parsing GraphQL introspection response", e);
+		catch (Exception ex) {
+			log.error("Error parsing GraphQL introspection response", ex);
 		}
 		return operations;
 	}
@@ -160,7 +163,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 			}
 			return objectMapper.writeValueAsString(payload);
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			return "{\"query\": \"{ " + fieldName + " }\"}";
 		}
 	}

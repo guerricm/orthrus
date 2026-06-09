@@ -16,21 +16,24 @@
 
 package ch.nexsol.orthrusdast.report;
 
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.ScanResult;
-import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
-import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
-import com.openhtmltopdf.extend.FSSupplier;
 import java.io.InputStream;
-import org.springframework.stereotype.Component;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
-import reactor.core.publisher.Mono;
-
 import java.io.OutputStream;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+
+import org.springframework.stereotype.Component;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import com.openhtmltopdf.extend.FSSupplier;
+import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
+import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+
+import reactor.core.publisher.Mono;
+
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
  * Generates a PDF report using Thymeleaf and OpenHTMLToPDF.
@@ -98,14 +101,18 @@ public class PdfReportGenerator implements ReportGenerator {
 
 				// 3. Calculate Global Grade
 				String grade = "A";
-				if (critical > 0)
+				if (critical > 0) {
 					grade = "F";
-				else if (high > 0)
+				}
+				else if (high > 0) {
 					grade = "D";
-				else if (medium > 0)
+				}
+				else if (medium > 0) {
 					grade = "C";
-				else if (low > 0)
+				}
+				else if (low > 0) {
 					grade = "B";
+				}
 				context.setVariable("globalGrade", grade);
 
 				// 4. Execution Details (if --include-passed)
@@ -168,8 +175,8 @@ public class PdfReportGenerator implements ReportGenerator {
 				builder.run();
 
 			}
-			catch (Exception e) {
-				throw new RuntimeException("Failed to generate PDF report", e);
+			catch (Exception ex) {
+				throw new RuntimeException("Failed to generate PDF report", ex);
 			}
 		}).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).then();
 	}
@@ -177,14 +184,16 @@ public class PdfReportGenerator implements ReportGenerator {
 	public static class ReportFormatter {
 
 		public String nl2br(String text) {
-			if (text == null)
+			if (text == null) {
 				return "";
+			}
 			return org.springframework.web.util.HtmlUtils.htmlEscape(text).replace("\n", "<br/>");
 		}
 
 		public String truncateUrl(String url) {
-			if (url == null)
+			if (url == null) {
 				return "";
+			}
 			if (url.length() > 100) {
 				return url.substring(0, 100) + "...[TRUNCATED]";
 			}

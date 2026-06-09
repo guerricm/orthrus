@@ -16,21 +16,22 @@
 
 package ch.nexsol.orthrusdast.engine;
 
-import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import java.time.Instant;
+import java.util.List;
 
-import ch.nexsol.orthrusdast.model.ScanAttempt;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.time.Instant;
-import java.util.List;
+import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.Vulnerability;
+import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 
 /**
  * Core engine that orchestrates the scanning process reactively.
@@ -55,6 +56,10 @@ public class ScanEngine {
 
 	/**
 	 * Runs a complete scan asynchronously.
+	 * @param discoverer the discoverer
+	 * @param targetUrl the targetUrl
+	 * @param config the config
+	 * @return the result
 	 */
 	public Flux<ScanAttempt> runScan(EndpointDiscoverer discoverer, String targetUrl, ScanConfiguration config) {
 		log.info("Starting scan engine with concurrency: {}", config.concurrency());

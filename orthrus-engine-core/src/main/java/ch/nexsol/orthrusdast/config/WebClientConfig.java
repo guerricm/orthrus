@@ -16,17 +16,19 @@
 
 package ch.nexsol.orthrusdast.config;
 
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import java.time.Duration;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
-import java.time.Duration;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 /**
  * WebClient configuration for the scan HTTP client.
@@ -64,8 +66,8 @@ public class WebClientConfig {
 					spec.sslContext(
 							SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build());
 				}
-				catch (Exception e) {
-					throw new RuntimeException("Failed to configure insecure SSL", e);
+				catch (Exception ex) {
+					throw new RuntimeException("Failed to configure insecure SSL", ex);
 				}
 			});
 		}

@@ -16,22 +16,24 @@
 
 package ch.nexsol.orthrusdast.ingestion;
 
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.GatewayType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
-import com.fasterxml.jackson.databind.JsonNode;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import ch.nexsol.orthrusdast.model.GatewayType;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 
 @Component
 public class ApiGatewayDiscoverer implements EndpointDiscoverer {
@@ -134,7 +136,7 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 		String url = target.endsWith("/") ? target + "api/http/routers" : target + "/api/http/routers";
 		return client.get().uri(url).retrieve().bodyToFlux(java.util.Map.class).map((node) -> {
 			String rule = (String) node.get("rule");
-			return rule != null ? extractPathFromTraefikRule(rule) : "";
+			return (rule != null) ? extractPathFromTraefikRule(rule) : "";
 		}).filter((s) -> !s.isEmpty()).collectList();
 	}
 
@@ -143,14 +145,16 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 		if (rule.contains("PathPrefix(`")) {
 			int start = rule.indexOf("PathPrefix(`") + 12;
 			int end = rule.indexOf("`)", start);
-			if (end > start)
+			if (end > start) {
 				return rule.substring(start, end);
+			}
 		}
 		else if (rule.contains("Path(`")) {
 			int start = rule.indexOf("Path(`") + 6;
 			int end = rule.indexOf("`)", start);
-			if (end > start)
+			if (end > start) {
 				return rule.substring(start, end);
+			}
 		}
 		return "";
 	}
@@ -159,14 +163,15 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 		String url = target.endsWith("/") ? target + "actuator/gateway/routes" : target + "/actuator/gateway/routes";
 		return client.get().uri(url).retrieve().bodyToFlux(java.util.Map.class).map((node) -> {
 			Object predicateObj = node.get("predicate");
-			return predicateObj != null ? predicateObj.toString() : "";
+			return (predicateObj != null) ? predicateObj.toString() : "";
 		}).map((predicate) -> {
 			// E.g. Paths: [/api/**], match trailing slash: true
 			if (predicate.contains("Paths: [")) {
 				int start = predicate.indexOf("Paths: [") + 8;
 				int end = predicate.indexOf("]", start);
-				if (end > start)
+				if (end > start) {
 					return predicate.substring(start, end);
+				}
 			}
 			return "";
 		}).filter((s) -> !s.isEmpty()).collectList();

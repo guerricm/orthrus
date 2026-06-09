@@ -16,10 +16,12 @@
 
 package ch.nexsol.orthrusdast.ingestion;
 
+import java.util.List;
+
+import reactor.core.publisher.Mono;
+
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import java.util.List;
-import reactor.core.publisher.Mono;
 
 /**
  * Interface for API discovery mechanisms.

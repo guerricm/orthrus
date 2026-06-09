@@ -16,10 +16,11 @@
 
 package ch.nexsol.orthrusdast.report;
 
-import ch.nexsol.orthrusdast.model.ScanResult;
+import java.io.OutputStream;
+
 import reactor.core.publisher.Mono;
 
-import java.io.OutputStream;
+import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
  * Common interface for all report generators.
@@ -35,6 +36,7 @@ public interface ReportGenerator {
 	 * Generates the report and writes it to the output stream.
 	 * @param result The scan result
 	 * @param output The output stream to write to
+	 * @param includePassed the includePassed
 	 * @return a Mono that completes when the report is fully written
 	 */
 	Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed);

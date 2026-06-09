@@ -16,12 +16,6 @@
 
 package ch.nexsol.orthrusdast.scanner.payload;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +23,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Service;
+
+import reactor.core.publisher.Flux;
 
 @Service
 public class PayloadLoaderService {
@@ -42,6 +43,8 @@ public class PayloadLoaderService {
 	 * Retrieves payloads for a specific category (e.g., "sqli", "xss"). Tries to read
 	 * from classpath:payloads/{category}.txt Falls back to a default minimal list if the
 	 * file is not found.
+	 * @param category the category
+	 * @return the result
 	 */
 	public Flux<String> getPayloads(String category) {
 		if (payloadCache.containsKey(category)) {
@@ -71,8 +74,8 @@ public class PayloadLoaderService {
 					payloads = getFallbackPayloads(category);
 				}
 			}
-			catch (Exception e) {
-				log.error("Failed to load payloads for category '{}': {}", category, e.getMessage());
+			catch (Exception ex) {
+				log.error("Failed to load payloads for category '{}': {}", category, ex.getMessage());
 				payloads = getFallbackPayloads(category);
 			}
 

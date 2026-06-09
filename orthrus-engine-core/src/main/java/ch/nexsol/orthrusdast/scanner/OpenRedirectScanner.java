@@ -16,25 +16,21 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
-import java.util.List;
-
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import java.util.HashMap;
-import java.util.Map;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
 /**
  * Scans for Open Redirect vulnerabilities (CWE-601).
@@ -83,10 +79,11 @@ public class OpenRedirectScanner implements SecurityScanner {
 		try {
 			URI uri = new URI(operation.url());
 			targetHost = uri.getHost();
-			if (targetHost == null)
+			if (targetHost == null) {
 				targetHost = "target.com";
+			}
 		}
-		catch (URISyntaxException e) {
+		catch (URISyntaxException ex) {
 			// default
 		}
 

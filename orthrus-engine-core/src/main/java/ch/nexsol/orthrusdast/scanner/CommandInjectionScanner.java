@@ -16,17 +16,18 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import java.util.ArrayList;
 
 /**
  * Scans for OS Command Injection vulnerabilities (CWE-78).
@@ -140,9 +141,10 @@ public class CommandInjectionScanner implements SecurityScanner {
 	}
 
 	private String truncate(String text) {
-		if (text == null)
+		if (text == null) {
 			return "null";
-		return text.length() > 200 ? text.substring(0, 200) + "..." : text;
+		}
+		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

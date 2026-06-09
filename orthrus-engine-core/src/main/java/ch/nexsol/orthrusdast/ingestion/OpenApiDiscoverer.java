@@ -16,24 +16,27 @@
 
 package ch.nexsol.orthrusdast.ingestion;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
+
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import net.datafaker.Faker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import reactor.core.scheduler.Schedulers;
 
 @Component
 public class OpenApiDiscoverer implements EndpointDiscoverer {
@@ -86,18 +89,24 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 				String path = entry.getKey();
 				PathItem pathItem = entry.getValue();
 
-				if (pathItem.getGet() != null)
+				if (pathItem.getGet() != null) {
 					endpoints.add(buildOperation(baseUrl, path, "GET", pathItem.getGet(), openAPI, authScheme));
-				if (pathItem.getPost() != null)
+				}
+				if (pathItem.getPost() != null) {
 					endpoints.add(buildOperation(baseUrl, path, "POST", pathItem.getPost(), openAPI, authScheme));
-				if (pathItem.getPut() != null)
+				}
+				if (pathItem.getPut() != null) {
 					endpoints.add(buildOperation(baseUrl, path, "PUT", pathItem.getPut(), openAPI, authScheme));
-				if (pathItem.getDelete() != null)
+				}
+				if (pathItem.getDelete() != null) {
 					endpoints.add(buildOperation(baseUrl, path, "DELETE", pathItem.getDelete(), openAPI, authScheme));
-				if (pathItem.getPatch() != null)
+				}
+				if (pathItem.getPatch() != null) {
 					endpoints.add(buildOperation(baseUrl, path, "PATCH", pathItem.getPatch(), openAPI, authScheme));
-				if (pathItem.getOptions() != null)
+				}
+				if (pathItem.getOptions() != null) {
 					endpoints.add(buildOperation(baseUrl, path, "OPTIONS", pathItem.getOptions(), openAPI, authScheme));
+				}
 			}
 		}
 

@@ -18,16 +18,18 @@ package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Scans for JWTs signed with a blank (empty) secret or common weak secrets.
@@ -103,7 +105,7 @@ public class JwtBlankSecretScanner implements SecurityScanner {
 						return Flux.empty();
 					});
 				}
-				catch (Exception e) {
+				catch (Exception ex) {
 					return Flux.empty();
 				}
 			}).take(1); // Stop after finding the first weak secret that works

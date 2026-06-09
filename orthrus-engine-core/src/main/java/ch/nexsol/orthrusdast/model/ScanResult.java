@@ -28,13 +28,15 @@ public record ScanResult(String id, String targetUrl, Instant scanStartTime, Ins
 		Map<RiskLevel, Long> riskSummary, Map<String, Integer> scannerSummary, ScanConfiguration configuration,
 		List<ScanAttempt> attempts, String discovererId) {
 	public String formattedDuration() {
-		if (scanStartTime == null || scanEndTime == null)
+		if (scanStartTime == null || scanEndTime == null) {
 			return "0s";
+		}
 		long seconds = java.time.Duration.between(scanStartTime, scanEndTime).getSeconds();
-		if (seconds == 0)
+		if (seconds == 0) {
 			return "less than 1s";
+		}
 		long mins = seconds / 60;
 		long secs = seconds % 60;
-		return mins > 0 ? mins + "m " + secs + "s" : secs + "s";
+		return (mins > 0) ? mins + "m " + secs + "s" : secs + "s";
 	}
 }

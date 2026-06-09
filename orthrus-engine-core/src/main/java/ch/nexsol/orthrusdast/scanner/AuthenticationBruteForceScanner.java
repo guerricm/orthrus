@@ -24,16 +24,18 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
 /**
  * Scans authentication endpoints for susceptibility to brute force / weak passwords.
@@ -85,8 +87,8 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 				passwords.addAll(List.of("123456", "password", "admin", "root", "qwerty"));
 			}
 		}
-		catch (Exception e) {
-			log.error("Failed to load passwords.txt", e);
+		catch (Exception ex) {
+			log.error("Failed to load passwords.txt", ex);
 			passwords.addAll(List.of("123456", "password", "admin", "root", "qwerty"));
 		}
 		return passwords;
@@ -199,9 +201,10 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 	}
 
 	private String truncate(String text) {
-		if (text == null)
+		if (text == null) {
 			return "null";
-		return text.length() > 200 ? text.substring(0, 200) + "..." : text;
+		}
+		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

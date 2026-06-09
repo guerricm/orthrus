@@ -16,16 +16,18 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * Scans for Insecure Deserialization vulnerabilities by sending known magic bytes or

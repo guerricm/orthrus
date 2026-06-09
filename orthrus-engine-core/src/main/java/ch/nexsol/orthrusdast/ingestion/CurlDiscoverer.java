@@ -16,13 +16,15 @@
 
 package ch.nexsol.orthrusdast.ingestion;
 
-import ch.nexsol.orthrusdast.model.Operation;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import ch.nexsol.orthrusdast.model.Operation;
 
 /**
  * "Discoverer" that just takes a single URL (like a curl command) and treats it as the

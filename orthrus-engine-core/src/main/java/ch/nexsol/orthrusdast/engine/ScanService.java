@@ -16,18 +16,20 @@
 
 package ch.nexsol.orthrusdast.engine;
 
-import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import reactor.core.publisher.Flux;
+
+import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 
 /**
  * High-level orchestration service. Finds the right discoverer and triggers the
@@ -50,6 +52,10 @@ public class ScanService {
 
 	/**
 	 * Execute a scan based on a target and a specific discoverer ID.
+	 * @param discovererId the discovererId
+	 * @param target the target
+	 * @param config the config
+	 * @return the result
 	 */
 	public Flux<ScanAttempt> executeScan(String discovererId, String target, ScanConfiguration config) {
 		EndpointDiscoverer discoverer = discoverers.get(discovererId);
@@ -64,6 +70,7 @@ public class ScanService {
 
 	/**
 	 * Get a list of available discoverers.
+	 * @return the result
 	 */
 	public List<String> getAvailableDiscoverers() {
 		return discoverers.keySet().stream().sorted().toList();
@@ -71,6 +78,7 @@ public class ScanService {
 
 	/**
 	 * Get a list of available scanner IDs.
+	 * @return the result
 	 */
 	public List<String> getAvailableScanners() {
 		return scanEngine.getAllScanners()
@@ -83,6 +91,7 @@ public class ScanService {
 	/**
 	 * Get a list of available scanner objects (useful for UI display with
 	 * names/descriptions).
+	 * @return the result
 	 */
 	public List<ch.nexsol.orthrusdast.scanner.SecurityScanner> getAvailableScannerObjects() {
 		return scanEngine.getAllScanners()

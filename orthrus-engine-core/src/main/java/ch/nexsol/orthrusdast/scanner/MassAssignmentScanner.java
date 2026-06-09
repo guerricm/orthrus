@@ -18,17 +18,20 @@ package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
 /**
  * Scans for Mass Assignment / BOPLA (API3:2023) (CWE-915).
@@ -111,8 +114,8 @@ public class MassAssignmentScanner implements SecurityScanner {
 								"injected sensitive fields using unexpected types (Arrays, Objects)"));
 
 			}
-			catch (Exception e) {
-				log.debug("Failed to parse or modify JSON body for {}: {}", operation.url(), e.getMessage());
+			catch (Exception ex) {
+				log.debug("Failed to parse or modify JSON body for {}: {}", operation.url(), ex.getMessage());
 				return Flux.empty();
 			}
 		});

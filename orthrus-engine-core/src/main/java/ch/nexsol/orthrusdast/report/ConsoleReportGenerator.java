@@ -16,15 +16,17 @@
 
 package ch.nexsol.orthrusdast.report;
 
-import ch.nexsol.orthrusdast.model.ScanResult;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import ch.nexsol.orthrusdast.model.ScanResult;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Prints a summary report to the console.

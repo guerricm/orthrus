@@ -16,19 +16,22 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import reactor.core.publisher.Flux;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Scans for Sensitive Information Exposure in Query Strings (CWE-598).
@@ -75,8 +78,9 @@ public class SensitiveQueryScanner implements SecurityScanner {
 							break;
 						}
 					}
-					if (paramMatch != null)
+					if (paramMatch != null) {
 						break;
+					}
 				}
 
 				if (paramMatch != null) {
@@ -136,7 +140,7 @@ public class SensitiveQueryScanner implements SecurityScanner {
 							});
 						}
 					}
-					catch (Exception e) {
+					catch (Exception ex) {
 						// Ignore parse errors
 					}
 				}

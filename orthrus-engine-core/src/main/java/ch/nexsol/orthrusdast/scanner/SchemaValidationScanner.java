@@ -16,22 +16,25 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.parameters.Parameter;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.stereotype.Component;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import reactor.core.publisher.Flux;
+
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.model.CWEReference;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.Vulnerability;
+
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 
 /**
  * Scans for Improper Input Validation (CWE-20) by testing OpenAPI schema constraints. It
@@ -93,8 +96,9 @@ public class SchemaValidationScanner implements SecurityScanner {
 
 	private List<Flux<Vulnerability>> generateRequestBodyTests(Operation operation, Schema schema) {
 		List<Flux<Vulnerability>> scans = new ArrayList<>();
-		if (schema.getProperties() == null)
+		if (schema.getProperties() == null) {
 			return scans;
+		}
 
 		Map<String, Object> baseline = buildBaseline(schema);
 		Map<String, Schema> properties = schema.getProperties();
@@ -163,12 +167,15 @@ public class SchemaValidationScanner implements SecurityScanner {
 				// Format
 				if (propSchema.getFormat() != null) {
 					Map<String, Object> mutated = new HashMap<>(baseline);
-					if ("email".equals(propSchema.getFormat()))
+					if ("email".equals(propSchema.getFormat())) {
 						mutated.put(propName, "not-an-email-address");
-					else if ("uuid".equals(propSchema.getFormat()))
+					}
+					else if ("uuid".equals(propSchema.getFormat())) {
 						mutated.put(propName, "not-a-uuid-1234");
-					else if ("date".equals(propSchema.getFormat()))
+					}
+					else if ("date".equals(propSchema.getFormat())) {
 						mutated.put(propName, "2024-13-45");
+					}
 					scans.add(testBodyPayload(operation, mutated, "Format Constraint Violation",
 							"The property '" + propName + "' expects format '" + propSchema.getFormat()
 									+ "', but an invalid format was accepted."));
@@ -232,8 +239,9 @@ public class SchemaValidationScanner implements SecurityScanner {
 		List<Flux<Vulnerability>> scans = new ArrayList<>();
 
 		for (Parameter param : parameters) {
-			if (param.getSchema() == null)
+			if (param.getSchema() == null) {
 				continue;
+			}
 
 			String pName = param.getName();
 			Schema pSchema = param.getSchema();
@@ -300,10 +308,12 @@ public class SchemaValidationScanner implements SecurityScanner {
 		Map<String, String> newQuery = op.queryParams() != null ? new HashMap<>(op.queryParams()) : new HashMap<>();
 		Map<String, String> newHeaders = op.headers() != null ? new HashMap<>(op.headers()) : new HashMap<>();
 
-		if ("query".equals(in))
+		if ("query".equals(in)) {
 			newQuery.remove(name);
-		if ("header".equals(in))
+		}
+		if ("header".equals(in)) {
 			newHeaders.remove(name);
+		}
 
 		return new Operation(op.url(), op.method(), newHeaders, newQuery, op.body(), op.securityRequirements(),
 				op.expectedContentTypes(), op.authScheme(), op.templateUrl(), op.sourceNode());
@@ -314,10 +324,12 @@ public class SchemaValidationScanner implements SecurityScanner {
 		Map<String, String> newHeaders = op.headers() != null ? new HashMap<>(op.headers()) : new HashMap<>();
 		String newUrl = op.url();
 
-		if ("query".equals(in))
+		if ("query".equals(in)) {
 			newQuery.put(name, value);
-		if ("header".equals(in))
+		}
+		if ("header".equals(in)) {
 			newHeaders.put(name, value);
+		}
 		if ("path".equals(in)) {
 			newUrl = mutatePathParameter(op.url(), op.templateUrl(), name, value);
 		}
@@ -327,8 +339,9 @@ public class SchemaValidationScanner implements SecurityScanner {
 	}
 
 	private String mutatePathParameter(String url, String templateUrl, String paramName, String newValue) {
-		if (url == null || templateUrl == null)
+		if (url == null || templateUrl == null) {
 			return url;
+		}
 
 		String[] urlParts = url.split("/");
 		String[] templateParts = templateUrl.split("/");
@@ -377,7 +390,7 @@ public class SchemaValidationScanner implements SecurityScanner {
 		try {
 			payloadJson = objectMapper.writeValueAsString(payloadMap);
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			return Flux.empty();
 		}
 

@@ -16,22 +16,22 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.springframework.stereotype.Component;
+
+import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.UUID;
 
 /**
  * Scans for Broken Object Level Authorization (BOLA) / IDOR.
@@ -78,7 +78,7 @@ public class BolaScanner implements SecurityScanner {
 		try {
 			originalId = Long.parseLong(originalIdStr);
 		}
-		catch (NumberFormatException e) {
+		catch (NumberFormatException ex) {
 			return Flux.empty();
 		}
 

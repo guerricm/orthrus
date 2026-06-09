@@ -16,8 +16,8 @@
 
 package ch.nexsol.orthrusdast.auth;
 
-import ch.nexsol.orthrusdast.model.OAuth2Config;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -27,10 +27,12 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import ch.nexsol.orthrusdast.model.OAuth2Config;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 @Service
 public class OAuth2TokenFetcher {
@@ -45,6 +47,8 @@ public class OAuth2TokenFetcher {
 
 	/**
 	 * Fetches tokens for all provided credentials or single client_credentials flow.
+	 * @param config the config
+	 * @return the result
 	 */
 	public Mono<List<SecurityScheme>> fetchTokens(OAuth2Config config) {
 		if (config == null || config.tokenUrl() == null || config.grantType() == null) {

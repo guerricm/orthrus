@@ -29,6 +29,9 @@ public class PayloadMutator {
 
 	/**
 	 * Mutates a raw payload based on where it's going to be injected.
+	 * @param rawPayload the rawPayload
+	 * @param context the context
+	 * @return the result
 	 */
 	public String mutate(String rawPayload, Context context) {
 		if (rawPayload == null || rawPayload.isEmpty()) {
