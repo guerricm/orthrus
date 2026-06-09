@@ -23,120 +23,113 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApiGatewayDiscovererTest {
 
-    private MockWebServer mockWebServer;
-    private ApiGatewayDiscoverer discoverer;
+	private MockWebServer mockWebServer;
 
-    @BeforeEach
-    void setUp() throws IOException {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-        ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer mockBlackbox = new ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer(
-                new OrthrusProperties()) {
-            @Override
-            public reactor.core.publisher.Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-                Operation op = new Operation(target, "GET", java.util.Map.of(), java.util.Map.of(), null, List.of(),
-                        List.of(), null);
-                return reactor.core.publisher.Mono.just(List.of(op));
-            }
-        };
-        discoverer = new ApiGatewayDiscoverer(mockBlackbox);
-    }
+	private ApiGatewayDiscoverer discoverer;
 
-    @AfterEach
-    void tearDown() throws IOException {
-        mockWebServer.shutdown();
-    }
+	@BeforeEach
+	void setUp() throws IOException {
+		mockWebServer = new MockWebServer();
+		mockWebServer.start();
+		ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer mockBlackbox = new ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer(
+				new OrthrusProperties()) {
+			@Override
+			public reactor.core.publisher.Mono<List<Operation>> discover(String target,
+					ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+				Operation op = new Operation(target, "GET", java.util.Map.of(), java.util.Map.of(), null, List.of(),
+						List.of(), null);
+				return reactor.core.publisher.Mono.just(List.of(op));
+			}
+		};
+		discoverer = new ApiGatewayDiscoverer(mockBlackbox);
+	}
 
-    @Test
-    void testDiscover_KongGateway() {
-        String url = mockWebServer.url("/").toString();
+	@AfterEach
+	void tearDown() throws IOException {
+		mockWebServer.shutdown();
+	}
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                if (request.getPath().equals("/routes")) {
-                    return new MockResponse().setResponseCode(200)
-                            .setHeader("Content-Type", "application/json")
-                            .setBody(
-                                    "{\"data\": [{\"paths\": [\"/api/v1/users\"], \"methods\": [\"GET\", \"POST\"]}]}");
-                }
-                return new MockResponse().setResponseCode(404);
-            }
-        });
+	@Test
+	void testDiscover_KongGateway() {
+		String url = mockWebServer.url("/").toString();
 
-        ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.KONG, null,
-                null, null, null);
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getPath().equals("/routes")) {
+					return new MockResponse().setResponseCode(200)
+						.setHeader("Content-Type", "application/json")
+						.setBody("{\"data\": [{\"paths\": [\"/api/v1/users\"], \"methods\": [\"GET\", \"POST\"]}]}");
+				}
+				return new MockResponse().setResponseCode(404);
+			}
+		});
 
-        StepVerifier.create(discoverer.discover(url, config))
-                .assertNext(operations -> {
-                    assertEquals(1, operations.size());
-                    assertTrue(operations.stream().anyMatch(o -> o.url().endsWith("/api/v1/users")));
-                })
-                .verifyComplete();
-    }
+		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null,
+				null, "en", false, GatewayType.KONG, null, null, null, null);
 
-    @Test
-    void testDiscover_TraefikGateway() {
-        String url = mockWebServer.url("/").toString();
+		StepVerifier.create(discoverer.discover(url, config)).assertNext(operations -> {
+			assertEquals(1, operations.size());
+			assertTrue(operations.stream().anyMatch(o -> o.url().endsWith("/api/v1/users")));
+		}).verifyComplete();
+	}
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                if (request.getPath().equals("/api/http/routers")) {
-                    return new MockResponse().setResponseCode(200)
-                            .setHeader("Content-Type", "application/json")
-                            .setBody("[{\"rule\": \"PathPrefix(`/api/v2/orders`)\"}]");
-                }
-                return new MockResponse().setResponseCode(404);
-            }
-        });
+	@Test
+	void testDiscover_TraefikGateway() {
+		String url = mockWebServer.url("/").toString();
 
-        ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.TRAEFIK,
-                "api.traefik.internal", null, null, null);
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getPath().equals("/api/http/routers")) {
+					return new MockResponse().setResponseCode(200)
+						.setHeader("Content-Type", "application/json")
+						.setBody("[{\"rule\": \"PathPrefix(`/api/v2/orders`)\"}]");
+				}
+				return new MockResponse().setResponseCode(404);
+			}
+		});
 
-        StepVerifier.create(discoverer.discover(url, config))
-                .assertNext(operations -> {
-                    assertFalse(operations.isEmpty());
-                    assertEquals(1, operations.size());
-                    Operation op = operations.get(0);
-                    assertTrue(op.url().endsWith("/api/v2/orders"));
-                    // Traefik adds default methods if not specified
-                    assertEquals("GET", op.method());
-                })
-                .verifyComplete();
-    }
+		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null,
+				null, "en", false, GatewayType.TRAEFIK, "api.traefik.internal", null, null, null);
 
-    @Test
-    void testDiscover_KubernetesIngress_WithToken() {
-        String url = mockWebServer.url("/").toString();
+		StepVerifier.create(discoverer.discover(url, config)).assertNext(operations -> {
+			assertFalse(operations.isEmpty());
+			assertEquals(1, operations.size());
+			Operation op = operations.get(0);
+			assertTrue(op.url().endsWith("/api/v2/orders"));
+			// Traefik adds default methods if not specified
+			assertEquals("GET", op.method());
+		}).verifyComplete();
+	}
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                if (!"Bearer test-k8s-token".equals(request.getHeader("Authorization"))) {
-                    return new MockResponse().setResponseCode(401);
-                }
-                if (request.getPath().equals("/apis/networking.k8s.io/v1/ingresses")) {
-                    return new MockResponse().setResponseCode(200)
-                            .setHeader("Content-Type", "application/json")
-                            .setBody(
-                                    "{\"items\": [{\"spec\": {\"rules\": [{\"host\": \"example.com\", \"http\": {\"paths\": [{\"path\": \"/login\"}]}}]}}]}");
-                }
-                return new MockResponse().setResponseCode(404);
-            }
-        });
+	@Test
+	void testDiscover_KubernetesIngress_WithToken() {
+		String url = mockWebServer.url("/").toString();
 
-        ScanConfiguration config = new ScanConfiguration(
-                List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false, GatewayType.K8S, null,
-                "test-k8s-token", null, null);
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (!"Bearer test-k8s-token".equals(request.getHeader("Authorization"))) {
+					return new MockResponse().setResponseCode(401);
+				}
+				if (request.getPath().equals("/apis/networking.k8s.io/v1/ingresses")) {
+					return new MockResponse().setResponseCode(200)
+						.setHeader("Content-Type", "application/json")
+						.setBody(
+								"{\"items\": [{\"spec\": {\"rules\": [{\"host\": \"example.com\", \"http\": {\"paths\": [{\"path\": \"/login\"}]}}]}}]}");
+				}
+				return new MockResponse().setResponseCode(404);
+			}
+		});
 
-        StepVerifier.create(discoverer.discover(url, config))
-                .assertNext(operations -> {
-                    assertEquals(1, operations.size());
-                    assertTrue(operations.get(0).url().endsWith("/login"));
-                })
-                .verifyComplete();
-    }
+		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null,
+				null, "en", false, GatewayType.K8S, null, "test-k8s-token", null, null);
+
+		StepVerifier.create(discoverer.discover(url, config)).assertNext(operations -> {
+			assertEquals(1, operations.size());
+			assertTrue(operations.get(0).url().endsWith("/login"));
+		}).verifyComplete();
+	}
+
 }
