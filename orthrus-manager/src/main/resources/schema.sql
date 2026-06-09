@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS "vulnerabilities" (
 -- Index for fast evolution queries
 CREATE INDEX IF NOT EXISTS idx_vuln_op ON "vulnerabilities"(operation_method, operation_url);
 
+-- Indexes for fast lookups by scan result ID
+CREATE INDEX IF NOT EXISTS idx_scan_attempts_result ON "scan_attempts"(scan_result_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_result ON "vulnerabilities"(scan_result_id);
+
 CREATE TABLE IF NOT EXISTS "slave_nodes" (
     id VARCHAR(255) PRIMARY KEY,
     url VARCHAR(255) NOT NULL,
@@ -65,5 +69,9 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
     completed_at TIMESTAMP,
     result_id VARCHAR(255),
     vulns_count INT,
-    tests_count INT
+    tests_count INT,
+    FOREIGN KEY (result_id) REFERENCES "scan_results"(id) ON DELETE SET NULL
 );
+
+-- Index for fast lookups of jobs by result ID
+CREATE INDEX IF NOT EXISTS idx_scanjobs_result ON "scan_jobs"(result_id);
