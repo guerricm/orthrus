@@ -23,138 +23,151 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ScannerIntegrationTests {
 
-    private MockWebServer mockWebServer;
-    private ScanHttpClient httpClient;
-    private String baseUrl;
+	private MockWebServer mockWebServer;
 
-    @BeforeEach
-    void setUp() throws IOException {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-        baseUrl = mockWebServer.url("/").toString();
-        // Remove trailing slash to mimic standard URL format
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-        httpClient = new ScanHttpClient(WebClient.create());
-    }
+	private ScanHttpClient httpClient;
 
-    @AfterEach
-    void tearDown() throws IOException {
-        mockWebServer.shutdown();
-    }
+	private String baseUrl;
 
-    @Test
-    void testSqlInjectionScanner() {
-        SqlInjectionScanner scanner = new SqlInjectionScanner(httpClient, 
-            new ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService(),
-            new ch.nexsol.orthrusdast.scanner.payload.PayloadMutator(),
-            new ch.nexsol.orthrusdast.scanner.oast.InteractshClient());
-        
-        Operation op = new Operation(baseUrl + "/users", "GET", Map.<String, String>of(), Map.of("id", "1"), null, List.<String>of(), List.<String>of(), null);
+	@BeforeEach
+	void setUp() throws IOException {
+		mockWebServer = new MockWebServer();
+		mockWebServer.start();
+		baseUrl = mockWebServer.url("/").toString();
+		// Remove trailing slash to mimic standard URL format
+		if (baseUrl.endsWith("/")) {
+			baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+		}
+		httpClient = new ScanHttpClient(WebClient.create());
+	}
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                if (request.getPath().contains("OR")) {
-                    return new MockResponse().setResponseCode(500).setBody("SQL syntax error near '' OR '1'='1'");
-                }
-                return new MockResponse().setResponseCode(200).setBody("{\"status\": \"ok\"}");
-            }
-        });
+	@AfterEach
+	void tearDown() throws IOException {
+		mockWebServer.shutdown();
+	}
 
-        List<Vulnerability> vulns = scanner.scan(op).collectList().block();
-        assertThat(vulns).isNotEmpty();
-        assertThat(vulns.get(0).cwe().getId()).isEqualTo(89);
-    }
+	@Test
+	void testSqlInjectionScanner() {
+		SqlInjectionScanner scanner = new SqlInjectionScanner(httpClient,
+				new ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService(),
+				new ch.nexsol.orthrusdast.scanner.payload.PayloadMutator(),
+				new ch.nexsol.orthrusdast.scanner.oast.InteractshClient());
 
-    @Test
-    void testXssScanner() {
-        XssScanner scanner = new XssScanner(httpClient, 
-            new ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService(),
-            new ch.nexsol.orthrusdast.scanner.payload.PayloadMutator(),
-            new ch.nexsol.orthrusdast.scanner.oast.InteractshClient());
+		Operation op = new Operation(baseUrl + "/users", "GET", Map.<String, String>of(), Map.of("id", "1"), null,
+				List.<String>of(), List.<String>of(), null);
 
-        Operation op = new Operation(baseUrl + "/search", "GET", Map.<String, String>of(), Map.of("q", "test"), null, List.<String>of(), List.<String>of(), null);
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getPath().contains("OR")) {
+					return new MockResponse().setResponseCode(500).setBody("SQL syntax error near '' OR '1'='1'");
+				}
+				return new MockResponse().setResponseCode(200).setBody("{\"status\": \"ok\"}");
+			}
+		});
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                return new MockResponse().setResponseCode(200).setHeader("Content-Type", "text/html").setBody("Results for <script>alert('XSS_VULNAPI_TEST')</script>");
-            }
-        });
+		List<Vulnerability> vulns = scanner.scan(op).collectList().block();
+		assertThat(vulns).isNotEmpty();
+		assertThat(vulns.get(0).cwe().getId()).isEqualTo(89);
+	}
 
-        List<Vulnerability> vulns = scanner.scan(op).collectList().block();
-        assertThat(vulns).isNotEmpty();
-        // Since it checks query and 3 headers, we might get multiple vulns. We just verify at least one XSS is found.
-        assertThat(vulns.get(0).cwe().getId()).isEqualTo(79);
-    }
+	@Test
+	void testXssScanner() {
+		XssScanner scanner = new XssScanner(httpClient,
+				new ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService(),
+				new ch.nexsol.orthrusdast.scanner.payload.PayloadMutator(),
+				new ch.nexsol.orthrusdast.scanner.oast.InteractshClient());
 
-    @Test
-    void testSstiScanner() {
-        SstiScanner scanner = new SstiScanner(httpClient);
+		Operation op = new Operation(baseUrl + "/search", "GET", Map.<String, String>of(), Map.of("q", "test"), null,
+				List.<String>of(), List.<String>of(), null);
 
-        Operation op = new Operation(baseUrl + "/template", "GET", Map.<String, String>of(), Map.of("name", "John"), null, List.<String>of(), List.<String>of(), null);
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				return new MockResponse().setResponseCode(200)
+					.setHeader("Content-Type", "text/html")
+					.setBody("Results for <script>alert('XSS_VULNAPI_TEST')</script>");
+			}
+		});
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                return new MockResponse().setResponseCode(200).setBody("Hello 65946504");
-            }
-        });
+		List<Vulnerability> vulns = scanner.scan(op).collectList().block();
+		assertThat(vulns).isNotEmpty();
+		// Since it checks query and 3 headers, we might get multiple vulns. We just
+		// verify at least one XSS is found.
+		assertThat(vulns.get(0).cwe().getId()).isEqualTo(79);
+	}
 
-        List<Vulnerability> vulns = scanner.scan(op).collectList().block();
-        assertThat(vulns).isNotEmpty();
-        assertThat(vulns.get(0).cwe().getId()).isEqualTo(1336);
-    }
+	@Test
+	void testSstiScanner() {
+		SstiScanner scanner = new SstiScanner(httpClient);
 
-    @Test
-    void testCleartextScanner() {
-        CleartextScanner scanner = new CleartextScanner(httpClient);
+		Operation op = new Operation(baseUrl + "/template", "GET", Map.<String, String>of(), Map.of("name", "John"),
+				null, List.<String>of(), List.<String>of(), null);
 
-        Operation httpOp = new Operation("http://api.example.com/data", "GET", Map.<String, String>of(), Map.<String, String>of(), null, List.<String>of(), List.<String>of(), null);
-        List<Vulnerability> vulns = scanner.scan(httpOp).collectList().block();
-        assertThat(vulns).hasSize(1);
-        assertThat(vulns.get(0).cwe().getId()).isEqualTo(319);
-    }
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				return new MockResponse().setResponseCode(200).setBody("Hello 65946504");
+			}
+		});
 
-    @Test
-    void testContentTypeSpoofingScanner() {
-        ContentTypeSpoofingScanner scanner = new ContentTypeSpoofingScanner(httpClient);
+		List<Vulnerability> vulns = scanner.scan(op).collectList().block();
+		assertThat(vulns).isNotEmpty();
+		assertThat(vulns.get(0).cwe().getId()).isEqualTo(1336);
+	}
 
-        Operation op = new Operation(baseUrl + "/data", "POST", Map.of("Content-Type", "application/json"), Map.<String, String>of(), "{\"key\": \"value\"}", List.<String>of(), List.<String>of(), null);
+	@Test
+	void testCleartextScanner() {
+		CleartextScanner scanner = new CleartextScanner(httpClient);
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                return new MockResponse().setResponseCode(200).setBody("root:x:0:0");
-            }
-        });
+		Operation httpOp = new Operation("http://api.example.com/data", "GET", Map.<String, String>of(),
+				Map.<String, String>of(), null, List.<String>of(), List.<String>of(), null);
+		List<Vulnerability> vulns = scanner.scan(httpOp).collectList().block();
+		assertThat(vulns).hasSize(1);
+		assertThat(vulns.get(0).cwe().getId()).isEqualTo(319);
+	}
 
-        List<Vulnerability> vulns = scanner.scan(op).collectList().block();
-        assertThat(vulns).hasSize(2);
-        assertThat(vulns).anyMatch(v -> v.cwe().getId() == 611);
-    }
+	@Test
+	void testContentTypeSpoofingScanner() {
+		ContentTypeSpoofingScanner scanner = new ContentTypeSpoofingScanner(httpClient);
 
-    @Test
-    void testCrossUserBolaScanner() {
-        CrossUserBolaScanner scanner = new CrossUserBolaScanner(httpClient);
+		Operation op = new Operation(baseUrl + "/data", "POST", Map.of("Content-Type", "application/json"),
+				Map.<String, String>of(), "{\"key\": \"value\"}", List.<String>of(), List.<String>of(), null);
 
-        SecurityScheme userA = SecurityScheme.bearer("TOKEN_A");
-        SecurityScheme userB = SecurityScheme.bearer("TOKEN_B");
-        ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false, "json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null);
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				return new MockResponse().setResponseCode(200).setBody("root:x:0:0");
+			}
+		});
 
-        Operation op = new Operation(baseUrl + "/invoices/123", "GET", Map.<String, String>of(), Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);
+		List<Vulnerability> vulns = scanner.scan(op).collectList().block();
+		assertThat(vulns).hasSize(2);
+		assertThat(vulns).anyMatch(v -> v.cwe().getId() == 611);
+	}
 
-        mockWebServer.setDispatcher(new Dispatcher() {
-            @Override
-            public MockResponse dispatch(RecordedRequest request) {
-                return new MockResponse().setResponseCode(200).setBody("{\"invoiceId\": 123, \"amount\": 100}");
-            }
-        });
+	@Test
+	void testCrossUserBolaScanner() {
+		CrossUserBolaScanner scanner = new CrossUserBolaScanner(httpClient);
 
-        List<Vulnerability> vulns = scanner.scan(op, config).collectList().block();
-        assertThat(vulns).hasSize(1);
-        assertThat(vulns.get(0).cwe().getId()).isEqualTo(639);
-    }
+		SecurityScheme userA = SecurityScheme.bearer("TOKEN_A");
+		SecurityScheme userB = SecurityScheme.bearer("TOKEN_B");
+		ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false,
+				"json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null);
+
+		Operation op = new Operation(baseUrl + "/invoices/123", "GET", Map.<String, String>of(),
+				Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);
+
+		mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				return new MockResponse().setResponseCode(200).setBody("{\"invoiceId\": 123, \"amount\": 100}");
+			}
+		});
+
+		List<Vulnerability> vulns = scanner.scan(op, config).collectList().block();
+		assertThat(vulns).hasSize(1);
+		assertThat(vulns.get(0).cwe().getId()).isEqualTo(639);
+	}
+
 }

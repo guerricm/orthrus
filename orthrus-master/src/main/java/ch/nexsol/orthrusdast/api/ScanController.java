@@ -22,98 +22,85 @@ import java.util.List;
 @RequestMapping("/api/v1/scans")
 public class ScanController {
 
-    private final OAuth2TokenFetcher tokenFetcher;
-    private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
-    private final tools.jackson.databind.ObjectMapper objectMapper;
+	private final OAuth2TokenFetcher tokenFetcher;
 
-    public ScanController(OAuth2TokenFetcher tokenFetcher,
-            ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
-            tools.jackson.databind.ObjectMapper objectMapper) {
-        this.tokenFetcher = tokenFetcher;
-        this.scanJobRepository = scanJobRepository;
-        this.objectMapper = objectMapper;
-    }
+	private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
 
-    /**
-     * Get available discoverers.
-     */
-    @GetMapping("/discoverers")
-    public Mono<List<String>> getDiscoverers() {
-        return Mono.just(List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
-    }
+	private final tools.jackson.databind.ObjectMapper objectMapper;
 
-    /**
-     * Trigger a new scan.
-     * Note: In a real production app, this would likely enqueue the scan and return
-     * an ID,
-     * but for this v1 we'll block the connection and return the result directly
-     * (since we don't have a DB).
-     */
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<ResponseEntity<ScanResult>> triggerScan(@RequestBody ScanRequest request) {
+	public ScanController(OAuth2TokenFetcher tokenFetcher,
+			ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
+			tools.jackson.databind.ObjectMapper objectMapper) {
+		this.tokenFetcher = tokenFetcher;
+		this.scanJobRepository = scanJobRepository;
+		this.objectMapper = objectMapper;
+	}
 
-        return Mono.justOrEmpty(request.oauth2())
-                .flatMap(oauth2Config -> tokenFetcher.fetchTokens(oauth2Config))
-                .defaultIfEmpty(List.of())
-                .flatMap(fetchedTokens -> {
-                    SecurityScheme authScheme = request.authScheme();
-                    SecurityScheme secondaryAuthScheme = request.secondaryAuthScheme();
+	/**
+	 * Get available discoverers.
+	 */
+	@GetMapping("/discoverers")
+	public Mono<List<String>> getDiscoverers() {
+		return Mono.just(List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
+	}
 
-                    if (!fetchedTokens.isEmpty()) {
-                        authScheme = fetchedTokens.get(0);
-                        if (fetchedTokens.size() > 1) {
-                            secondaryAuthScheme = fetchedTokens.get(1);
-                        }
-                    }
+	/**
+	 * Trigger a new scan. Note: In a real production app, this would likely enqueue the
+	 * scan and return an ID, but for this v1 we'll block the connection and return the
+	 * result directly (since we don't have a DB).
+	 */
+	@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	public Mono<ResponseEntity<ScanResult>> triggerScan(@RequestBody ScanRequest request) {
 
-                    ScanConfiguration config = new ScanConfiguration(
-                            request.includeScanners() != null ? request.includeScanners() : List.of(),
-                            request.excludeScanners() != null ? request.excludeScanners() : List.of(),
-                            request.concurrency() > 0 ? request.concurrency() : 10,
-                            5000,
-                            10000,
-                            request.ignoreSslErrors(),
-                            "json",
-                            authScheme,
-                            secondaryAuthScheme,
-                            request.language() != null ? request.language() : "en",
-                            request.includePassed() != null ? request.includePassed() : false,
-                            GatewayType.AUTO,
-                            null,
-                            null,
-                            request.oauth2(),
-                            request.overrideHost());
+		return Mono.justOrEmpty(request.oauth2())
+			.flatMap(oauth2Config -> tokenFetcher.fetchTokens(oauth2Config))
+			.defaultIfEmpty(List.of())
+			.flatMap(fetchedTokens -> {
+				SecurityScheme authScheme = request.authScheme();
+				SecurityScheme secondaryAuthScheme = request.secondaryAuthScheme();
 
-                    return Mono.fromCallable(() -> objectMapper.writeValueAsString(config))
-                            .flatMap(configJson -> {
-                                ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-                                        request.discovererId(), request.target(), configJson,
-                                        ch.nexsol.orthrusdast.model.JobStatus.PENDING);
-                                return scanJobRepository.save(job);
-                            })
-                            .map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need a DTO or just
-                                                                                                // return job ID
-                            .doOnError(e -> org.slf4j.LoggerFactory.getLogger(ScanController.class)
-                                    .error("Failed to create or save scan job for target: {}", request.target(), e));
-                })
-                .onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()))
-                .onErrorResume(Exception.class,
-                        e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
-    }
+				if (!fetchedTokens.isEmpty()) {
+					authScheme = fetchedTokens.get(0);
+					if (fetchedTokens.size() > 1) {
+						secondaryAuthScheme = fetchedTokens.get(1);
+					}
+				}
 
-    // DTO for incoming requests
-    public record ScanRequest(
-            String discovererId, // e.g. 'openapi', 'blackbox', 'curl'
-            String target,
-            String overrideHost,
-            List<String> includeScanners,
-            List<String> excludeScanners,
-            int concurrency,
-            boolean ignoreSslErrors,
-            SecurityScheme authScheme,
-            SecurityScheme secondaryAuthScheme,
-            OAuth2Config oauth2,
-            String language,
-            Boolean includePassed) {
-    }
+				ScanConfiguration config = new ScanConfiguration(
+						request.includeScanners() != null ? request.includeScanners() : List.of(),
+						request.excludeScanners() != null ? request.excludeScanners() : List.of(),
+						request.concurrency() > 0 ? request.concurrency() : 10, 5000, 10000, request.ignoreSslErrors(),
+						"json", authScheme, secondaryAuthScheme, request.language() != null ? request.language() : "en",
+						request.includePassed() != null ? request.includePassed() : false, GatewayType.AUTO, null, null,
+						request.oauth2(), request.overrideHost());
+
+				return Mono.fromCallable(() -> objectMapper.writeValueAsString(config)).flatMap(configJson -> {
+					ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+							request.discovererId(), request.target(), configJson,
+							ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+					return scanJobRepository.save(job);
+				})
+					.map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need
+																						// a
+																						// DTO
+																						// or
+																						// just
+																						// return
+																						// job
+																						// ID
+					.doOnError(e -> org.slf4j.LoggerFactory.getLogger(ScanController.class)
+						.error("Failed to create or save scan job for target: {}", request.target(), e));
+			})
+			.onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()))
+			.onErrorResume(Exception.class,
+					e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
+	}
+
+	// DTO for incoming requests
+	public record ScanRequest(String discovererId, // e.g. 'openapi', 'blackbox', 'curl'
+			String target, String overrideHost, List<String> includeScanners, List<String> excludeScanners,
+			int concurrency, boolean ignoreSslErrors, SecurityScheme authScheme, SecurityScheme secondaryAuthScheme,
+			OAuth2Config oauth2, String language, Boolean includePassed) {
+	}
+
 }

@@ -10,62 +10,63 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages Server-Sent Event sinks keyed by scan job ID.
- * Browsers subscribe to a Flux for a given job and receive updates
- * when the job status changes (PENDING → RUNNING → COMPLETED/FAILED).
+ * Manages Server-Sent Event sinks keyed by scan job ID. Browsers subscribe to a Flux for
+ * a given job and receive updates when the job status changes (PENDING → RUNNING →
+ * COMPLETED/FAILED).
  */
 @Component
 public class JobEventPublisher {
 
-    private final Map<Long, Sinks.Many<JobEvent>> sinks = new ConcurrentHashMap<>();
-    private final Sinks.Many<JobEvent> globalSink = Sinks.many().replay().limit(50);
+	private final Map<Long, Sinks.Many<JobEvent>> sinks = new ConcurrentHashMap<>();
 
-    /**
-     * Get or create a Flux for a given job ID.
-     */
-    public Flux<JobEvent> stream(Long jobId) {
-        return getOrCreateSink(jobId).asFlux();
-    }
+	private final Sinks.Many<JobEvent> globalSink = Sinks.many().replay().limit(50);
 
-    /**
-     * Subscribe to all events globally.
-     */
-    public Flux<JobEvent> globalStream() {
-        return globalSink.asFlux();
-    }
+	/**
+	 * Get or create a Flux for a given job ID.
+	 */
+	public Flux<JobEvent> stream(Long jobId) {
+		return getOrCreateSink(jobId).asFlux();
+	}
 
-    /**
-     * Emit an event to all subscribers of a given job, and globally.
-     */
-    public void emit(Long jobId, JobEvent event) {
-        getOrCreateSink(jobId).tryEmitNext(event);
-        globalSink.tryEmitNext(event);
-    }
+	/**
+	 * Subscribe to all events globally.
+	 */
+	public Flux<JobEvent> globalStream() {
+		return globalSink.asFlux();
+	}
 
-    /**
-     * Complete the sink for a given job (no more events will be sent).
-     * This closes the EventSource on the client side.
-     */
-    public void complete(Long jobId) {
-        Sinks.Many<JobEvent> sink = sinks.remove(jobId);
-        if (sink != null) {
-            sink.tryEmitComplete();
-        }
-    }
+	/**
+	 * Emit an event to all subscribers of a given job, and globally.
+	 */
+	public void emit(Long jobId, JobEvent event) {
+		getOrCreateSink(jobId).tryEmitNext(event);
+		globalSink.tryEmitNext(event);
+	}
 
-    private Sinks.Many<JobEvent> getOrCreateSink(Long jobId) {
-        return sinks.computeIfAbsent(jobId,
-                id -> Sinks.many().replay().latest());
-    }
+	/**
+	 * Complete the sink for a given job (no more events will be sent). This closes the
+	 * EventSource on the client side.
+	 */
+	public void complete(Long jobId) {
+		Sinks.Many<JobEvent> sink = sinks.remove(jobId);
+		if (sink != null) {
+			sink.tryEmitComplete();
+		}
+	}
 
-    /**
-     * When the application is shutting down (e.g. Ctrl+C), we must close all infinite
-     * SSE streams so that Netty's Graceful Shutdown doesn't wait 30 seconds for them.
-     */
-    @EventListener(ContextClosedEvent.class)
-    public void onShutdown() {
-        globalSink.tryEmitComplete();
-        sinks.values().forEach(Sinks.Many::tryEmitComplete);
-        sinks.clear();
-    }
+	private Sinks.Many<JobEvent> getOrCreateSink(Long jobId) {
+		return sinks.computeIfAbsent(jobId, id -> Sinks.many().replay().latest());
+	}
+
+	/**
+	 * When the application is shutting down (e.g. Ctrl+C), we must close all infinite SSE
+	 * streams so that Netty's Graceful Shutdown doesn't wait 30 seconds for them.
+	 */
+	@EventListener(ContextClosedEvent.class)
+	public void onShutdown() {
+		globalSink.tryEmitComplete();
+		sinks.values().forEach(Sinks.Many::tryEmitComplete);
+		sinks.clear();
+	}
+
 }

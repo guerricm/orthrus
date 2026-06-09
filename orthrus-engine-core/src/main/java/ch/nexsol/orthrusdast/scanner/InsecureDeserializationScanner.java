@@ -1,5 +1,20 @@
-package ch.nexsol.orthrusdast.scanner;
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
+package ch.nexsol.orthrusdast.scanner;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
@@ -13,110 +28,101 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Scans for Insecure Deserialization vulnerabilities by sending known magic bytes or serialized payloads.
+ * Scans for Insecure Deserialization vulnerabilities by sending known magic bytes or
+ * serialized payloads.
  */
 @Component
 public class InsecureDeserializationScanner implements SecurityScanner {
 
-    private final ScanHttpClient httpClient;
-    private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final ScanHttpClient httpClient;
 
-    // Common magic payloads that cause predictable errors if deserialized
-    private static final Map<String, String> PAYLOADS = Map.of(
-            "Java Serialized (Hex encoded header)", "rO0ABXNyAA...",
-            "Python Pickle", "c__builtin__\neval\n(Vprint(1)\ntR.",
-            "Jackson/Fastjson Gadget (Error-Based)", "{\"@type\":\"java.lang.Class\",\"val\":\"com.sun.rowset.JdbcRowSetImpl\"}"
-    );
+	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
 
-    public InsecureDeserializationScanner(ScanHttpClient httpClient, ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
-        this.httpClient = httpClient;
-        this.oastService = oastService;
-    }
+	// Common magic payloads that cause predictable errors if deserialized
+	private static final Map<String, String> PAYLOADS = Map.of("Java Serialized (Hex encoded header)", "rO0ABXNyAA...",
+			"Python Pickle", "c__builtin__\neval\n(Vprint(1)\ntR.", "Jackson/Fastjson Gadget (Error-Based)",
+			"{\"@type\":\"java.lang.Class\",\"val\":\"com.sun.rowset.JdbcRowSetImpl\"}");
 
-    @Override
-    public String getId() {
-        return "insecure-deserialization";
-    }
+	public InsecureDeserializationScanner(ScanHttpClient httpClient,
+			ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+		this.httpClient = httpClient;
+		this.oastService = oastService;
+	}
 
-    @Override
-    public String getName() {
-        return "Insecure Deserialization Scanner";
-    }
+	@Override
+	public String getId() {
+		return "insecure-deserialization";
+	}
 
-    @Override
-    public Flux<Vulnerability> scan(Operation operation) {
-        return Flux.defer(() -> {
-        if (!List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
-            return Flux.empty();
-        }
+	@Override
+	public String getName() {
+		return "Insecure Deserialization Scanner";
+	}
 
-        return oastService.createSession().flatMapMany(oastSession -> {
-            
-            // OAST Gadget Payload (Fastjson / Jackson DNS lookup)
-            String oastGadget = "{\"@type\":\"java.net.URL\",\"val\":\"http://" + oastSession.domain() + "\"}";
-            
-            Operation oastOp = new Operation(
-                    operation.url(), operation.method(), operation.headers(), operation.queryParams(),
-                    oastGadget, operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme()
-            );
+	@Override
+	public Flux<Vulnerability> scan(Operation operation) {
+		return Flux.defer(() -> {
+			if (!List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
+				return Flux.empty();
+			}
 
-            Flux<Vulnerability> errorBasedVulns = Flux.fromIterable(PAYLOADS.entrySet()).flatMap(entry -> {
-                String payloadName = entry.getKey();
-                String payload = entry.getValue();
+			return oastService.createSession().flatMapMany((oastSession) -> {
 
-                Operation testOp = new Operation(
-                        operation.url(), operation.method(), operation.headers(), operation.queryParams(),
-                        payload, operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme()
-                );
+				// OAST Gadget Payload (Fastjson / Jackson DNS lookup)
+				String oastGadget = "{\"@type\":\"java.net.URL\",\"val\":\"http://" + oastSession.domain() + "\"}";
 
-                return httpClient.send(testOp).flatMapMany(response -> {
-                    // If the server returns a 500 or stack trace containing deserialization errors, flag it
-                    if (response.statusCode().is5xxServerError() && 
-                        (response.bodyContains("java.io.ObjectInputStream") || 
-                         response.bodyContains("ClassCastException") ||
-                         response.bodyContains("cPickle") ||
-                         response.bodyContains("fastjson") ||
-                         response.bodyContains("Jackson"))) {
-                        
-                        Vulnerability vuln = createVulnerabilityWithTrace(
-                                "Insecure Deserialization",
-                                "The endpoint appears to blindly deserialize the request body. Sending a " + payloadName + " payload triggered a deserialization error.",
-                                RiskLevel.CRITICAL,
-                                Vulnerability.Confidence.MEDIUM,
-                                operation,
-                                CWEReference.CWE_502,
-                                List.of("CAPEC-586"),
-                                9.8,
-                                "Server responded with a stack trace indicating deserialization failure.",
-                                "Avoid deserializing untrusted data. If necessary, use safe formats like standard JSON, or use strict type whitelisting.", testOp, response,
-                                "API Endpoint (Network)",
-                                "Unauthorized Access / Data Exposure");
-                        return Flux.just(vuln);
-                    }
-                    return Flux.empty();
-                });
-            });
+				Operation oastOp = new Operation(operation.url(), operation.method(), operation.headers(),
+						operation.queryParams(), oastGadget, operation.securityRequirements(),
+						operation.expectedContentTypes(), operation.authScheme());
 
-            Flux<Vulnerability> blindVulns = httpClient.send(oastOp)
-                    .flatMapMany(res -> Flux.<Vulnerability>empty()) // We don't care about the response body
-                    .concatWith(oastService.pollInteractions(oastSession).map(interaction -> 
-                        createVulnerabilityWithTrace(
-                                "Blind Insecure Deserialization (OAST)",
-                                "The endpoint successfully deserialized a gadget payload (java.net.URL) and made an out-of-band request to the OAST server.",
-                                RiskLevel.CRITICAL,
-                                Vulnerability.Confidence.HIGH,
-                                operation,
-                                CWEReference.CWE_502,
-                                List.of("CAPEC-586"),
-                                9.8,
-                                "An interaction was received from " + interaction.remoteAddress() + " via " + interaction.protocol(),
-                                "Disable default typing in Jackson/Fastjson. Avoid deserializing untrusted data.", oastOp, null,
-                                "API Endpoint (Network)",
-                                "Unauthorized Access / Data Exposure")
-                    ));
+				Flux<Vulnerability> errorBasedVulns = Flux.fromIterable(PAYLOADS.entrySet()).flatMap((entry) -> {
+					String payloadName = entry.getKey();
+					String payload = entry.getValue();
 
-            return Flux.concat(errorBasedVulns, blindVulns);
-        });
-            });
-    }
+					Operation testOp = new Operation(operation.url(), operation.method(), operation.headers(),
+							operation.queryParams(), payload, operation.securityRequirements(),
+							operation.expectedContentTypes(), operation.authScheme());
+
+					return httpClient.send(testOp).flatMapMany((response) -> {
+						// If the server returns a 500 or stack trace containing
+						// deserialization errors, flag it
+						if (response.statusCode().is5xxServerError()
+								&& (response.bodyContains("java.io.ObjectInputStream")
+										|| response.bodyContains("ClassCastException")
+										|| response.bodyContains("cPickle") || response.bodyContains("fastjson")
+										|| response.bodyContains("Jackson"))) {
+
+							Vulnerability vuln = createVulnerabilityWithTrace("Insecure Deserialization",
+									"The endpoint appears to blindly deserialize the request body. Sending a "
+											+ payloadName + " payload triggered a deserialization error.",
+									RiskLevel.CRITICAL, Vulnerability.Confidence.MEDIUM, operation,
+									CWEReference.CWE_502, List.of("CAPEC-586"), 9.8,
+									"Server responded with a stack trace indicating deserialization failure.",
+									"Avoid deserializing untrusted data. If necessary, use safe formats like standard JSON, or use strict type whitelisting.",
+									testOp, response, "API Endpoint (Network)", "Unauthorized Access / Data Exposure");
+							return Flux.just(vuln);
+						}
+						return Flux.empty();
+					});
+				});
+
+				Flux<Vulnerability> blindVulns = httpClient.send(oastOp)
+					.flatMapMany((res) -> Flux.<Vulnerability>empty()) // We don't care
+																		// about the
+																		// response body
+					.concatWith(oastService.pollInteractions(oastSession)
+						.map((interaction) -> createVulnerabilityWithTrace("Blind Insecure Deserialization (OAST)",
+								"The endpoint successfully deserialized a gadget payload (java.net.URL) and made an out-of-band request to the OAST server.",
+								RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_502,
+								List.of("CAPEC-586"), 9.8,
+								"An interaction was received from " + interaction.remoteAddress() + " via "
+										+ interaction.protocol(),
+								"Disable default typing in Jackson/Fastjson. Avoid deserializing untrusted data.",
+								oastOp, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
+
+				return Flux.concat(errorBasedVulns, blindVulns);
+			});
+		});
+	}
+
 }

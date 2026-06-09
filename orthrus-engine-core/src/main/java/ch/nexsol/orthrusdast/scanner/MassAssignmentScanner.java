@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
@@ -20,100 +36,106 @@ import reactor.core.publisher.Flux;
 @Component
 public class MassAssignmentScanner implements SecurityScanner {
 
-    private static final Logger log = LoggerFactory.getLogger(MassAssignmentScanner.class);
-    private final ScanHttpClient httpClient;
-    private final ObjectMapper mapper = new ObjectMapper();
+	private static final Logger log = LoggerFactory.getLogger(MassAssignmentScanner.class);
 
-    public MassAssignmentScanner(ScanHttpClient httpClient) {
-        this.httpClient = httpClient;
-    }
+	private final ScanHttpClient httpClient;
 
-    @Override
-    public String getId() {
-        return "mass-assignment";
-    }
+	private final ObjectMapper mapper = new ObjectMapper();
 
-    @Override
-    public String getName() {
-        return "Mass Assignment Scanner (BOPLA)";
-    }
+	public MassAssignmentScanner(ScanHttpClient httpClient) {
+		this.httpClient = httpClient;
+	}
 
-    @Override
-    public Flux<Vulnerability> scan(Operation operation) {
-        return Flux.defer(() -> {
-        String method = operation.method().toUpperCase();
-        if (!("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
-            return Flux.empty();
-        }
+	@Override
+	public String getId() {
+		return "mass-assignment";
+	}
 
-        if (operation.body() == null || operation.body().isEmpty() || !operation.body().trim().startsWith("{")) {
-            return Flux.empty();
-        }
+	@Override
+	public String getName() {
+		return "Mass Assignment Scanner (BOPLA)";
+	}
 
-        try {
-            ObjectNode jsonBody = (ObjectNode) mapper.readTree(operation.body());
-            
-            // Define sensitive fields to inject
-            String[] sensitiveBooleanFields = {"is_admin", "isAdmin", "deleted", "is_deleted", "isOwner", "system", "superuser"};
-            String[] sensitiveStringFields = {"role", "permissions", "group", "status", "privilege", "account_type", "user_type"};
-            String[] sensitiveIntFields = {"user_id", "tenant_id", "account_id", "org_id", "balance", "credit"};
+	@Override
+	public Flux<Vulnerability> scan(Operation operation) {
+		return Flux.defer(() -> {
+			String method = operation.method().toUpperCase();
+			if (!("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
+				return Flux.empty();
+			}
 
-            // Test 1: Standard Injection (Booleans, Strings, Ints)
-            ObjectNode standardInject = jsonBody.deepCopy();
-            for (String field : sensitiveBooleanFields) standardInject.put(field, true);
-            for (String field : sensitiveStringFields) standardInject.put(field, "admin");
-            for (String field : sensitiveIntFields) standardInject.put(field, 1);
-            String standardBody = mapper.writeValueAsString(standardInject);
+			if (operation.body() == null || operation.body().isEmpty() || !operation.body().trim().startsWith("{")) {
+				return Flux.empty();
+			}
 
-            // Test 2: Type Confusion (Arrays and Objects)
-            ObjectNode typeConfusionInject = jsonBody.deepCopy();
-            for (String field : sensitiveBooleanFields) typeConfusionInject.putArray(field).add(true);
-            for (String field : sensitiveStringFields) typeConfusionInject.putObject(field).put("id", 1);
-            String typeConfusionBody = mapper.writeValueAsString(typeConfusionInject);
+			try {
+				ObjectNode jsonBody = (ObjectNode) mapper.readTree(operation.body());
 
-            Operation standardOp = new Operation(
-                    operation.url(), operation.method(), operation.headers(), operation.queryParams(),
-                    standardBody, operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme()
-            );
+				// Define sensitive fields to inject
+				String[] sensitiveBooleanFields = { "is_admin", "isAdmin", "deleted", "is_deleted", "isOwner", "system",
+						"superuser" };
+				String[] sensitiveStringFields = { "role", "permissions", "group", "status", "privilege",
+						"account_type", "user_type" };
+				String[] sensitiveIntFields = { "user_id", "tenant_id", "account_id", "org_id", "balance", "credit" };
 
-            Operation typeConfusionOp = new Operation(
-                    operation.url(), operation.method(), operation.headers(), operation.queryParams(),
-                    typeConfusionBody, operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme()
-            );
+				// Test 1: Standard Injection (Booleans, Strings, Ints)
+				ObjectNode standardInject = jsonBody.deepCopy();
+				for (String field : sensitiveBooleanFields)
+					standardInject.put(field, true);
+				for (String field : sensitiveStringFields)
+					standardInject.put(field, "admin");
+				for (String field : sensitiveIntFields)
+					standardInject.put(field, 1);
+				String standardBody = mapper.writeValueAsString(standardInject);
 
-            return Flux.concat(
-                executeMassAssignmentCheck(standardOp, operation, "Standard Injection", "injected sensitive fields (booleans, strings, ints)"),
-                executeMassAssignmentCheck(typeConfusionOp, operation, "Type Confusion Injection", "injected sensitive fields using unexpected types (Arrays, Objects)")
-            );
+				// Test 2: Type Confusion (Arrays and Objects)
+				ObjectNode typeConfusionInject = jsonBody.deepCopy();
+				for (String field : sensitiveBooleanFields)
+					typeConfusionInject.putArray(field).add(true);
+				for (String field : sensitiveStringFields)
+					typeConfusionInject.putObject(field).put("id", 1);
+				String typeConfusionBody = mapper.writeValueAsString(typeConfusionInject);
 
-        } catch (Exception e) {
-            log.debug("Failed to parse or modify JSON body for {}: {}", operation.url(), e.getMessage());
-            return Flux.empty();
-        }
-        });
-    }
+				Operation standardOp = new Operation(operation.url(), operation.method(), operation.headers(),
+						operation.queryParams(), standardBody, operation.securityRequirements(),
+						operation.expectedContentTypes(), operation.authScheme());
 
-    private Flux<Vulnerability> executeMassAssignmentCheck(Operation testOp, Operation originalOp, String testType, String context) {
-        return httpClient.send(testOp)
-                .flatMapMany(response -> {
-                    // If the server accepts the modified payload without a 400 Bad Request, it MIGHT be vulnerable
-                    if (response.isSuccessful() && !response.bodyContains("invalid type") && !response.bodyContains("validation error")) {
-                        Vulnerability vuln = createVulnerabilityWithTrace(
-                                "Potential Mass Assignment (BOPLA) - " + testType,
-                                "The endpoint accepts unexpected fields in the JSON payload without returning a validation error.",
-                                RiskLevel.MEDIUM,
-                                Vulnerability.Confidence.LOW,
-                                originalOp,
-                                CWEReference.CWE_915,
-                                List.of("CAPEC-17"),
-                                6.5,
-                                "Server returned " + response.statusCode() + " OK after " + context + " into the JSON payload.",
-                                "Use DTOs (Data Transfer Objects) to explicitly map accepted fields. Avoid binding HTTP requests directly to domain models or database entities. Enforce strict JSON schema validation.", testOp, response,
-                                "API Endpoint (Network)",
-                                "Unauthorized Access / Data Exposure");
-                        return Flux.just(vuln);
-                    }
-                    return Flux.empty();
-                });
-    }
+				Operation typeConfusionOp = new Operation(operation.url(), operation.method(), operation.headers(),
+						operation.queryParams(), typeConfusionBody, operation.securityRequirements(),
+						operation.expectedContentTypes(), operation.authScheme());
+
+				return Flux.concat(
+						executeMassAssignmentCheck(standardOp, operation, "Standard Injection",
+								"injected sensitive fields (booleans, strings, ints)"),
+						executeMassAssignmentCheck(typeConfusionOp, operation, "Type Confusion Injection",
+								"injected sensitive fields using unexpected types (Arrays, Objects)"));
+
+			}
+			catch (Exception e) {
+				log.debug("Failed to parse or modify JSON body for {}: {}", operation.url(), e.getMessage());
+				return Flux.empty();
+			}
+		});
+	}
+
+	private Flux<Vulnerability> executeMassAssignmentCheck(Operation testOp, Operation originalOp, String testType,
+			String context) {
+		return httpClient.send(testOp).flatMapMany((response) -> {
+			// If the server accepts the modified payload without a 400 Bad Request, it
+			// MIGHT be vulnerable
+			if (response.isSuccessful() && !response.bodyContains("invalid type")
+					&& !response.bodyContains("validation error")) {
+				Vulnerability vuln = createVulnerabilityWithTrace("Potential Mass Assignment (BOPLA) - " + testType,
+						"The endpoint accepts unexpected fields in the JSON payload without returning a validation error.",
+						RiskLevel.MEDIUM, Vulnerability.Confidence.LOW, originalOp, CWEReference.CWE_915,
+						List.of("CAPEC-17"), 6.5,
+						"Server returned " + response.statusCode() + " OK after " + context + " into the JSON payload.",
+						"Use DTOs (Data Transfer Objects) to explicitly map accepted fields. Avoid binding HTTP requests directly to domain models or database entities. Enforce strict JSON schema validation.",
+						testOp, response, "API Endpoint (Network)", "Unauthorized Access / Data Exposure");
+				return Flux.just(vuln);
+			}
+			return Flux.empty();
+		});
+	}
+
 }

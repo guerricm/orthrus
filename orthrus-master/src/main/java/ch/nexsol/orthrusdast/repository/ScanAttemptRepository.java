@@ -7,5 +7,7 @@ import reactor.core.publisher.Flux;
 
 @Repository
 public interface ScanAttemptRepository extends ReactiveCrudRepository<ScanAttemptEntity, Long> {
-    Flux<ScanAttemptEntity> findByScanResultId(String scanResultId);
+
+	Flux<ScanAttemptEntity> findByScanResultId(String scanResultId);
+
 }

@@ -11,23 +11,25 @@ import picocli.CommandLine.IFactory;
 @ComponentScan(basePackages = "ch.nexsol.orthrusdast")
 public class OrthrusCliApplication implements CommandLineRunner {
 
-    private final ScanCommand scanCommand;
-    private final IFactory factory;
+	private final ScanCommand scanCommand;
 
-    public OrthrusCliApplication(ScanCommand scanCommand, IFactory factory) {
-        this.scanCommand = scanCommand;
-        this.factory = factory;
-    }
+	private final IFactory factory;
 
-    public static void main(String[] args) {
-        System.setProperty("server.port", "0");
-        System.setProperty("spring.main.web-application-type", "none");
-        SpringApplication.run(OrthrusCliApplication.class, args);
-    }
+	public OrthrusCliApplication(ScanCommand scanCommand, IFactory factory) {
+		this.scanCommand = scanCommand;
+		this.factory = factory;
+	}
 
-    @Override
-    public void run(String... args) throws Exception {
-        int exitCode = new CommandLine(scanCommand, factory).execute(args);
-        System.exit(exitCode);
-    }
+	public static void main(String[] args) {
+		System.setProperty("server.port", "0");
+		System.setProperty("spring.main.web-application-type", "none");
+		SpringApplication.run(OrthrusCliApplication.class, args);
+	}
+
+	@Override
+	public void run(String... args) throws Exception {
+		int exitCode = new CommandLine(scanCommand, factory).execute(args);
+		System.exit(exitCode);
+	}
+
 }

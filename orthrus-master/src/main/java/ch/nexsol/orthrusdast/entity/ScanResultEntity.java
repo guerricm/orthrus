@@ -5,22 +5,17 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.time.Instant;
 
 @Table("scan_results")
-public record ScanResultEntity(
-    @Id String id,
-    String targetUrl,
-    Instant scanStartTime,
-    Instant scanEndTime,
-    Integer operationsDiscovered,
-    Integer operationsScanned
-) implements org.springframework.data.domain.Persistable<String> {
-    
-    @Override
-    public String getId() {
-        return id;
-    }
+public record ScanResultEntity(@Id String id, String targetUrl, Instant scanStartTime, Instant scanEndTime,
+		Integer operationsDiscovered,
+		Integer operationsScanned) implements org.springframework.data.domain.Persistable<String> {
 
-    @Override
-    public boolean isNew() {
-        return true;
-    }
+	@Override
+	public String getId() {
+		return id;
+	}
+
+	@Override
+	public boolean isNew() {
+		return true;
+	}
 }
