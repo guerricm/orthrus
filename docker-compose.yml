@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  orthrus-master:
-    image: nexsoltech/orthrus-master:0.0.1-SNAPSHOT # Replace with your actual registry/image tag
-    container_name: orthrus-master
+  orthrus-manager:
+    image: nexsoltech/orthrus-manager:0.0.1-SNAPSHOT # Replace with your actual registry/image tag
+    container_name: orthrus-manager
     ports:
       - "8080:8080"
     environment:
@@ -21,19 +21,19 @@ services:
     networks:
       - orthrus-network
 
-  orthrus-slave:
-    image: nexsoltech/orthrus-slave:0.0.1-SNAPSHOT # Replace with your actual registry/image tag
-    container_name: orthrus-slave
+  orthrus-worker:
+    image: nexsoltech/orthrus-worker:0.0.1-SNAPSHOT # Replace with your actual registry/image tag
+    container_name: orthrus-worker
     ports:
       - "8081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - ORTHRUS_MASTER_URL=http://orthrus-master:8080
+      - ORTHRUS_MASTER_URL=http://orthrus-manager:8080
       - ORTHRUS_MASTER_INTERNAL_TOKEN=super-secret-internal-token
       - ORTHRUS_SLAVE_ID=slave-docker-node-1
-      - ORTHRUS_SLAVE_ADVERTISED_URL=http://orthrus-slave:8081
+      - ORTHRUS_SLAVE_ADVERTISED_URL=http://orthrus-worker:8081
     depends_on:
-      orthrus-master:
+      orthrus-manager:
         condition: service_started
     networks:
       - orthrus-network
