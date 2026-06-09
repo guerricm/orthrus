@@ -36,7 +36,7 @@ class ApiGatewayDiscovererTest {
 			@Override
 			public reactor.core.publisher.Mono<List<Operation>> discover(String target,
 					ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-				Operation op = new Operation(target, "GET", java.util.Map.of(), java.util.Map.of(), null, List.of(),
+				Operation op = new Operation(target, org.springframework.http.HttpMethod.GET, java.util.Map.of(), java.util.Map.of(), null, List.of(),
 						List.of(), null);
 				return reactor.core.publisher.Mono.just(List.of(op));
 			}
@@ -99,7 +99,7 @@ class ApiGatewayDiscovererTest {
 			Operation op = operations.get(0);
 			assertTrue(op.url().endsWith("/api/v2/orders"));
 			// Traefik adds default methods if not specified
-			assertEquals("GET", op.method());
+			assertEquals(org.springframework.http.HttpMethod.GET, op.method());
 		}).verifyComplete();
 	}
 

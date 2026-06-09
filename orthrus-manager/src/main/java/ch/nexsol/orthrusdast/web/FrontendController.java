@@ -51,6 +51,8 @@ public class FrontendController {
 
 	private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
 
+	private final ch.nexsol.orthrusdast.repository.TestPlanRepository testPlanRepository;
+
 	private final ch.nexsol.orthrusdast.repository.SlaveNodeRepository slaveNodeRepository;
 
 	private final tools.jackson.databind.ObjectMapper objectMapper;
@@ -64,6 +66,7 @@ public class FrontendController {
 	public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator,
 			HtmlReportGenerator htmlReportGenerator, OAuth2TokenFetcher tokenFetcher,
 			StatisticsService statisticsService, ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
+			ch.nexsol.orthrusdast.repository.TestPlanRepository testPlanRepository,
 			ch.nexsol.orthrusdast.repository.SlaveNodeRepository slaveNodeRepository,
 			tools.jackson.databind.ObjectMapper objectMapper, JobEventPublisher jobEventPublisher,
 			org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations) {
@@ -73,6 +76,7 @@ public class FrontendController {
 		this.tokenFetcher = tokenFetcher;
 		this.statisticsService = statisticsService;
 		this.scanJobRepository = scanJobRepository;
+		this.testPlanRepository = testPlanRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.objectMapper = objectMapper;
 		this.webClient = org.springframework.web.reactive.function.client.WebClient.builder().build();
@@ -153,9 +157,7 @@ public class FrontendController {
 									oldConfig.oauth2Config(), oldConfig.openapiOverrideHost());
 							try {
 								String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
-								ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-										job.getDiscovererId(), job.getTarget(), updatedConfigJson,
-										ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+								ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = prepareReplayedJob(job, updatedConfigJson);
 								return scanJobRepository.save(newJob);
 							}
 							catch (Exception e) {
@@ -168,14 +170,30 @@ public class FrontendController {
 				// fallback
 			}
 
-			ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-					job.getDiscovererId(), job.getTarget(), job.getScanConfigurationJson(),
-					ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+			ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = prepareReplayedJob(job, job.getScanConfigurationJson());
 			return scanJobRepository.save(newJob);
 		})
 			.doOnNext(newJob -> jobEventPublisher.emit(newJob.getId(),
 					JobEvent.queued(newJob.getId(), newJob.getTarget())))
 			.thenReturn("redirect:/scans/all");
+	}
+
+	private ch.nexsol.orthrusdast.entity.ScanJobEntity prepareReplayedJob(ch.nexsol.orthrusdast.entity.ScanJobEntity job, String updatedConfigJson) {
+		if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.COMPLETED) {
+			return new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+					job.getDiscovererId(), job.getTarget(), updatedConfigJson,
+					ch.nexsol.orthrusdast.model.JobStatus.PENDING, job.getTestPlanId());
+		} else {
+			job.setScanConfigurationJson(updatedConfigJson);
+			job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+			job.setAssignedSlaveId(null);
+			job.setStartedAt(null);
+			job.setCompletedAt(null);
+			job.setResultId(null);
+			job.setVulnsCount(null);
+			job.setTestsCount(null);
+			return job;
+		}
 	}
 
 	@PostMapping("/system/slaves/{id}/toggle-active")
@@ -353,8 +371,8 @@ public class FrontendController {
 		}).switchIfEmpty(Mono.just("redirect:/scans"));
 	}
 
-	@GetMapping("/scans/new")
-	public Mono<String> newScan(Model model) {
+	@GetMapping("/plans/new")
+	public Mono<String> newTestPlan(Model model) {
 		return Mono.zip(scanJobRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
 			.flatMap(tuple -> {
 				java.util.List<ch.nexsol.orthrusdast.entity.ScanJobEntity> jobs = tuple.getT1();
@@ -391,22 +409,52 @@ public class FrontendController {
 						.map(caps -> {
 							model.addAttribute("discoverers", caps.discoverers());
 							model.addAttribute("scanners", caps.scanners());
-							return "scans/new";
+							return "plans/edit";
 						})
 						.onErrorResume(e -> {
-							model.addAttribute("discoverers", java.util.List.of());
+							model.addAttribute("discoverers", java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
 							model.addAttribute("scanners", java.util.List.of());
 							model.addAttribute("error",
-									"Failed to fetch capabilities from active slave: " + e.getMessage());
-							return Mono.just("scans/new");
+									"Failed to fetch capabilities from active slave: " + e.getMessage() + ". Using default discoverers.");
+							return Mono.just("plans/edit");
 						});
 				}
 				else {
-					model.addAttribute("discoverers", java.util.List.of());
+					model.addAttribute("discoverers", java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
 					model.addAttribute("scanners", java.util.List.of());
-					return Mono.just("scans/new");
+					return Mono.just("plans/edit");
 				}
 			});
+	}
+
+	@GetMapping("/plans")
+	public Mono<String> listTestPlans(Model model) {
+		return Mono.zip(testPlanRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
+			.map(tuple -> {
+				java.util.List<ch.nexsol.orthrusdast.entity.TestPlanEntity> plans = tuple.getT1();
+				java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
+
+				boolean hasOnlineSlaves = slaves.stream()
+						.anyMatch(slave -> slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE);
+
+				model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
+				model.addAttribute("plans", plans);
+				return "plans/list";
+			});
+	}
+
+	@PostMapping("/plans/{id}/run")
+	public Mono<String> runTestPlan(@PathVariable Long id, org.springframework.web.server.ServerWebExchange exchange) {
+		return testPlanRepository.findById(id).flatMap(plan -> {
+			ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
+					plan.getDiscovererId(), plan.getTarget(), plan.getScanConfigurationJson(),
+					ch.nexsol.orthrusdast.model.JobStatus.PENDING, plan.getId());
+			return scanJobRepository.save(job)
+				.doOnSuccess(savedJob -> {
+					jobEventPublisher.emit(savedJob.getId(), ch.nexsol.orthrusdast.sse.JobEvent.queued(savedJob.getId(), savedJob.getTarget()));
+				})
+				.thenReturn("redirect:/scans/all");
+		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Test plan not found")));
 	}
 
 	@PostMapping("/scans/{id}/cancel")
@@ -574,8 +622,8 @@ public class FrontendController {
 		}).defaultIfEmpty("fragments/scan-items :: items");
 	}
 
-	@PostMapping(value = "/web/scans")
-	public Mono<String> triggerScan(ServerWebExchange exchange, Model model) {
+	@PostMapping(value = "/web/plans")
+	public Mono<String> createTestPlan(ServerWebExchange exchange, Model model) {
 		return exchange.getFormData().flatMap(formData -> {
 			String target = formData.getFirst("target");
 			String discovererId = formData.getFirst("discovererId");
@@ -643,17 +691,20 @@ public class FrontendController {
 							openapiOverrideHost);
 
 					return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig)).flatMap(configJson -> {
-						ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-								discovererId, target, configJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING);
-						return scanJobRepository.save(job);
-					}).doOnSuccess(savedJob -> {
-						jobEventPublisher.emit(savedJob.getId(), JobEvent.queued(savedJob.getId(), target));
+						String name = formData.getFirst("name");
+						String description = formData.getFirst("description");
+						if (name == null || name.isBlank()) {
+							name = "Unnamed Plan";
+						}
+						ch.nexsol.orthrusdast.entity.TestPlanEntity plan = new ch.nexsol.orthrusdast.entity.TestPlanEntity(
+								name, description, discovererId, target, configJson);
+						return testPlanRepository.save(plan);
 					})
 						.doOnError(e -> org.slf4j.LoggerFactory.getLogger(FrontendController.class)
-							.error("Failed to create or save scan job for target: {}", target, e));
+							.error("Failed to create or save test plan for target: {}", target, e));
 				})
-				.map(savedJob -> {
-					exchange.getResponse().getHeaders().add("HX-Redirect", "/scans/all");
+				.map(savedPlan -> {
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
 					return "fragments/scan-queued :: empty";
 				});
 		}).onErrorResume(e -> {

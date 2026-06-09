@@ -77,7 +77,7 @@ public class ScanController {
 				return Mono.fromCallable(() -> objectMapper.writeValueAsString(config)).flatMap(configJson -> {
 					ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
 							request.discovererId(), request.target(), configJson,
-							ch.nexsol.orthrusdast.model.JobStatus.PENDING);
+							ch.nexsol.orthrusdast.model.JobStatus.PENDING, null);
 					return scanJobRepository.save(job);
 				})
 					.map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need

@@ -66,7 +66,7 @@ public class FileUploadScanner implements SecurityScanner {
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			// Only target endpoints that likely accept multipart/form-data
-			if (!List.of("POST", "PUT").contains(operation.method().toUpperCase())) {
+			if (!List.of("POST", "PUT").contains(operation.method().name())) {
 				return Flux.empty();
 			}
 

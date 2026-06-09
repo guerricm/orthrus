@@ -24,31 +24,41 @@ import java.util.Map;
  * Represents a single API operation (endpoint + method) to be scanned. Aligned with
  * vulnapi's Operation concept.
  */
-public record Operation(String url, String method, Map<String, String> headers, Map<String, String> queryParams,
-		String body, List<String> securityRequirements, List<String> expectedContentTypes, SecurityScheme authScheme,
-		String templateUrl, Object sourceNode) {
+public record Operation(String url, org.springframework.http.HttpMethod method, Map<String, String> headers,
+		Map<String, String> queryParams, String body, List<String> securityRequirements,
+		List<String> expectedContentTypes, SecurityScheme authScheme, String templateUrl, Object sourceNode,
+		List<org.springframework.http.HttpMethod> supportedMethods) {
 
-	public Operation(String url, String method, Map<String, String> headers, Map<String, String> queryParams,
-			String body, List<String> securityRequirements, List<String> expectedContentTypes,
-			SecurityScheme authScheme) {
-		this(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, authScheme, url,
-				null);
+	public Operation(String url, org.springframework.http.HttpMethod method, Map<String, String> headers,
+			Map<String, String> queryParams, String body, List<String> securityRequirements,
+			List<String> expectedContentTypes, SecurityScheme authScheme, String templateUrl, Object sourceNode) {
+		this(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, authScheme,
+				templateUrl, sourceNode, method != null ? List.of(method) : Collections.emptyList());
+	}
+
+	public Operation(String url, org.springframework.http.HttpMethod method, Map<String, String> headers,
+			Map<String, String> queryParams, String body, List<String> securityRequirements,
+			List<String> expectedContentTypes, SecurityScheme authScheme) {
+		this(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, authScheme, url, null,
+				method != null ? List.of(method) : Collections.emptyList());
 	}
 
 	/**
 	 * Create a simple operation with just URL and method (for blackbox discovery).
 	 */
-	public static Operation simple(String url, String method) {
+	public static Operation simple(String url, org.springframework.http.HttpMethod method) {
 		return new Operation(url, method, Collections.emptyMap(), Collections.emptyMap(), null, Collections.emptyList(),
-				Collections.emptyList(), null, url, null);
+				Collections.emptyList(), null, url, null, method != null ? List.of(method) : Collections.emptyList());
 	}
 
 	/**
 	 * Create an operation with headers (for curl-like discovery).
 	 */
-	public static Operation withHeaders(String url, String method, Map<String, String> headers, String body) {
+	public static Operation withHeaders(String url, org.springframework.http.HttpMethod method,
+			Map<String, String> headers, String body) {
 		return new Operation(url, method, headers != null ? headers : Collections.emptyMap(), Collections.emptyMap(),
-				body, Collections.emptyList(), Collections.emptyList(), null, url, null);
+				body, Collections.emptyList(), Collections.emptyList(), null, url, null,
+				method != null ? List.of(method) : Collections.emptyList());
 	}
 
 	/**
@@ -56,6 +66,6 @@ public record Operation(String url, String method, Map<String, String> headers, 
 	 */
 	public Operation withAuth(SecurityScheme scheme) {
 		return new Operation(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes,
-				scheme, templateUrl, sourceNode);
+				scheme, templateUrl, sourceNode, supportedMethods);
 	}
 }

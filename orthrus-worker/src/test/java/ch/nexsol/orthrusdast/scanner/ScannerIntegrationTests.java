@@ -53,7 +53,7 @@ class ScannerIntegrationTests {
 				new ch.nexsol.orthrusdast.scanner.payload.PayloadMutator(),
 				new ch.nexsol.orthrusdast.scanner.oast.InteractshClient());
 
-		Operation op = new Operation(baseUrl + "/users", "GET", Map.<String, String>of(), Map.of("id", "1"), null,
+		Operation op = new Operation(baseUrl + "/users", org.springframework.http.HttpMethod.GET, Map.<String, String>of(), Map.of("id", "1"), null,
 				List.<String>of(), List.<String>of(), null);
 
 		mockWebServer.setDispatcher(new Dispatcher() {
@@ -78,7 +78,7 @@ class ScannerIntegrationTests {
 				new ch.nexsol.orthrusdast.scanner.payload.PayloadMutator(),
 				new ch.nexsol.orthrusdast.scanner.oast.InteractshClient());
 
-		Operation op = new Operation(baseUrl + "/search", "GET", Map.<String, String>of(), Map.of("q", "test"), null,
+		Operation op = new Operation(baseUrl + "/search", org.springframework.http.HttpMethod.GET, Map.<String, String>of(), Map.of("q", "test"), null,
 				List.<String>of(), List.<String>of(), null);
 
 		mockWebServer.setDispatcher(new Dispatcher() {
@@ -101,7 +101,7 @@ class ScannerIntegrationTests {
 	void testSstiScanner() {
 		SstiScanner scanner = new SstiScanner(httpClient);
 
-		Operation op = new Operation(baseUrl + "/template", "GET", Map.<String, String>of(), Map.of("name", "John"),
+		Operation op = new Operation(baseUrl + "/template", org.springframework.http.HttpMethod.GET, Map.<String, String>of(), Map.of("name", "John"),
 				null, List.<String>of(), List.<String>of(), null);
 
 		mockWebServer.setDispatcher(new Dispatcher() {
@@ -120,7 +120,7 @@ class ScannerIntegrationTests {
 	void testCleartextScanner() {
 		CleartextScanner scanner = new CleartextScanner(httpClient);
 
-		Operation httpOp = new Operation("http://api.example.com/data", "GET", Map.<String, String>of(),
+		Operation httpOp = new Operation("http://api.example.com/data", org.springframework.http.HttpMethod.GET, Map.<String, String>of(),
 				Map.<String, String>of(), null, List.<String>of(), List.<String>of(), null);
 		List<Vulnerability> vulns = scanner.scan(httpOp).collectList().block();
 		assertThat(vulns).hasSize(1);
@@ -131,7 +131,7 @@ class ScannerIntegrationTests {
 	void testContentTypeSpoofingScanner() {
 		ContentTypeSpoofingScanner scanner = new ContentTypeSpoofingScanner(httpClient);
 
-		Operation op = new Operation(baseUrl + "/data", "POST", Map.of("Content-Type", "application/json"),
+		Operation op = new Operation(baseUrl + "/data", org.springframework.http.HttpMethod.POST, Map.of("Content-Type", "application/json"),
 				Map.<String, String>of(), "{\"key\": \"value\"}", List.<String>of(), List.<String>of(), null);
 
 		mockWebServer.setDispatcher(new Dispatcher() {
@@ -155,7 +155,7 @@ class ScannerIntegrationTests {
 		ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false,
 				"json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null);
 
-		Operation op = new Operation(baseUrl + "/invoices/123", "GET", Map.<String, String>of(),
+		Operation op = new Operation(baseUrl + "/invoices/123", org.springframework.http.HttpMethod.GET, Map.<String, String>of(),
 				Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);
 
 		mockWebServer.setDispatcher(new Dispatcher() {

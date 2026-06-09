@@ -89,7 +89,7 @@ public class ScanHttpClient {
 			boolean retryTransientErrors) {
 		long startTime = System.currentTimeMillis();
 
-		HttpMethod method = HttpMethod.valueOf(operation.method().toUpperCase());
+		HttpMethod method = operation.method();
 
 		WebClient.RequestBodySpec requestSpec = webClient.method(method).uri(buildUri(operation)).headers((headers) -> {
 			// Apply operation headers
@@ -167,7 +167,7 @@ public class ScanHttpClient {
 					errorMsg = "Request timed out after 15 seconds";
 				}
 
-				log.warn("HTTP request failed for {} {}: {}", operation.method(), logUrl, errorMsg);
+				log.warn("HTTP request failed for {} {}: {}", operation.method().name(), logUrl, errorMsg);
 				return Mono.just(new ScanHttpResponse(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
 						new HttpHeaders(), "Error: " + errorMsg, System.currentTimeMillis() - startTime));
 			});
@@ -179,7 +179,7 @@ public class ScanHttpClient {
 	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> sendGet(String url) {
-		return send(Operation.simple(url, "GET"));
+		return send(Operation.simple(url, org.springframework.http.HttpMethod.GET));
 	}
 
 	/**
@@ -190,7 +190,8 @@ public class ScanHttpClient {
 	 * @param body the body
 	 * @return the result
 	 */
-	public Mono<ScanHttpResponse> sendRaw(String url, String method, Map<String, String> headers, String body) {
+	public Mono<ScanHttpResponse> sendRaw(String url, org.springframework.http.HttpMethod method,
+			Map<String, String> headers, String body) {
 		Operation op = Operation.withHeaders(url, method, headers, body);
 		return send(op);
 	}

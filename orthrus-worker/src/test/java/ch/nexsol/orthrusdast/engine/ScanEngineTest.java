@@ -61,7 +61,7 @@ class ScanEngineTest {
 		ScanEngine engine = new ScanEngine(List.of(mockScanner), mockHttpClient);
 
 		// Create 20 operations
-		Operation op = new Operation("http://localhost", "GET", Map.of(), Map.of(), null, List.of(), List.of(), null,
+		Operation op = new Operation("http://localhost", org.springframework.http.HttpMethod.GET, Map.of(), Map.of(), null, List.of(), List.of(), null,
 				null, null);
 		List<Operation> operations = java.util.stream.IntStream.range(0, 20).mapToObj(i -> op).toList();
 

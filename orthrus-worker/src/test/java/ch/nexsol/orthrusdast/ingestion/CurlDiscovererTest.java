@@ -19,7 +19,7 @@ class CurlDiscovererTest {
 		StepVerifier.create(discoverer.discover("http://example.com/api", null)).assertNext(ops -> {
 			assertEquals(1, ops.size());
 			assertEquals("http://example.com/api", ops.get(0).url());
-			assertEquals("GET", ops.get(0).method());
+			assertEquals(org.springframework.http.HttpMethod.GET, ops.get(0).method());
 		}).verifyComplete();
 	}
 

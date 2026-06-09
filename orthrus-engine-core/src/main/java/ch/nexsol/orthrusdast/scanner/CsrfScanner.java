@@ -54,7 +54,7 @@ public class CsrfScanner implements SecurityScanner {
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			// Only target state-changing methods
-			if (!List.of("POST", "PUT", "DELETE", "PATCH").contains(operation.method().toUpperCase())) {
+			if (!List.of("POST", "PUT", "DELETE", "PATCH").contains(operation.method().name())) {
 				return Flux.empty();
 			}
 

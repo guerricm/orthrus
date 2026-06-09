@@ -73,7 +73,7 @@ public class GraphqlDosScanner implements SecurityScanner {
 				return Flux.empty();
 			}
 
-			if (!"POST".equals(operation.method().toUpperCase())) {
+			if (!"POST".equals(operation.method().name())) {
 				return Flux.empty();
 			}
 

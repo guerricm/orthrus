@@ -77,7 +77,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			if (!"POST".equalsIgnoreCase(operation.method()) || operation.body() == null
+			if (!org.springframework.http.HttpMethod.POST.equals(operation.method()) || operation.body() == null
 					|| !operation.body().contains("\"variables\"")) {
 				return Flux.empty();
 			}

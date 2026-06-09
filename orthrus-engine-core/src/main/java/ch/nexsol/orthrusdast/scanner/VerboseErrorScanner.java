@@ -60,7 +60,7 @@ public class VerboseErrorScanner implements SecurityScanner {
 			Flux<Vulnerability> bodyVulns = Flux.empty();
 			Flux<Vulnerability> queryVulns = Flux.empty();
 
-			String method = operation.method().toUpperCase();
+			String method = operation.method().name();
 			if ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method)) {
 				Operation testOpBody = new Operation(operation.url(), operation.method(), operation.headers(),
 						operation.queryParams(), MALFORMED_JSON, operation.securityRequirements(),

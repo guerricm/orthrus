@@ -59,7 +59,8 @@ public class SecurityHeadersScanner implements SecurityScanner {
 
 			// Send a bogus method to trigger a container-level error page (e.g., 405 or
 			// 400) which often leaks Server headers
-			Operation errorOp = new Operation(operation.url(), "BOGUS_METHOD_TEST", operation.headers(),
+			Operation errorOp = new Operation(operation.url(),
+					org.springframework.http.HttpMethod.valueOf("BOGUS_METHOD_TEST"), operation.headers(),
 					operation.queryParams(), operation.body(), operation.securityRequirements(),
 					operation.expectedContentTypes(), operation.authScheme());
 			Mono<ch.nexsol.orthrusdast.http.ScanHttpResponse> errorResponseMono = httpClient.send(errorOp, false)

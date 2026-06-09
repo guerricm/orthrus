@@ -94,20 +94,20 @@ public class ScanEngine {
 
 	private Flux<ScanAttempt> scanOperation(Operation operation, List<SecurityScanner> scanners,
 			ScanConfiguration config) {
-		log.debug("Scanning operation: {} {}", operation.method(), operation.url());
+		log.debug("Scanning operation: {} {}", operation.method().name(), operation.url());
 		return httpClient.send(operation).flatMapMany((response) -> {
 			if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
-				log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method(),
+				log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method().name(),
 						operation.url(), response.statusCode().value());
 				return Flux.fromIterable(scanners)
-					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method(),
+					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
 							operation.url(), ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR, List.of()));
 			}
 
 			return Flux.fromIterable(scanners)
 				.flatMap((scanner) -> scanner.scan(operation, config)
 					.collectList()
-					.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method(),
+					.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
 							operation.url(),
 							vulns.isEmpty() ? ch.nexsol.orthrusdast.model.AttemptStatus.PASSED
 									: ch.nexsol.orthrusdast.model.AttemptStatus.FAILED,
@@ -115,7 +115,7 @@ public class ScanEngine {
 					.onErrorResume((e) -> {
 						log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(),
 								e.getMessage());
-						return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(), operation.method(),
+						return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
 								operation.url(), ch.nexsol.orthrusdast.model.AttemptStatus.ERROR, List.of()));
 					}));
 		});

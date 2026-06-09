@@ -63,7 +63,7 @@ public class WellKnownDiscoverer implements EndpointDiscoverer {
 	}
 
 	private Mono<Operation> checkPath(String url, SecurityScheme authScheme) {
-		Operation op = Operation.simple(url, "GET").withAuth(authScheme);
+		Operation op = Operation.simple(url, org.springframework.http.HttpMethod.GET).withAuth(authScheme);
 		return httpClient.send(op).flatMap((response) -> {
 			// Only consider it "discovered" if it returns a 200 OK
 			if (response.isSuccessful()) {

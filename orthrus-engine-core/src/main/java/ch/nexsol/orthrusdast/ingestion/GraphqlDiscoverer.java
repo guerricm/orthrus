@@ -60,7 +60,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 		ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
 		log.info("Starting GraphQL discovery on {}", target);
 
-		Operation introspectionOp = new Operation(target, "POST",
+		Operation introspectionOp = new Operation(target, org.springframework.http.HttpMethod.POST,
 				Map.of("Content-Type", "application/json", "Accept", "application/json"), Collections.emptyMap(),
 				INTROSPECTION_QUERY, Collections.emptyList(), List.of("application/json"), authScheme);
 
@@ -102,7 +102,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 								String queryBody = buildDummyQuery(typeName.equals(mutationTypeName), fieldName,
 										fieldNode.path("args"));
 
-								Operation op = new Operation(targetUrl, "POST",
+								Operation op = new Operation(targetUrl, org.springframework.http.HttpMethod.POST,
 										Map.of("Content-Type", "application/json"), Collections.emptyMap(), queryBody,
 										Collections.emptyList(), List.of("application/json"), authScheme);
 								operations.add(op);

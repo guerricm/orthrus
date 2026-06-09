@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS "slave_nodes" (
     last_seen_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS "test_plans" (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    discoverer_id VARCHAR(100),
+    target VARCHAR(2048),
+    scan_configuration_json TEXT,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS "scan_jobs" (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     discoverer_id VARCHAR(100),
@@ -67,11 +78,14 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
     created_at TIMESTAMP,
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
+    test_plan_id BIGINT,
     result_id VARCHAR(255),
     vulns_count INT,
     tests_count INT,
-    FOREIGN KEY (result_id) REFERENCES "scan_results"(id) ON DELETE SET NULL
+    FOREIGN KEY (result_id) REFERENCES "scan_results"(id) ON DELETE SET NULL,
+    FOREIGN KEY (test_plan_id) REFERENCES "test_plans"(id) ON DELETE SET NULL
 );
 
--- Index for fast lookups of jobs by result ID
+-- Index for fast lookups of jobs by result ID and test plan ID
 CREATE INDEX IF NOT EXISTS idx_scanjobs_result ON "scan_jobs"(result_id);
+CREATE INDEX IF NOT EXISTS idx_scanjobs_test_plan ON "scan_jobs"(test_plan_id);

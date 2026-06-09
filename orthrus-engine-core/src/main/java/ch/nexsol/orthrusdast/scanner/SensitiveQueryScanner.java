@@ -66,7 +66,7 @@ public class SensitiveQueryScanner implements SecurityScanner {
 			Flux<Vulnerability> passiveVulns = Flux.empty();
 			Flux<Vulnerability> activeVulns = Flux.empty();
 
-			if ("GET".equals(operation.method().toUpperCase())) {
+			if ("GET".equals(operation.method().name())) {
 				// Passive check: Check if any query parameter name matches a sensitive
 				// keyword
 				String paramMatch = null;
@@ -98,7 +98,7 @@ public class SensitiveQueryScanner implements SecurityScanner {
 					});
 				}
 			}
-			else if (List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
+			else if (List.of("POST", "PUT", "PATCH").contains(operation.method().name())) {
 				// Active check: Try moving JSON body fields to Query String (Parameter
 				// Binding abuse)
 				if (operation.body() != null && operation.body().trim().startsWith("{")) {

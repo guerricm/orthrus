@@ -65,7 +65,7 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 			Flux<Vulnerability> overrideVulns = Flux.empty();
 
 			// Test X-HTTP-Method-Override bypass
-			String originalMethod = operation.method().toUpperCase();
+			String originalMethod = operation.method().name();
 			if ("POST".equals(originalMethod) || "PUT".equals(originalMethod) || "DELETE".equals(originalMethod)
 					|| "PATCH".equals(originalMethod)) {
 				// Send as GET but with X-HTTP-Method-Override: POST
@@ -75,9 +75,9 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 				overrideHeaders.put("X-HTTP-Method", originalMethod);
 				overrideHeaders.put("X-Method-Override", originalMethod);
 
-				Operation overrideOp = new Operation(operation.url(), "GET", overrideHeaders, operation.queryParams(),
-						operation.body(), operation.securityRequirements(), operation.expectedContentTypes(),
-						operation.authScheme());
+				Operation overrideOp = new Operation(operation.url(), org.springframework.http.HttpMethod.GET,
+						overrideHeaders, operation.queryParams(), operation.body(), operation.securityRequirements(),
+						operation.expectedContentTypes(), operation.authScheme());
 
 				overrideVulns = httpClient.send(overrideOp).flatMapMany((response) -> {
 					if (response.isSuccessful()) {
@@ -102,12 +102,13 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 	}
 
 	private Flux<Vulnerability> testMethod(Operation operation, String method) {
-		Operation testOp = new Operation(operation.url(), method, operation.headers(), operation.queryParams(), null, // No
-																														// body
-																														// for
-																														// these
-																														// methods
-																														// usually
+		Operation testOp = new Operation(operation.url(), org.springframework.http.HttpMethod.valueOf(method),
+				operation.headers(), operation.queryParams(), null, // No
+				// body
+				// for
+				// these
+				// methods
+				// usually
 				operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme());
 
 		return httpClient.send(testOp).flatMapMany((response) -> {

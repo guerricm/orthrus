@@ -63,7 +63,7 @@ public class CodeInjectionScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			if (!List.of("GET", "POST", "PUT").contains(operation.method().toUpperCase())) {
+			if (!List.of("GET", "POST", "PUT").contains(operation.method().name())) {
 				return Flux.empty();
 			}
 

@@ -89,23 +89,43 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 				String path = entry.getKey();
 				PathItem pathItem = entry.getValue();
 
+				List<org.springframework.http.HttpMethod> supportedMethods = new ArrayList<>();
+				if (pathItem.getGet() != null)
+					supportedMethods.add(org.springframework.http.HttpMethod.GET);
+				if (pathItem.getPost() != null)
+					supportedMethods.add(org.springframework.http.HttpMethod.POST);
+				if (pathItem.getPut() != null)
+					supportedMethods.add(org.springframework.http.HttpMethod.PUT);
+				if (pathItem.getDelete() != null)
+					supportedMethods.add(org.springframework.http.HttpMethod.DELETE);
+				if (pathItem.getPatch() != null)
+					supportedMethods.add(org.springframework.http.HttpMethod.PATCH);
+				if (pathItem.getOptions() != null)
+					supportedMethods.add(org.springframework.http.HttpMethod.OPTIONS);
+
 				if (pathItem.getGet() != null) {
-					endpoints.add(buildOperation(baseUrl, path, "GET", pathItem.getGet(), openAPI, authScheme));
+					endpoints.add(buildOperation(baseUrl, path, org.springframework.http.HttpMethod.GET,
+							pathItem.getGet(), openAPI, authScheme, supportedMethods));
 				}
 				if (pathItem.getPost() != null) {
-					endpoints.add(buildOperation(baseUrl, path, "POST", pathItem.getPost(), openAPI, authScheme));
+					endpoints.add(buildOperation(baseUrl, path, org.springframework.http.HttpMethod.POST,
+							pathItem.getPost(), openAPI, authScheme, supportedMethods));
 				}
 				if (pathItem.getPut() != null) {
-					endpoints.add(buildOperation(baseUrl, path, "PUT", pathItem.getPut(), openAPI, authScheme));
+					endpoints.add(buildOperation(baseUrl, path, org.springframework.http.HttpMethod.PUT,
+							pathItem.getPut(), openAPI, authScheme, supportedMethods));
 				}
 				if (pathItem.getDelete() != null) {
-					endpoints.add(buildOperation(baseUrl, path, "DELETE", pathItem.getDelete(), openAPI, authScheme));
+					endpoints.add(buildOperation(baseUrl, path, org.springframework.http.HttpMethod.DELETE,
+							pathItem.getDelete(), openAPI, authScheme, supportedMethods));
 				}
 				if (pathItem.getPatch() != null) {
-					endpoints.add(buildOperation(baseUrl, path, "PATCH", pathItem.getPatch(), openAPI, authScheme));
+					endpoints.add(buildOperation(baseUrl, path, org.springframework.http.HttpMethod.PATCH,
+							pathItem.getPatch(), openAPI, authScheme, supportedMethods));
 				}
 				if (pathItem.getOptions() != null) {
-					endpoints.add(buildOperation(baseUrl, path, "OPTIONS", pathItem.getOptions(), openAPI, authScheme));
+					endpoints.add(buildOperation(baseUrl, path, org.springframework.http.HttpMethod.OPTIONS,
+							pathItem.getOptions(), openAPI, authScheme, supportedMethods));
 				}
 			}
 		}
@@ -114,8 +134,9 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 		return endpoints;
 	}
 
-	private Operation buildOperation(String baseUrl, String path, String method,
-			io.swagger.v3.oas.models.Operation operation, OpenAPI openAPI, SecurityScheme authScheme) {
+	private Operation buildOperation(String baseUrl, String path, org.springframework.http.HttpMethod method,
+			io.swagger.v3.oas.models.Operation operation, OpenAPI openAPI, SecurityScheme authScheme,
+			List<org.springframework.http.HttpMethod> supportedMethods) {
 		Map<String, String> queryParams = new HashMap<>();
 		Map<String, String> headers = new HashMap<>();
 		String actualPath = path;
@@ -157,7 +178,7 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 		}
 
 		return new Operation(baseUrl + actualPath, method, headers, queryParams, mockPayload, securityRequirements,
-				expectedContentTypes, authScheme, baseUrl + path, operation);
+				expectedContentTypes, authScheme, baseUrl + path, operation, supportedMethods);
 	}
 
 	private String generateMockValue(Parameter param) {

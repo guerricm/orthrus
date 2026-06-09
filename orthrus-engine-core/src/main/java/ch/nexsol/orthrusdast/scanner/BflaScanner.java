@@ -53,21 +53,47 @@ public class BflaScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			String method = operation.method().toUpperCase();
+			org.springframework.http.HttpMethod method = operation.method();
+			List<org.springframework.http.HttpMethod> stateChangingMethods = List.of(
+					org.springframework.http.HttpMethod.POST, org.springframework.http.HttpMethod.PUT,
+					org.springframework.http.HttpMethod.PATCH, org.springframework.http.HttpMethod.DELETE);
 
-			// We only test HTTP Method Override bypasses to avoid false positives
-			// when hitting legitimate endpoints with actual method changes.
-			java.util.Map<String, String> overrideHeaders = new java.util.HashMap<>(
-					operation.headers() != null ? operation.headers() : new java.util.HashMap<>());
-			overrideHeaders.put("X-HTTP-Method-Override", "DELETE");
-			overrideHeaders.put("X-HTTP-Method", "DELETE");
+			List<org.springframework.http.HttpMethod> methodsToTestDirectly = new java.util.ArrayList<>();
+			List<org.springframework.http.HttpMethod> methodsToTestViaHeader = new java.util.ArrayList<>();
 
-			return executeBflaCheck(operation, method, overrideHeaders,
-					"Using X-HTTP-Method-Override header to simulate DELETE");
+			List<org.springframework.http.HttpMethod> supportedMethods = operation.supportedMethods();
+			if (supportedMethods == null) {
+				supportedMethods = List.of(method);
+			}
+
+			for (org.springframework.http.HttpMethod sm : stateChangingMethods) {
+				if (supportedMethods.contains(sm)) {
+					methodsToTestViaHeader.add(sm);
+				}
+				else {
+					methodsToTestDirectly.add(sm);
+				}
+			}
+
+			Flux<Vulnerability> directTests = Flux.fromIterable(methodsToTestDirectly)
+				.flatMap(testMethod -> executeBflaCheck(operation, testMethod, operation.headers(),
+						"Using " + testMethod.name() + " method directly"));
+
+			Flux<Vulnerability> headerTests = Flux.fromIterable(methodsToTestViaHeader).flatMap(testMethod -> {
+				java.util.Map<String, String> overrideHeaders = new java.util.HashMap<>(
+						operation.headers() != null ? operation.headers() : new java.util.HashMap<>());
+				overrideHeaders.put("X-HTTP-Method-Override", testMethod.name());
+				overrideHeaders.put("X-HTTP-Method", testMethod.name());
+
+				return executeBflaCheck(operation, method, overrideHeaders,
+						"Using HTTP method override headers to simulate " + testMethod.name());
+			});
+
+			return Flux.concat(directTests, headerTests);
 		});
 	}
 
-	private Flux<Vulnerability> executeBflaCheck(Operation operation, String testMethod,
+	private Flux<Vulnerability> executeBflaCheck(Operation operation, org.springframework.http.HttpMethod testMethod,
 			java.util.Map<String, String> testHeaders, String context) {
 		Operation testOp = new Operation(operation.url(), testMethod, testHeaders, operation.queryParams(),
 				operation.body(), operation.securityRequirements(), operation.expectedContentTypes(),

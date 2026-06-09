@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+    th:replace="~{fragments/layout :: layout(~{::main}, 'Orthrus DAST - Test Plans')}">
+
+<body>
+    <main>
+        <div class="row justify-content-center">
+            <div class="col-lg-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Test Plans</h2>
+                    <a href="/plans/new" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle me-1" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                        </svg>
+                        Create New Plan
+                    </a>
+                </div>
+
+                <!-- Error Card: No online slaves -->
+                <div class="alert alert-info shadow-sm mb-4 d-flex align-items-center" role="alert"
+                    th:unless="${hasOnlineSlaves}">
+                    <span class="fs-1 me-3">ℹ️</span>
+                    <div>
+                        <h5 class="alert-heading mb-1">No Slave Nodes Available</h5>
+                        <p class="mb-0">There are no online slave nodes connected to the master. You can still queue a test plan for execution, but it will remain PENDING until a node becomes available.</p>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <div th:if="${plans == null or plans.isEmpty()}"
+                        class="alert alert-info bg-transparent border-info text-light d-flex align-items-center mb-0"
+                        role="alert">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            class="bi bi-info-circle-fill me-3 flex-shrink-0" viewBox="0 0 16 16">
+                            <path
+                                d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2" />
+                        </svg>
+                        <div>
+                            No test plans created yet. Click "Create New Plan" to get started.
+                        </div>
+                    </div>
+
+                    <div class="table-responsive" th:if="${plans != null and !plans.isEmpty()}">
+                        <table class="table table-dark table-hover mb-0 align-middle" style="background-color: transparent;">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Target</th>
+                                    <th>Created</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="plan : ${plans}">
+                                    <td th:text="${plan.name}" class="fw-bold text-primary">Plan Name</td>
+                                    <td th:text="${plan.description}">Description</td>
+                                    <td><code class="text-info" th:text="${plan.target}">http://example.com</code></td>
+                                    <td th:text="${#temporals.format(plan.createdAt, 'yyyy-MM-dd HH:mm')}">Date</td>
+                                    <td class="text-end">
+                                        <form th:action="@{/plans/{id}/run(id=${plan.id})}" method="post" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill me-1" viewBox="0 0 16 16">
+                                                  <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
+                                                </svg>
+                                                Run Now
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>

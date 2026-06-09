@@ -50,7 +50,7 @@ public class CurlDiscoverer implements EndpointDiscoverer {
 		// would require parsing target string if it contained CLI-like flags,
 		// but for now we just take the URL as target.
 
-		Operation op = Operation.simple(target, "GET").withAuth(authScheme);
+		Operation op = Operation.simple(target, org.springframework.http.HttpMethod.GET).withAuth(authScheme);
 		return Mono.just(List.of(op));
 	}
 

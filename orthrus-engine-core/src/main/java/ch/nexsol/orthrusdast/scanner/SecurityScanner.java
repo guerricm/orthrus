@@ -107,7 +107,7 @@ public interface SecurityScanner {
 			fullUrl.setLength(fullUrl.length() - 1); // remove last &
 		}
 
-		sb.append(op.method()).append(" ").append(fullUrl).append(" HTTP/1.1\n");
+		sb.append(op.method().name()).append(" ").append(fullUrl).append(" HTTP/1.1\n");
 
 		try {
 			if (url != null) {

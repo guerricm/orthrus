@@ -60,8 +60,8 @@ public class RateLimitingScanner implements SecurityScanner {
 			// We only scan POST/PUT/DELETE for rate limiting to avoid overwhelming GET
 			// endpoints during general scans,
 			// or specifically target login/auth endpoints.
-			boolean isStateChanging = !operation.method().equalsIgnoreCase("GET")
-					&& !operation.method().equalsIgnoreCase("OPTIONS");
+			boolean isStateChanging = !org.springframework.http.HttpMethod.GET.equals(operation.method())
+					&& !org.springframework.http.HttpMethod.OPTIONS.equals(operation.method());
 			boolean isAuthEndpoint = operation.url().toLowerCase().contains("login")
 					|| operation.url().toLowerCase().contains("auth")
 					|| operation.url().toLowerCase().contains("token");

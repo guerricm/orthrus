@@ -72,15 +72,15 @@ public class GraphqlIntrospectionScanner implements SecurityScanner {
 
 			log.debug("Scanning for GraphQL Introspection: {}", operation.url());
 
-			Operation testOpPost = new Operation(operation.url(), "POST", Map.of("Content-Type", "application/json"),
-					Collections.emptyMap(), INTROSPECTION_QUERY, operation.securityRequirements(),
-					operation.expectedContentTypes(), operation.authScheme());
-
-			Operation testOpGet = new Operation(operation.url(), "GET", Collections.emptyMap(),
-					Map.of("query", "query { __schema { queryType { name } } }"), null,
+			Operation testOpPost = new Operation(operation.url(), org.springframework.http.HttpMethod.POST,
+					Map.of("Content-Type", "application/json"), Collections.emptyMap(), INTROSPECTION_QUERY,
 					operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme());
 
-			Operation testOpFieldSuggestion = new Operation(operation.url(), "POST",
+			Operation testOpGet = new Operation(operation.url(), org.springframework.http.HttpMethod.GET,
+					Collections.emptyMap(), Map.of("query", "query { __schema { queryType { name } } }"), null,
+					operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme());
+
+			Operation testOpFieldSuggestion = new Operation(operation.url(), org.springframework.http.HttpMethod.POST,
 					Map.of("Content-Type", "application/json"), Collections.emptyMap(), FIELD_SUGGESTION_QUERY,
 					operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme());
 

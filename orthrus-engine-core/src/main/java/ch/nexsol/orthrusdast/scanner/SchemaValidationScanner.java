@@ -73,7 +73,7 @@ public class SchemaValidationScanner implements SecurityScanner {
 			List<Flux<Vulnerability>> allScans = new ArrayList<>();
 
 			// 1. Request Body Validation
-			if (List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
+			if (List.of("POST", "PUT", "PATCH").contains(operation.method().name())) {
 				if (openApiOperation.getRequestBody() != null
 						&& openApiOperation.getRequestBody().getContent() != null) {
 					io.swagger.v3.oas.models.media.MediaType mediaType = openApiOperation.getRequestBody()

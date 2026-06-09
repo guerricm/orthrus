@@ -74,47 +74,51 @@ public class CorsScanner implements SecurityScanner {
 					"https://evil" + targetHost);
 
 			return Flux.fromIterable(payloads)
-				.concatMap((origin) -> httpClient
-					.sendRaw(operation.url(), "OPTIONS",
-							Map.of("Origin", origin, "Access-Control-Request-Method", operation.method()), null)
-					.flatMapMany((response) -> {
-						String acao = response.getHeader("Access-Control-Allow-Origin");
-						String acac = response.getHeader("Access-Control-Allow-Credentials");
+				.concatMap(
+						(origin) -> httpClient
+							.sendRaw(operation.url(), org.springframework.http.HttpMethod.OPTIONS,
+									Map.of("Origin", origin, "Access-Control-Request-Method",
+											operation.method().name()),
+									null)
+							.flatMapMany((response) -> {
+								String acao = response.getHeader("Access-Control-Allow-Origin");
+								String acac = response.getHeader("Access-Control-Allow-Credentials");
 
-						boolean isVulnerable = false;
-						String evidence = "";
+								boolean isVulnerable = false;
+								String evidence = "";
 
-						if (origin.equals(acao)) {
-							isVulnerable = true;
-							evidence = "Server reflected the requested Origin ('" + origin
-									+ "') in Access-Control-Allow-Origin.";
-							if ("true".equals(acac)) {
-								evidence += " It also allows credentials (Access-Control-Allow-Credentials: true), which is critical.";
-							}
-						}
-						else if ("*".equals(acao) && "true".equals(acac)) {
-							// Browsers usually block * with credentials, but it's a
-							// severe misconfig
-							isVulnerable = true;
-							evidence = "Server returned Access-Control-Allow-Origin: * along with Access-Control-Allow-Credentials: true.";
-						}
+								if (origin.equals(acao)) {
+									isVulnerable = true;
+									evidence = "Server reflected the requested Origin ('" + origin
+											+ "') in Access-Control-Allow-Origin.";
+									if ("true".equals(acac)) {
+										evidence += " It also allows credentials (Access-Control-Allow-Credentials: true), which is critical.";
+									}
+								}
+								else if ("*".equals(acao) && "true".equals(acac)) {
+									// Browsers usually block * with credentials, but it's
+									// a
+									// severe misconfig
+									isVulnerable = true;
+									evidence = "Server returned Access-Control-Allow-Origin: * along with Access-Control-Allow-Credentials: true.";
+								}
 
-						if (isVulnerable) {
-							RiskLevel level = ("true".equals(acac) && !origin.equals("null")) ? RiskLevel.HIGH
-									: RiskLevel.MEDIUM;
-							Vulnerability vuln = createVulnerabilityWithTrace("CORS Misconfiguration - Bypass",
-									"The endpoint has overly permissive Cross-Origin Resource Sharing (CORS) settings, allowing a bypass using origin: "
-											+ origin,
-									level, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_942,
-									List.of("CAPEC-63"), 5.3, evidence,
-									"Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly. Use strict string matching (not startsWith or endsWith).",
-									operation, response, "API Endpoint (Network)",
-									"Unauthorized Access / Data Exposure");
-							return Flux.just(vuln);
-						}
+								if (isVulnerable) {
+									RiskLevel level = ("true".equals(acac) && !origin.equals("null")) ? RiskLevel.HIGH
+											: RiskLevel.MEDIUM;
+									Vulnerability vuln = createVulnerabilityWithTrace("CORS Misconfiguration - Bypass",
+											"The endpoint has overly permissive Cross-Origin Resource Sharing (CORS) settings, allowing a bypass using origin: "
+													+ origin,
+											level, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_942,
+											List.of("CAPEC-63"), 5.3, evidence,
+											"Restrict Access-Control-Allow-Origin to trusted domains only. Do not reflect the Origin header blindly. Use strict string matching (not startsWith or endsWith).",
+											operation, response, "API Endpoint (Network)",
+											"Unauthorized Access / Data Exposure");
+									return Flux.just(vuln);
+								}
 
-						return Flux.empty();
-					}))
+								return Flux.<Vulnerability>empty();
+							}))
 				.take(1); // Stop after finding one bypass
 		});
 	}

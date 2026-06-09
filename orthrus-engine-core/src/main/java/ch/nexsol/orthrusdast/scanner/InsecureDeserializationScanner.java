@@ -64,7 +64,7 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			if (!List.of("POST", "PUT", "PATCH").contains(operation.method().toUpperCase())) {
+			if (!List.of("POST", "PUT", "PATCH").contains(operation.method().name())) {
 				return Flux.empty();
 			}
 

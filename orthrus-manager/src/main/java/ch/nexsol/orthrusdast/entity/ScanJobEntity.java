@@ -25,6 +25,8 @@ public class ScanJobEntity {
 	// UUID of the slave node executing it
 	private String assignedSlaveId;
 
+	private Long testPlanId;
+
 	private Instant createdAt;
 
 	private Instant startedAt;
@@ -40,11 +42,13 @@ public class ScanJobEntity {
 	public ScanJobEntity() {
 	}
 
-	public ScanJobEntity(String discovererId, String target, String scanConfigurationJson, JobStatus status) {
+	public ScanJobEntity(String discovererId, String target, String scanConfigurationJson, JobStatus status,
+			Long testPlanId) {
 		this.discovererId = discovererId;
 		this.target = target;
 		this.scanConfigurationJson = scanConfigurationJson;
 		this.status = status;
+		this.testPlanId = testPlanId;
 		this.createdAt = Instant.now();
 	}
 
@@ -94,6 +98,14 @@ public class ScanJobEntity {
 
 	public void setAssignedSlaveId(String assignedSlaveId) {
 		this.assignedSlaveId = assignedSlaveId;
+	}
+
+	public Long getTestPlanId() {
+		return testPlanId;
+	}
+
+	public void setTestPlanId(Long testPlanId) {
+		this.testPlanId = testPlanId;
 	}
 
 	public Instant getCreatedAt() {

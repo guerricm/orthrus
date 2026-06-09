@@ -111,7 +111,8 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 			boolean isAuthEndpoint = urlLower.contains("/login") || urlLower.contains("/auth")
 					|| urlLower.contains("/token") || urlLower.contains("/signin");
 
-			if (!isAuthEndpoint || !"POST".equalsIgnoreCase(operation.method()) || operation.body() == null) {
+			if (!isAuthEndpoint || !org.springframework.http.HttpMethod.POST.equals(operation.method())
+					|| operation.body() == null) {
 				return Flux.empty();
 			}
 
