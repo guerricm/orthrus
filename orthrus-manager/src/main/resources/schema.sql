@@ -65,7 +65,9 @@ CREATE TABLE IF NOT EXISTS "test_plans" (
     target VARCHAR(2048),
     scan_configuration_json TEXT,
     created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    last_modified_at TIMESTAMP,
+    created_by VARCHAR(255),
+    last_modified_by VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS "scan_jobs" (
@@ -89,3 +91,9 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
 -- Index for fast lookups of jobs by result ID and test plan ID
 CREATE INDEX IF NOT EXISTS idx_scanjobs_result ON "scan_jobs"(result_id);
 CREATE INDEX IF NOT EXISTS idx_scanjobs_test_plan ON "scan_jobs"(test_plan_id);
+
+-- Add auditing columns safely if they do not exist
+ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
+ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS last_modified_at TIMESTAMP;
+ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);
+ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS last_modified_by VARCHAR(255);

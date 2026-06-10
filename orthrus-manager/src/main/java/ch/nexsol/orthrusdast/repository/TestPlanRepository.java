@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface TestPlanRepository extends R2dbcRepository<TestPlanEntity, Long> {
+
 }

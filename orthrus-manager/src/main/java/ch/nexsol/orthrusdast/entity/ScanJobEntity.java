@@ -39,7 +39,18 @@ public class ScanJobEntity {
 
 	private Integer testsCount;
 
+	@org.springframework.data.annotation.Transient
+	private String planName;
+
 	public ScanJobEntity() {
+	}
+
+	public String getPlanName() {
+		return planName;
+	}
+
+	public void setPlanName(String planName) {
+		this.planName = planName;
 	}
 
 	public ScanJobEntity(String discovererId, String target, String scanConfigurationJson, JobStatus status,

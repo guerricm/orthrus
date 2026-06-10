@@ -125,6 +125,7 @@ To enable SSO (e.g., with Keycloak, Auth0, Google), simply provide the standard 
 ```bash
 export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID="orthrus-client"
 export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET="your_client_secret"
+export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_SCOPE="openid,profile,email"
 export SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI="https://your-idp.example.com/realms/master"
 export SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="https://your-idp.example.com/realms/master"
 java -jar orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar

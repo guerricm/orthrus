@@ -122,6 +122,9 @@
         <div th:if="${loginError}" class="alert alert-danger" role="alert">
             Invalid username or password.
         </div>
+        <div th:if="${loginErrorOauth2}" class="alert alert-danger" role="alert">
+            OIDC Login failed. Please check your credentials or contact the administrator. See server logs for details.
+        </div>
 
         <!-- Logout Message -->
         <div th:if="${logoutMessage}" class="alert alert-success" role="alert">

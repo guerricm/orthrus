@@ -90,6 +90,9 @@ public class FrontendController {
 		if (exchange.getRequest().getQueryParams().containsKey("error")) {
 			model.addAttribute("loginError", true);
 		}
+		if (exchange.getRequest().getQueryParams().containsKey("error_oauth2")) {
+			model.addAttribute("loginErrorOauth2", true);
+		}
 		if (exchange.getRequest().getQueryParams().containsKey("logout")) {
 			model.addAttribute("logoutMessage", true);
 		}
@@ -157,7 +160,8 @@ public class FrontendController {
 									oldConfig.oauth2Config(), oldConfig.openapiOverrideHost());
 							try {
 								String updatedConfigJson = objectMapper.writeValueAsString(updatedConfig);
-								ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = prepareReplayedJob(job, updatedConfigJson);
+								ch.nexsol.orthrusdast.entity.ScanJobEntity newJob = prepareReplayedJob(job,
+										updatedConfigJson);
 								return scanJobRepository.save(newJob);
 							}
 							catch (Exception e) {
@@ -178,12 +182,13 @@ public class FrontendController {
 			.thenReturn("redirect:/scans/all");
 	}
 
-	private ch.nexsol.orthrusdast.entity.ScanJobEntity prepareReplayedJob(ch.nexsol.orthrusdast.entity.ScanJobEntity job, String updatedConfigJson) {
+	private ch.nexsol.orthrusdast.entity.ScanJobEntity prepareReplayedJob(
+			ch.nexsol.orthrusdast.entity.ScanJobEntity job, String updatedConfigJson) {
 		if (job.getStatus() == ch.nexsol.orthrusdast.model.JobStatus.COMPLETED) {
-			return new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-					job.getDiscovererId(), job.getTarget(), updatedConfigJson,
-					ch.nexsol.orthrusdast.model.JobStatus.PENDING, job.getTestPlanId());
-		} else {
+			return new ch.nexsol.orthrusdast.entity.ScanJobEntity(job.getDiscovererId(), job.getTarget(),
+					updatedConfigJson, ch.nexsol.orthrusdast.model.JobStatus.PENDING, job.getTestPlanId());
+		}
+		else {
 			job.setScanConfigurationJson(updatedConfigJson);
 			job.setStatus(ch.nexsol.orthrusdast.model.JobStatus.PENDING);
 			job.setAssignedSlaveId(null);
@@ -412,15 +417,17 @@ public class FrontendController {
 							return "plans/edit";
 						})
 						.onErrorResume(e -> {
-							model.addAttribute("discoverers", java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
+							model.addAttribute("discoverers",
+									java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
 							model.addAttribute("scanners", java.util.List.of());
-							model.addAttribute("error",
-									"Failed to fetch capabilities from active slave: " + e.getMessage() + ". Using default discoverers.");
+							model.addAttribute("error", "Failed to fetch capabilities from active slave: "
+									+ e.getMessage() + ". Using default discoverers.");
 							return Mono.just("plans/edit");
 						});
 				}
 				else {
-					model.addAttribute("discoverers", java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
+					model.addAttribute("discoverers",
+							java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
 					model.addAttribute("scanners", java.util.List.of());
 					return Mono.just("plans/edit");
 				}
@@ -430,16 +437,53 @@ public class FrontendController {
 	@GetMapping("/plans")
 	public Mono<String> listTestPlans(Model model) {
 		return Mono.zip(testPlanRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
-			.map(tuple -> {
+			.flatMap(tuple -> {
 				java.util.List<ch.nexsol.orthrusdast.entity.TestPlanEntity> plans = tuple.getT1();
 				java.util.List<ch.nexsol.orthrusdast.entity.SlaveNodeEntity> slaves = tuple.getT2();
 
 				boolean hasOnlineSlaves = slaves.stream()
-						.anyMatch(slave -> slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE);
+					.anyMatch(slave -> slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE);
 
-				model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
-				model.addAttribute("plans", plans);
-				return "plans/list";
+				// Get capabilities if slaves are online to know total scanners
+				Mono<Integer> totalScannersMono = Mono.just(0);
+				if (hasOnlineSlaves) {
+					ch.nexsol.orthrusdast.entity.SlaveNodeEntity activeSlave = slaves.stream()
+						.filter(s -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE).findFirst().orElse(null);
+					if (activeSlave != null) {
+						totalScannersMono = org.springframework.web.reactive.function.client.WebClient.create()
+							.get()
+							.uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
+							.retrieve()
+							.bodyToMono(CapabilitiesResponse.class)
+							.map(caps -> caps.scanners() != null ? caps.scanners().size() : 0)
+							.onErrorReturn(0);
+					}
+				}
+
+				return totalScannersMono.map(totalScanners -> {
+					java.util.List<java.util.Map<String, Object>> mappedPlans = new java.util.ArrayList<>();
+					for (ch.nexsol.orthrusdast.entity.TestPlanEntity plan : plans) {
+						java.util.Map<String, Object> map = new java.util.HashMap<>();
+						map.put("plan", plan);
+						try {
+							ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper.readValue(
+									plan.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+							if (conf.includeScanners() == null || conf.includeScanners().isEmpty()) {
+								map.put("scannersCount", totalScanners > 0 ? totalScanners : "All");
+							} else {
+								map.put("scannersCount", conf.includeScanners().size());
+							}
+						} catch (Exception e) {
+							map.put("scannersCount", "All");
+						}
+						map.put("totalScanners", totalScanners > 0 ? totalScanners : "?");
+						mappedPlans.add(map);
+					}
+
+					model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
+					model.addAttribute("mappedPlans", mappedPlans);
+					return "plans/list";
+				});
 			});
 	}
 
@@ -449,11 +493,10 @@ public class FrontendController {
 			ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
 					plan.getDiscovererId(), plan.getTarget(), plan.getScanConfigurationJson(),
 					ch.nexsol.orthrusdast.model.JobStatus.PENDING, plan.getId());
-			return scanJobRepository.save(job)
-				.doOnSuccess(savedJob -> {
-					jobEventPublisher.emit(savedJob.getId(), ch.nexsol.orthrusdast.sse.JobEvent.queued(savedJob.getId(), savedJob.getTarget()));
-				})
-				.thenReturn("redirect:/scans/all");
+			return scanJobRepository.save(job).doOnSuccess(savedJob -> {
+				jobEventPublisher.emit(savedJob.getId(),
+						ch.nexsol.orthrusdast.sse.JobEvent.queued(savedJob.getId(), savedJob.getTarget()));
+			}).thenReturn("redirect:/scans/all");
 		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Test plan not found")));
 	}
 
@@ -594,6 +637,7 @@ public class FrontendController {
 	@GetMapping("/scans")
 	public Mono<String> listScans(Model model) {
 		return scanJobRepository.findAllByOrderByCreatedAtDesc(org.springframework.data.domain.PageRequest.of(0, 10))
+			.flatMap(this::populatePlanName)
 			.collectList()
 			.map(history -> {
 				model.addAttribute("history", history);
@@ -607,6 +651,7 @@ public class FrontendController {
 			@org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size, Model model) {
 		return scanJobRepository
 			.findAllByOrderByCreatedAtDesc(org.springframework.data.domain.PageRequest.of(page, size))
+			.flatMap(this::populatePlanName)
 			.collectList()
 			.map(history -> {
 				model.addAttribute("history", history);
@@ -616,10 +661,22 @@ public class FrontendController {
 
 	@GetMapping("/api/scans/row/{id}")
 	public Mono<String> getScanRowFragment(@org.springframework.web.bind.annotation.PathVariable Long id, Model model) {
-		return scanJobRepository.findById(id).map(job -> {
+		return scanJobRepository.findById(id).flatMap(this::populatePlanName).map(job -> {
 			model.addAttribute("history", java.util.List.of(job));
 			return "fragments/scan-items :: items";
 		}).defaultIfEmpty("fragments/scan-items :: items");
+	}
+
+	private Mono<ch.nexsol.orthrusdast.entity.ScanJobEntity> populatePlanName(ch.nexsol.orthrusdast.entity.ScanJobEntity job) {
+		if (job.getTestPlanId() != null) {
+			return testPlanRepository.findById(job.getTestPlanId())
+				.map(plan -> {
+					job.setPlanName(plan.getName());
+					return job;
+				})
+				.defaultIfEmpty(job);
+		}
+		return Mono.just(job);
 	}
 
 	@PostMapping(value = "/web/plans")
@@ -709,6 +766,143 @@ public class FrontendController {
 				});
 		}).onErrorResume(e -> {
 			model.addAttribute("error", "Scan failed: " + e.getMessage());
+			return Mono.just("fragments/results :: errorPanel");
+		});
+	}
+
+	@GetMapping("/api/plans/{id}/details")
+	public Mono<String> planDetails(@PathVariable Long id, Model model) {
+		return testPlanRepository.findById(id).map((plan) -> {
+			model.addAttribute("plan", plan);
+			return "fragments/plan-offcanvas :: details";
+		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
+	}
+
+	@GetMapping("/api/plans/{id}/edit")
+	public Mono<String> editPlanDetails(@PathVariable Long id, Model model) {
+		return testPlanRepository.findById(id).flatMap((plan) -> {
+			model.addAttribute("plan", plan);
+			try {
+				ch.nexsol.orthrusdast.model.ScanConfiguration conf = objectMapper
+					.readValue(plan.getScanConfigurationJson(), ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+				model.addAttribute("config", conf);
+			}
+			catch (Exception ex) {
+			}
+
+			return slaveNodeRepository.findAll()
+				.filter((s) -> s.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE)
+				.next()
+				.flatMap((activeSlave) -> webClient.get()
+					.uri(activeSlave.getUrl() + "/api/v1/slave/capabilities")
+					.retrieve()
+					.bodyToMono(CapabilitiesResponse.class))
+				.map((caps) -> {
+					model.addAttribute("discoverers", caps.discoverers());
+					model.addAttribute("scanners", caps.scanners());
+					return "fragments/plan-offcanvas :: edit";
+				})
+				.defaultIfEmpty("fragments/plan-offcanvas :: edit")
+				.doOnNext((view) -> {
+					if (!model.containsAttribute("discoverers")) {
+						model.addAttribute("discoverers",
+								java.util.List.of("openapi", "graphql", "blackbox", "well-known", "curl"));
+						model.addAttribute("scanners", java.util.List.of());
+					}
+				});
+		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
+	}
+
+	@PostMapping("/api/plans/{id}")
+	public Mono<String> updateTestPlan(@PathVariable Long id, ServerWebExchange exchange, Model model) {
+		return testPlanRepository.findById(id).flatMap((existingPlan) -> {
+			return exchange.getFormData().flatMap((formData) -> {
+				String name = formData.getFirst("name");
+				String description = formData.getFirst("description");
+				String target = formData.getFirst("target");
+				String discovererId = formData.getFirst("discovererId");
+
+				if (name == null || name.isBlank()) {
+					name = "Unnamed Plan";
+				}
+				existingPlan.setName(name);
+				existingPlan.setDescription(description);
+				if (target != null && !target.isBlank()) {
+					existingPlan.setTarget(target);
+				}
+				if (discovererId != null && !discovererId.isBlank()) {
+					existingPlan.setDiscovererId(discovererId);
+				}
+
+				String gatewayType = formData.getFirst("gatewayType");
+				String appUrl = formData.getFirst("appUrl");
+				String k8sToken = formData.getFirst("k8sToken");
+				String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
+				List<String> rawIncludeScanners = formData.get("includeScanners");
+				final List<String> includeScanners = (rawIncludeScanners == null) ? java.util.List.of()
+						: rawIncludeScanners;
+				String concurrencyStr = formData.getFirst("concurrency");
+				final int concurrency = (concurrencyStr != null && !concurrencyStr.isBlank())
+						? Integer.parseInt(concurrencyStr) : 10;
+
+				String oauth2Url = formData.getFirst("oauth2Url");
+				String oauth2Grant = formData.getFirst("oauth2Grant");
+				String oauth2ClientId = formData.getFirst("oauth2ClientId");
+				String oauth2ClientSecret = formData.getFirst("oauth2ClientSecret");
+				String oauth2CredsStr = formData.getFirst("oauth2Creds");
+				List<String> oauth2Creds = (oauth2CredsStr != null && !oauth2CredsStr.isBlank())
+						? Arrays.stream(oauth2CredsStr.split(",")).map(String::trim).collect(Collectors.toList())
+						: null;
+
+				String bearerToken = formData.getFirst("bearerToken");
+				String bearerTokenSecondary = formData.getFirst("bearerTokenSecondary");
+
+				try {
+					ch.nexsol.orthrusdast.model.ScanConfiguration oldConfig = objectMapper.readValue(
+							existingPlan.getScanConfigurationJson(),
+							ch.nexsol.orthrusdast.model.ScanConfiguration.class);
+
+					OAuth2Config oauth2Config = oldConfig.oauth2Config();
+					if (oauth2Url != null && !oauth2Url.isBlank() && oauth2Grant != null && !oauth2Grant.isBlank()) {
+						String secret = (oauth2ClientSecret == null || oauth2ClientSecret.isBlank())
+								? (oauth2Config != null ? oauth2Config.clientSecret() : "") : oauth2ClientSecret;
+						oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, secret, oauth2Grant, oauth2Creds);
+					}
+					else if (oauth2Url != null && oauth2Url.isBlank()) {
+						oauth2Config = null;
+					}
+
+					SecurityScheme authScheme = oldConfig.authScheme();
+					SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
+
+					if (bearerToken != null && !bearerToken.isBlank()) {
+						authScheme = SecurityScheme.bearer(bearerToken.trim());
+					}
+					if (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank()) {
+						secondaryAuthScheme = SecurityScheme.bearer(bearerTokenSecondary.trim());
+					}
+
+					ch.nexsol.orthrusdast.model.ScanConfiguration scanConfig = new ch.nexsol.orthrusdast.model.ScanConfiguration(
+							includeScanners, oldConfig.excludeScanners(), concurrency, oldConfig.httpConnectTimeoutMs(),
+							oldConfig.httpReadTimeoutMs(), oldConfig.ignoreSslErrors(), oldConfig.reportFormat(),
+							authScheme, secondaryAuthScheme, oldConfig.language(), oldConfig.includePassed(),
+							(gatewayType != null) ? GatewayType.fromString(gatewayType) : oldConfig.gatewayType(), appUrl,
+							k8sToken, oauth2Config, openapiOverrideHost);
+
+					existingPlan.setScanConfigurationJson(objectMapper.writeValueAsString(scanConfig));
+				}
+				catch (Exception ex) {
+					// Fallback
+				}
+
+				return testPlanRepository.save(existingPlan);
+			});
+		}).map((savedPlan) -> {
+			exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
+			return "fragments/scan-queued :: empty";
+		}).onErrorResume((ex) -> {
+			org.slf4j.LoggerFactory.getLogger(FrontendController.class).error("Failed to update test plan: {}", id, ex);
+			model.addAttribute("error", "Update failed: " + ex.getMessage());
 			return Mono.just("fragments/results :: errorPanel");
 		});
 	}

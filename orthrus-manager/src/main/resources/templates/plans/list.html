@@ -27,53 +27,81 @@
                     </div>
                 </div>
 
-                <div class="glass-card">
-                    <div th:if="${plans == null or plans.isEmpty()}"
-                        class="alert alert-info bg-transparent border-info text-light d-flex align-items-center mb-0"
-                        role="alert">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
-                            class="bi bi-info-circle-fill me-3 flex-shrink-0" viewBox="0 0 16 16">
-                            <path
-                                d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2" />
-                        </svg>
-                        <div>
-                            No test plans created yet. Click "Create New Plan" to get started.
-                        </div>
-                    </div>
-
-                    <div class="table-responsive" th:if="${plans != null and !plans.isEmpty()}">
-                        <table class="table table-dark table-hover mb-0 align-middle" style="background-color: transparent;">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Target</th>
-                                    <th>Created</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="plan : ${plans}">
-                                    <td th:text="${plan.name}" class="fw-bold text-primary">Plan Name</td>
-                                    <td th:text="${plan.description}">Description</td>
-                                    <td><code class="text-info" th:text="${plan.target}">http://example.com</code></td>
-                                    <td th:text="${#temporals.format(plan.createdAt, 'yyyy-MM-dd HH:mm')}">Date</td>
-                                    <td class="text-end">
-                                        <form th:action="@{/plans/{id}/run(id=${plan.id})}" method="post" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-success">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill me-1" viewBox="0 0 16 16">
-                                                  <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
-                                                </svg>
-                                                Run Now
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <div th:if="${mappedPlans == null or mappedPlans.isEmpty()}"
+                    class="alert alert-info bg-transparent border-info text-light d-flex align-items-center mb-0"
+                    role="alert">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                        class="bi bi-info-circle-fill me-3 flex-shrink-0" viewBox="0 0 16 16">
+                        <path
+                            d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2" />
+                    </svg>
+                    <div>
+                        No test plans created yet. Click "Create New Plan" to get started.
                     </div>
                 </div>
 
+                <div class="glass-card" style="padding: 0; overflow: hidden;" th:if="${mappedPlans != null and !mappedPlans.isEmpty()}">
+                    <table class="table table-dark table-hover mb-0 align-middle" style="background-color: transparent;">
+                        <thead>
+                            <tr>
+                                <th class="bg-transparent border-secondary" style="padding: 1rem;">Name</th>
+                                <th class="bg-transparent border-secondary" style="padding: 1rem;">Description</th>
+                                <th class="bg-transparent border-secondary" style="padding: 1rem;">Target</th>
+                                <th class="bg-transparent border-secondary" style="padding: 1rem;">Created</th>
+                                <th class="bg-transparent border-secondary text-end" style="padding: 1rem;"></th>
+                                <th class="bg-transparent border-secondary text-end" style="padding: 1rem;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="mappedPlan : ${mappedPlans}" style="cursor: pointer;"
+                                th:attr="hx-get=@{/api/plans/{id}/details(id=${mappedPlan['plan'].id})}"
+                                hx-target="#planOffcanvasContent"
+                                data-bs-toggle="offcanvas" data-bs-target="#planOffcanvas">
+                                <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
+                                    <span class="fw-bold text-primary me-2" th:text="${mappedPlan['plan'].name}">Plan Name</span>
+                                </td>
+                                <td class="bg-transparent border-secondary text-truncate" style="padding: 1rem; vertical-align: middle; max-width: 300px;" th:title="${mappedPlan['plan'].description}" th:text="${mappedPlan['plan'].description}">Description</td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;"><code class="text-info" th:text="${mappedPlan['plan'].target}">http://example.com</code></td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${#temporals.format(mappedPlan['plan'].createdAt, 'yyyy-MM-dd HH:mm')}">Date</td>
+                                <td class="bg-transparent border-secondary text-end" style="padding: 1rem; vertical-align: middle;">
+                                    <span class="badge bg-secondary text-light text-uppercase me-1" th:text="${mappedPlan['plan'].discovererId}">openapi</span>
+                                    <span class="badge bg-info text-dark" th:title="'Scanners enabled / total available'" data-bs-toggle="tooltip">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-shield-check me-1 mb-1" viewBox="0 0 16 16">
+                                          <path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 0 1-2.517 2.453 7.159 7.159 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z"/>
+                                          <path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z"/>
+                                        </svg>
+                                        <span th:text="${mappedPlan['scannersCount']} + ' / ' + ${mappedPlan['totalScanners']}">1/10</span>
+                                    </span>
+                                </td>
+                                <td class="bg-transparent border-secondary text-end" style="padding: 1rem; vertical-align: middle;">
+                                    <form th:action="@{/plans/{id}/run(id=${mappedPlan['plan'].id})}" method="post" class="d-inline ms-2" onsubmit="event.stopPropagation();">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Run Now">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16">
+                                              <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+        </div>
+        <!-- Offcanvas for Plan Details -->
+        <div class="offcanvas offcanvas-end bg-dark text-light" tabindex="-1" id="planOffcanvas" aria-labelledby="planOffcanvasLabel" style="--bs-offcanvas-width: 700px;">
+            <div class="offcanvas-header border-bottom border-secondary">
+                <h5 class="offcanvas-title text-primary" id="planOffcanvasLabel">Plan Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body" id="planOffcanvasContent">
+                <!-- Content loaded via HTMX -->
+                <div class="text-center mt-5 text-muted">
+                    <div class="spinner-border text-secondary" role="status"></div>
+                    <div class="mt-2">Loading...</div>
+                </div>
             </div>
         </div>
     </main>

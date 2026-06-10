@@ -1,9 +1,29 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.entity;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Table;
-
 import java.time.Instant;
+
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.relational.core.mapping.Table;
 
 @Table("test_plans")
 public class TestPlanEntity {
@@ -22,9 +42,17 @@ public class TestPlanEntity {
 	// JSON representation of ScanConfiguration
 	private String scanConfigurationJson;
 
+	@CreatedDate
 	private Instant createdAt;
 
-	private Instant updatedAt;
+	@LastModifiedDate
+	private Instant lastModifiedAt;
+
+	@CreatedBy
+	private String createdBy;
+
+	@LastModifiedBy
+	private String lastModifiedBy;
 
 	public TestPlanEntity() {
 	}
@@ -36,8 +64,6 @@ public class TestPlanEntity {
 		this.discovererId = discovererId;
 		this.target = target;
 		this.scanConfigurationJson = scanConfigurationJson;
-		this.createdAt = Instant.now();
-		this.updatedAt = this.createdAt;
 	}
 
 	public Long getId() {
@@ -96,12 +122,28 @@ public class TestPlanEntity {
 		this.createdAt = createdAt;
 	}
 
-	public Instant getUpdatedAt() {
-		return updatedAt;
+	public Instant getLastModifiedAt() {
+		return lastModifiedAt;
 	}
 
-	public void setUpdatedAt(Instant updatedAt) {
-		this.updatedAt = updatedAt;
+	public void setLastModifiedAt(Instant lastModifiedAt) {
+		this.lastModifiedAt = lastModifiedAt;
+	}
+
+	public String getCreatedBy() {
+		return createdBy;
+	}
+
+	public void setCreatedBy(String createdBy) {
+		this.createdBy = createdBy;
+	}
+
+	public String getLastModifiedBy() {
+		return lastModifiedBy;
+	}
+
+	public void setLastModifiedBy(String lastModifiedBy) {
+		this.lastModifiedBy = lastModifiedBy;
 	}
 
 }

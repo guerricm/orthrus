@@ -54,8 +54,8 @@ class FrontendControllerTest {
 	@org.junit.jupiter.api.BeforeEach
 	void setUp() {
 		controller = new FrontendController(scanResultService, pdfReportGenerator, htmlReportGenerator, tokenFetcher,
-				statisticsService, scanJobRepository, testPlanRepository, slaveNodeRepository, objectMapper, jobEventPublisher,
-				clientRegistrations);
+				statisticsService, scanJobRepository, testPlanRepository, slaveNodeRepository, objectMapper,
+				jobEventPublisher, clientRegistrations);
 	}
 
 	@Test

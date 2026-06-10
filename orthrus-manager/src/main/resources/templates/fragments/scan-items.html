@@ -6,8 +6,9 @@
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
             <strong class="text-light" th:text="'#' + ${scan.id}">#1</strong>
         </td>
+        <td class="bg-transparent border-secondary fw-bold text-primary" style="padding: 1rem; vertical-align: middle;" th:text="${scan.planName ?: '-'}">Plan Name</td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${#temporals.format(scan.createdAt, 'HH:mm:ss dd/MM/yyyy')}">10:00 01/01/2026</td>
-        <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle; word-break: break-all;" th:text="${scan.target}">https://api.example.com</td>
+        <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle; word-break: break-all;"><code class="text-info" th:text="${scan.target}">https://api.example.com</code></td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
             <span th:id="'job-status-' + ${scan.id}" th:class="'badge ' + (${scan.status.name() == 'PENDING'} ? 'bg-secondary' : (${scan.status.name() == 'RUNNING'} ? 'bg-primary' : (${scan.status.name() == 'COMPLETED'} ? 'bg-success' : (${scan.status.name() == 'CANCELLED'} ? 'bg-secondary' : 'bg-danger'))))" th:text="${scan.status}">COMPLETED</span>
         </td>
