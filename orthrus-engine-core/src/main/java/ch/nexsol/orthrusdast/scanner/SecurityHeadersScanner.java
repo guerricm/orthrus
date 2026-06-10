@@ -30,6 +30,9 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
+import org.springframework.http.HttpMethod;
+
 /**
  * Scans for missing or misconfigured security headers.
  */
@@ -55,15 +58,14 @@ public class SecurityHeadersScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			Mono<ch.nexsol.orthrusdast.http.ScanHttpResponse> normalResponseMono = httpClient.send(operation);
+			Mono<ScanHttpResponse> normalResponseMono = httpClient.send(operation);
 
 			// Send a bogus method to trigger a container-level error page (e.g., 405 or
 			// 400) which often leaks Server headers
-			Operation errorOp = new Operation(operation.url(),
-					org.springframework.http.HttpMethod.valueOf("BOGUS_METHOD_TEST"), operation.headers(),
-					operation.queryParams(), operation.body(), operation.securityRequirements(),
+			Operation errorOp = new Operation(operation.url(), HttpMethod.valueOf("BOGUS_METHOD_TEST"),
+					operation.headers(), operation.queryParams(), operation.body(), operation.securityRequirements(),
 					operation.expectedContentTypes(), operation.authScheme());
-			Mono<ch.nexsol.orthrusdast.http.ScanHttpResponse> errorResponseMono = httpClient.send(errorOp, false)
+			Mono<ScanHttpResponse> errorResponseMono = httpClient.send(errorOp, false)
 				.onErrorResume((e) -> Mono.empty());
 
 			return Flux.merge(normalResponseMono, errorResponseMono).flatMap((response) -> {
@@ -91,8 +93,8 @@ public class SecurityHeadersScanner implements SecurityScanner {
 		});
 	}
 
-	private void checkHeader(ch.nexsol.orthrusdast.http.ScanHttpResponse response, String headerName, String shortName,
-			CWEReference cwe, Operation operation, List<Vulnerability> vulns) {
+	private void checkHeader(ScanHttpResponse response, String headerName, String shortName, CWEReference cwe,
+			Operation operation, List<Vulnerability> vulns) {
 		if (!response.hasHeader(headerName)) {
 			vulns.add(createVulnerabilityWithTrace("Missing Security Header: " + shortName,
 					"The HTTP response does not contain the '" + headerName + "' security header.", RiskLevel.LOW,
@@ -151,8 +153,7 @@ public class SecurityHeadersScanner implements SecurityScanner {
 		}
 	}
 
-	private void checkServerInfoLeakage(ch.nexsol.orthrusdast.http.ScanHttpResponse response, Operation operation,
-			List<Vulnerability> vulns) {
+	private void checkServerInfoLeakage(ScanHttpResponse response, Operation operation, List<Vulnerability> vulns) {
 		List<String> leakyHeaders = List.of("Server", "X-Powered-By", "X-AspNet-Version");
 		for (String header : leakyHeaders) {
 			String value = response.getHeader(header);

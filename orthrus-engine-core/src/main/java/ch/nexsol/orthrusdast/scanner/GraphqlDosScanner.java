@@ -28,6 +28,9 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Scans for GraphQL Denial of Service via deeply nested queries (CWE-400/CWE-770).
  */
@@ -77,7 +80,7 @@ public class GraphqlDosScanner implements SecurityScanner {
 				return Flux.empty();
 			}
 
-			java.util.Map<String, String> newHeaders = new java.util.HashMap<>(operation.headers());
+			Map<String, String> newHeaders = new HashMap<>(operation.headers());
 			newHeaders.put("Content-Type", "application/json");
 
 			Operation testOpIntrospection = new Operation(operation.url(), operation.method(), newHeaders,

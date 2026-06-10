@@ -37,6 +37,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import org.springframework.http.HttpMethod;
+
 /**
  * Scans authentication endpoints for susceptibility to brute force / weak passwords.
  * (CWE-307, CWE-521).
@@ -111,8 +113,7 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 			boolean isAuthEndpoint = urlLower.contains("/login") || urlLower.contains("/auth")
 					|| urlLower.contains("/token") || urlLower.contains("/signin");
 
-			if (!isAuthEndpoint || !org.springframework.http.HttpMethod.POST.equals(operation.method())
-					|| operation.body() == null) {
+			if (!isAuthEndpoint || !HttpMethod.POST.equals(operation.method()) || operation.body() == null) {
 				return Flux.empty();
 			}
 

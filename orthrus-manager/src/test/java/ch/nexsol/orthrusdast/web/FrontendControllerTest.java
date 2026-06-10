@@ -12,46 +12,63 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import static org.mockito.Mockito.when;
 
-@org.junit.jupiter.api.extension.ExtendWith(org.mockito.junit.jupiter.MockitoExtension.class)
+import ch.nexsol.orthrusdast.repository.ScanJobRepository;
+import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
+import ch.nexsol.orthrusdast.repository.TestPlanRepository;
+import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
+import org.springframework.ui.ConcurrentModel;
+import org.springframework.ui.Model;
+import reactor.core.publisher.Flux;
+
+@ExtendWith(MockitoExtension.class)
 class FrontendControllerTest {
 
 	// ScanService removed
 
-	@org.mockito.Mock
+	@Mock
 	private ScanResultService scanResultService;
 
-	@org.mockito.Mock
+	@Mock
 	private PdfReportGenerator pdfReportGenerator;
 
-	@org.mockito.Mock
+	@Mock
 	private HtmlReportGenerator htmlReportGenerator;
 
-	@org.mockito.Mock
-	private ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher tokenFetcher;
+	@Mock
+	private OAuth2TokenFetcher tokenFetcher;
 
-	@org.mockito.Mock
+	@Mock
 	private StatisticsService statisticsService;
 
-	@org.mockito.Mock
-	private ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
+	@Mock
+	private ScanJobRepository scanJobRepository;
 
-	@org.mockito.Mock
-	private ch.nexsol.orthrusdast.repository.SlaveNodeRepository slaveNodeRepository;
+	@Mock
+	private SlaveNodeRepository slaveNodeRepository;
 
 	private tools.jackson.databind.ObjectMapper objectMapper = new tools.jackson.databind.ObjectMapper();
 
-	@org.mockito.Mock
-	private ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher;
+	@Mock
+	private JobEventPublisher jobEventPublisher;
 
-	@org.mockito.Mock
-	private org.springframework.beans.factory.ObjectProvider<org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository> clientRegistrations;
+	@Mock
+	private ObjectProvider<ReactiveClientRegistrationRepository> clientRegistrations;
 
-	@org.mockito.Mock
-	private ch.nexsol.orthrusdast.repository.TestPlanRepository testPlanRepository;
+	@Mock
+	private TestPlanRepository testPlanRepository;
 
 	private FrontendController controller;
 
-	@org.junit.jupiter.api.BeforeEach
+	@BeforeEach
 	void setUp() {
 		controller = new FrontendController(scanResultService, pdfReportGenerator, htmlReportGenerator, tokenFetcher,
 				statisticsService, scanJobRepository, testPlanRepository, slaveNodeRepository, objectMapper,
@@ -60,25 +77,24 @@ class FrontendControllerTest {
 
 	@Test
 	void testGetIndexPage() {
-		when(scanResultService.findAll()).thenReturn(reactor.core.publisher.Flux.empty());
-		when(scanResultService.findAll()).thenReturn(reactor.core.publisher.Flux.empty());
+		when(scanResultService.findAll()).thenReturn(Flux.empty());
+		when(scanResultService.findAll()).thenReturn(Flux.empty());
 
-		org.springframework.ui.Model model = new org.springframework.ui.ConcurrentModel();
+		Model model = new ConcurrentModel();
 		String viewName = controller.index(model).block();
-		org.junit.jupiter.api.Assertions.assertEquals("home", viewName);
-		org.junit.jupiter.api.Assertions.assertTrue(model.containsAttribute("discoverers"));
+		Assertions.assertEquals("home", viewName);
+		Assertions.assertTrue(model.containsAttribute("discoverers"));
 	}
 
 	@Test
 	void testGetResultsPage() {
-		when(scanJobRepository.findAllByOrderByCreatedAtDesc(
-				org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
-			.thenReturn(reactor.core.publisher.Flux.empty());
+		when(scanJobRepository.findAllByOrderByCreatedAtDesc(ArgumentMatchers.any(Pageable.class)))
+			.thenReturn(Flux.empty());
 
-		org.springframework.ui.Model model = new org.springframework.ui.ConcurrentModel();
+		Model model = new ConcurrentModel();
 		String viewName = controller.listScans(model).block();
-		org.junit.jupiter.api.Assertions.assertEquals("scans/list", viewName);
-		org.junit.jupiter.api.Assertions.assertTrue(model.containsAttribute("history"));
+		Assertions.assertEquals("scans/list", viewName);
+		Assertions.assertTrue(model.containsAttribute("history"));
 	}
 
 }

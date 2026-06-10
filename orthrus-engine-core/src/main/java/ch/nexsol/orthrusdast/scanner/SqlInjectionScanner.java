@@ -30,6 +30,10 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.scanner.oast.OastService;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
+
 /**
  * Scans for SQL Injection vulnerabilities (CWE-89).
  */
@@ -40,16 +44,14 @@ public class SqlInjectionScanner implements SecurityScanner {
 
 	private final ScanHttpClient httpClient;
 
-	private final ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService payloadLoader;
+	private final PayloadLoaderService payloadLoader;
 
-	private final ch.nexsol.orthrusdast.scanner.payload.PayloadMutator payloadMutator;
+	private final PayloadMutator payloadMutator;
 
-	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final OastService oastService;
 
-	public SqlInjectionScanner(ScanHttpClient httpClient,
-			ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService payloadLoader,
-			ch.nexsol.orthrusdast.scanner.payload.PayloadMutator payloadMutator,
-			ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+	public SqlInjectionScanner(ScanHttpClient httpClient, PayloadLoaderService payloadLoader,
+			PayloadMutator payloadMutator, OastService oastService) {
 		this.httpClient = httpClient;
 		this.payloadLoader = payloadLoader;
 		this.payloadMutator = payloadMutator;
@@ -76,8 +78,7 @@ public class SqlInjectionScanner implements SecurityScanner {
 
 				scanVulns = payloadLoader.getPayloads("sqli").concatMap((rawPayload) -> {
 					String oastPayload = rawPayload.replace("{{OAST_HOST}}", oastSession.domain());
-					String payload = payloadMutator.mutate(oastPayload,
-							ch.nexsol.orthrusdast.scanner.payload.PayloadMutator.Context.URL_PARAM);
+					String payload = payloadMutator.mutate(oastPayload, PayloadMutator.Context.URL_PARAM);
 					return InjectionHelper.generateInjectedOperations(operation, payload)
 						.concatMap((test) -> executeSqlInjectionTest(operation, test.mutatedOperation(),
 								test.injectionPoint(), payload));

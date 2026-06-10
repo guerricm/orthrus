@@ -35,6 +35,17 @@ import reactor.core.publisher.Mono;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanResult;
 
+import ch.nexsol.orthrusdast.model.AttemptStatus;
+import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.HtmlUtils;
+import reactor.core.scheduler.Schedulers;
+
 /**
  * Generates a PDF report using Thymeleaf and OpenHTMLToPDF.
  *
@@ -69,7 +80,7 @@ public class PdfReportGenerator implements ReportGenerator {
 				// 1. Determine Language
 				String langStr = result.configuration() != null && result.configuration().language() != null
 						? result.configuration().language() : "en";
-				Locale locale = org.springframework.util.StringUtils.parseLocaleString(langStr);
+				Locale locale = StringUtils.parseLocaleString(langStr);
 
 				// 2. Prepare Context for Thymeleaf
 				Context context = new Context(locale);
@@ -117,33 +128,29 @@ public class PdfReportGenerator implements ReportGenerator {
 
 				// 4. Execution Details (if --include-passed)
 				if (includePassed && result.attempts() != null && !result.attempts().isEmpty()) {
-					java.util.LinkedHashMap<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> grouped = new java.util.LinkedHashMap<>();
-					for (ch.nexsol.orthrusdast.model.ScanAttempt a : result.attempts()) {
+					LinkedHashMap<String, List<ScanAttempt>> grouped = new LinkedHashMap<>();
+					for (ScanAttempt a : result.attempts()) {
 						String key = a.operationMethod() + " " + a.operationUrl();
-						grouped.computeIfAbsent(key, (k) -> new java.util.ArrayList<>()).add(a);
+						grouped.computeIfAbsent(key, (k) -> new ArrayList<>()).add(a);
 					}
 
-					java.util.List<ch.nexsol.orthrusdast.model.EndpointAttemptGroup> attemptGroupsList = new java.util.ArrayList<>();
-					for (java.util.Map.Entry<String, java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt>> entry : grouped
-						.entrySet()) {
+					List<EndpointAttemptGroup> attemptGroupsList = new ArrayList<>();
+					for (Map.Entry<String, List<ScanAttempt>> entry : grouped.entrySet()) {
 						long passed = entry.getValue()
 							.stream()
-							.filter((a) -> ch.nexsol.orthrusdast.model.AttemptStatus.PASSED == a.status())
+							.filter((a) -> AttemptStatus.PASSED == a.status())
 							.count();
 						long failed = entry.getValue()
 							.stream()
-							.filter((a) -> ch.nexsol.orthrusdast.model.AttemptStatus.FAILED == a.status())
+							.filter((a) -> AttemptStatus.FAILED == a.status())
 							.count();
 						long authError = entry.getValue()
 							.stream()
-							.filter((a) -> ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR == a.status())
+							.filter((a) -> AttemptStatus.AUTH_ERROR == a.status())
 							.count();
-						long error = entry.getValue()
-							.stream()
-							.filter((a) -> ch.nexsol.orthrusdast.model.AttemptStatus.ERROR == a.status())
-							.count();
-						attemptGroupsList.add(new ch.nexsol.orthrusdast.model.EndpointAttemptGroup(entry.getKey(),
-								entry.getValue(), passed, failed, authError, error));
+						long error = entry.getValue().stream().filter((a) -> AttemptStatus.ERROR == a.status()).count();
+						attemptGroupsList.add(new EndpointAttemptGroup(entry.getKey(), entry.getValue(), passed, failed,
+								authError, error));
 					}
 					context.setVariable("attemptGroups", attemptGroupsList);
 				}
@@ -178,7 +185,7 @@ public class PdfReportGenerator implements ReportGenerator {
 			catch (Exception ex) {
 				throw new RuntimeException("Failed to generate PDF report", ex);
 			}
-		}).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).then();
+		}).subscribeOn(Schedulers.boundedElastic()).then();
 	}
 
 	public static class ReportFormatter {
@@ -187,7 +194,7 @@ public class PdfReportGenerator implements ReportGenerator {
 			if (text == null) {
 				return "";
 			}
-			return org.springframework.web.util.HtmlUtils.htmlEscape(text).replace("\n", "<br/>");
+			return HtmlUtils.htmlEscape(text).replace("\n", "<br/>");
 		}
 
 		public String truncateUrl(String url) {

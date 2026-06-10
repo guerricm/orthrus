@@ -15,6 +15,11 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 
+import ch.nexsol.orthrusdast.config.OrthrusProperties;
+import ch.nexsol.orthrusdast.sse.JobEvent;
+import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import java.time.Duration;
+
 @Component
 @EnableScheduling
 public class JobDispatcherScheduler {
@@ -25,13 +30,12 @@ public class JobDispatcherScheduler {
 
 	private final WebClient webClient;
 
-	private final ch.nexsol.orthrusdast.config.OrthrusProperties orthrusProperties;
+	private final OrthrusProperties orthrusProperties;
 
-	private final ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher;
+	private final JobEventPublisher jobEventPublisher;
 
 	public JobDispatcherScheduler(ScanJobRepository scanJobRepository, SlaveNodeRepository slaveNodeRepository,
-			ch.nexsol.orthrusdast.config.OrthrusProperties orthrusProperties,
-			ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher) {
+			OrthrusProperties orthrusProperties, JobEventPublisher jobEventPublisher) {
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.webClient = WebClient.builder().build();
@@ -64,27 +68,26 @@ public class JobDispatcherScheduler {
 				.uri(slave.getUrl() + "/api/v1/slave/capabilities")
 				.retrieve()
 				.bodyToMono(Void.class)
-				.timeout(java.time.Duration.ofSeconds(3))
+				.timeout(Duration.ofSeconds(3))
 				.thenReturn(true)
 				.onErrorResume(e -> {
 					System.err.println("Ping failed to " + slave.getUrl() + ": " + e.getMessage());
 					return Mono.just(false);
 				})
 				.flatMap(isUp -> {
-					if (!isUp && slave.getStatus() != ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
+					if (!isUp && slave.getStatus() != NodeStatus.OFFLINE) {
 						System.out.println("Slave " + slave.getId() + " is unreachable. Marking as OFFLINE.");
 						return slaveNodeRepository
-							.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
-									ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE.name(), slave.getLastSeenAt())
+							.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.OFFLINE.name(),
+									slave.getLastSeenAt())
 							.flatMap(r -> failZombieScansForSlave(slave.getId()))
 							.doOnSuccess(r -> System.out
 								.println("Slave " + slave.getId() + " marked OFFLINE and zombie scans failed."));
 					}
-					else if (isUp && slave.getStatus() == ch.nexsol.orthrusdast.model.NodeStatus.OFFLINE) {
+					else if (isUp && slave.getStatus() == NodeStatus.OFFLINE) {
 						System.out.println("Slave " + slave.getId() + " is back online. Marking as IDLE.");
 						return slaveNodeRepository
-							.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
-									ch.nexsol.orthrusdast.model.NodeStatus.IDLE.name(), Instant.now())
+							.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.IDLE.name(), Instant.now())
 							.doOnSuccess(r -> System.out.println("Rows updated to IDLE: " + r));
 					}
 					return Mono.empty();
@@ -95,13 +98,13 @@ public class JobDispatcherScheduler {
 	@Scheduled(fixedDelay = 60000)
 	public void monitorGlobalTimeouts() {
 		// Find jobs that have been RUNNING for more than 4 hours
-		Instant fourHoursAgo = Instant.now().minus(java.time.Duration.ofHours(4));
+		Instant fourHoursAgo = Instant.now().minus(Duration.ofHours(4));
 		scanJobRepository.findByStatusAndStartedAtBefore(JobStatus.RUNNING, fourHoursAgo).flatMap(job -> {
 			System.out.println("Job " + job.getId() + " has exceeded the global 4-hour timeout. Marking as FAILED.");
 			job.setStatus(JobStatus.FAILED);
 			return scanJobRepository.save(job)
-				.doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(),
-						j.getTarget(), "Global Timeout Exceeded (4h)")));
+				.doOnSuccess(j -> jobEventPublisher.emit(j.getId(),
+						JobEvent.failed(j.getId(), j.getTarget(), "Global Timeout Exceeded (4h)")));
 		}).subscribe();
 	}
 
@@ -111,8 +114,8 @@ public class JobDispatcherScheduler {
 				.println("Failing zombie job " + job.getId() + " because assigned slave " + slaveId + " went OFFLINE.");
 			job.setStatus(JobStatus.FAILED);
 			return scanJobRepository.save(job)
-				.doOnSuccess(j -> jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.failed(j.getId(),
-						j.getTarget(), "Slave node crashed or disconnected")));
+				.doOnSuccess(j -> jobEventPublisher.emit(j.getId(),
+						JobEvent.failed(j.getId(), j.getTarget(), "Slave node crashed or disconnected")));
 		}).then();
 	}
 
@@ -124,10 +127,10 @@ public class JobDispatcherScheduler {
 			.flatMap(runningCount -> {
 				long newCount = runningCount + 1;
 				if (newCount >= slave.getMaxConcurrentScans()) {
-					slave.setStatus(ch.nexsol.orthrusdast.model.NodeStatus.BUSY);
+					slave.setStatus(NodeStatus.BUSY);
 				}
 				else {
-					slave.setStatus(ch.nexsol.orthrusdast.model.NodeStatus.IDLE);
+					slave.setStatus(NodeStatus.IDLE);
 				}
 				return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), slave.getStatus().name(),
 						slave.getLastSeenAt());
@@ -139,7 +142,7 @@ public class JobDispatcherScheduler {
 				return scanJobRepository.save(job);
 			})
 			.doOnSuccess(j -> {
-				jobEventPublisher.emit(j.getId(), ch.nexsol.orthrusdast.sse.JobEvent.running(j.getId(), j.getTarget()));
+				jobEventPublisher.emit(j.getId(), JobEvent.running(j.getId(), j.getTarget()));
 			})
 			.flatMap(j -> {
 				// Send HTTP POST to Slave API using Jackson serialization

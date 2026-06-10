@@ -31,6 +31,8 @@ import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.util.Base64;
+
 /**
  * Scans for JWTs signed with a blank (empty) secret or common weak secrets.
  */
@@ -78,7 +80,7 @@ public class JwtBlankSecretScanner implements SecurityScanner {
 					javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
 					mac.init(new javax.crypto.spec.SecretKeySpec(secret.getBytes(), "HmacSHA256"));
 					byte[] signatureBytes = mac.doFinal(headerAndPayload.getBytes());
-					String signature = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes);
+					String signature = Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes);
 
 					String forgedToken = headerAndPayload + "." + signature;
 					SecurityScheme forgedScheme = SecurityScheme.bearer(forgedToken);

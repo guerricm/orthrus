@@ -23,6 +23,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import java.util.HashMap;
+
 /**
  * Mapper for OAuth2/OIDC roles from Keycloak to Spring Security roles.
  */
@@ -41,14 +43,16 @@ public class OidcRoleMapper {
 
 		return userRequest -> delegate.loadUser(userRequest).map(oidcUser -> {
 			Collection<GrantedAuthority> mappedAuthorities = new ArrayList<>(oidcUser.getAuthorities());
-			
+
 			// 1. Try to extract from ID Token / UserInfo
 			boolean mapped = extractKeycloakRoles(oidcUser.getAttributes(), mappedAuthorities);
-			
-			// 2. If not found, Keycloak often puts roles in the Access Token. Let's parse it.
+
+			// 2. If not found, Keycloak often puts roles in the Access Token. Let's parse
+			// it.
 			Map<String, Object> accessTokenAttrs = null;
 			if (!mapped) {
-				accessTokenAttrs = extractRolesFromAccessToken(userRequest.getAccessToken().getTokenValue(), mappedAuthorities);
+				accessTokenAttrs = extractRolesFromAccessToken(userRequest.getAccessToken().getTokenValue(),
+						mappedAuthorities);
 			}
 
 			final Map<String, Object> finalAccessTokenAttrs = accessTokenAttrs;
@@ -69,7 +73,7 @@ public class OidcRoleMapper {
 
 				@Override
 				public Map<String, Object> getAttributes() {
-					Map<String, Object> attrs = new java.util.HashMap<>(super.getAttributes());
+					Map<String, Object> attrs = new HashMap<>(super.getAttributes());
 					if (finalAccessTokenAttrs != null) {
 						attrs.putAll(finalAccessTokenAttrs);
 					}
@@ -80,7 +84,8 @@ public class OidcRoleMapper {
 	}
 
 	/**
-	 * Custom OAuth2 user service to extract roles from Keycloak UserInfo when openid scope is missing.
+	 * Custom OAuth2 user service to extract roles from Keycloak UserInfo when openid
+	 * scope is missing.
 	 * @return the reactive OAuth2 user service
 	 */
 	@Bean
@@ -89,22 +94,25 @@ public class OidcRoleMapper {
 
 		return userRequest -> delegate.loadUser(userRequest).map(oauth2User -> {
 			Collection<GrantedAuthority> mappedAuthorities = new ArrayList<>(oauth2User.getAuthorities());
-			
+
 			boolean mapped = extractKeycloakRoles(oauth2User.getAttributes(), mappedAuthorities);
 			Map<String, Object> accessTokenAttrs = null;
 			if (!mapped) {
-				accessTokenAttrs = extractRolesFromAccessToken(userRequest.getAccessToken().getTokenValue(), mappedAuthorities);
+				accessTokenAttrs = extractRolesFromAccessToken(userRequest.getAccessToken().getTokenValue(),
+						mappedAuthorities);
 			}
-			
-			String userNameAttributeName = userRequest.getClientRegistration().getProviderDetails()
-					.getUserInfoEndpoint().getUserNameAttributeName();
+
+			String userNameAttributeName = userRequest.getClientRegistration()
+				.getProviderDetails()
+				.getUserInfoEndpoint()
+				.getUserNameAttributeName();
 			if (userNameAttributeName == null || userNameAttributeName.isEmpty()) {
 				userNameAttributeName = "preferred_username";
 			}
 			if (!oauth2User.getAttributes().containsKey(userNameAttributeName)) {
 				userNameAttributeName = "sub";
 			}
-			
+
 			final Map<String, Object> finalAccessTokenAttrs = accessTokenAttrs;
 			return new DefaultOAuth2User(mappedAuthorities, oauth2User.getAttributes(), userNameAttributeName) {
 				@Override
@@ -123,7 +131,7 @@ public class OidcRoleMapper {
 
 				@Override
 				public Map<String, Object> getAttributes() {
-					Map<String, Object> attrs = new java.util.HashMap<>(super.getAttributes());
+					Map<String, Object> attrs = new HashMap<>(super.getAttributes());
 					if (finalAccessTokenAttrs != null) {
 						attrs.putAll(finalAccessTokenAttrs);
 					}
@@ -133,13 +141,16 @@ public class OidcRoleMapper {
 		});
 	}
 
-	private Map<String, Object> extractRolesFromAccessToken(String tokenValue, Collection<GrantedAuthority> mappedAuthorities) {
+	private Map<String, Object> extractRolesFromAccessToken(String tokenValue,
+			Collection<GrantedAuthority> mappedAuthorities) {
 		try {
 			if (tokenValue != null && tokenValue.contains(".")) {
 				String[] parts = tokenValue.split("\\.");
 				if (parts.length >= 2) {
 					String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
-					Map<String, Object> attributes = objectMapper.readValue(payload, new TypeReference<Map<String, Object>>() {});
+					Map<String, Object> attributes = objectMapper.readValue(payload,
+							new TypeReference<Map<String, Object>>() {
+							});
 					extractKeycloakRoles(attributes, mappedAuthorities);
 					return attributes;
 				}
@@ -151,7 +162,8 @@ public class OidcRoleMapper {
 		return null;
 	}
 
-	private boolean extractKeycloakRoles(Map<String, Object> attributes, Collection<GrantedAuthority> mappedAuthorities) {
+	private boolean extractKeycloakRoles(Map<String, Object> attributes,
+			Collection<GrantedAuthority> mappedAuthorities) {
 		if (attributes == null) {
 			return false;
 		}
@@ -189,7 +201,7 @@ public class OidcRoleMapper {
 				}
 			}
 		}
-		
+
 		return found;
 	}
 

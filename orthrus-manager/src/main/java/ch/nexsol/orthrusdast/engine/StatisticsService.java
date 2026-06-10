@@ -10,6 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import ch.nexsol.orthrusdast.entity.ScanResultEntity;
+import ch.nexsol.orthrusdast.entity.VulnerabilityEntity;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+
 @Service
 public class StatisticsService {
 
@@ -38,23 +44,22 @@ public class StatisticsService {
 						}))
 				.collectList()
 				.map(scanEntries -> {
-					Map<String, Map<String, Map<String, Long>>> result = new java.util.HashMap<>();
+					Map<String, Map<String, Map<String, Long>>> result = new HashMap<>();
 
-					for (Map.Entry<ch.nexsol.orthrusdast.entity.ScanResultEntity, Map<String, Long>> scanEntry : scanEntries) {
-						ch.nexsol.orthrusdast.entity.ScanResultEntity scan = scanEntry.getKey();
+					for (Map.Entry<ScanResultEntity, Map<String, Long>> scanEntry : scanEntries) {
+						ScanResultEntity scan = scanEntry.getKey();
 						String targetUrl = scan.targetUrl() != null ? scan.targetUrl() : "Unknown Target";
 						String scanId = scan.id();
 						Map<String, Long> endpoints = scanEntry.getValue();
 
 						Map<String, Map<String, Long>> targetMap = result.computeIfAbsent(targetUrl,
-								k -> new java.util.HashMap<>());
+								k -> new HashMap<>());
 
 						for (Map.Entry<String, Long> endpointEntry : endpoints.entrySet()) {
 							String endpoint = endpointEntry.getKey();
 							Long count = endpointEntry.getValue();
 
-							targetMap.computeIfAbsent(endpoint, k -> new java.util.LinkedHashMap<>())
-								.put(scanId, count);
+							targetMap.computeIfAbsent(endpoint, k -> new LinkedHashMap<>()).put(scanId, count);
 						}
 					}
 					return result;
@@ -62,8 +67,8 @@ public class StatisticsService {
 		});
 	}
 
-	public record GlobalScanSummary(String scanId, String targetUrl, java.time.Instant startTime,
-			Map<String, Long> vulnsByRisk, Map<String, Long> vulnsByCwe, long totalVulns) {
+	public record GlobalScanSummary(String scanId, String targetUrl, Instant startTime, Map<String, Long> vulnsByRisk,
+			Map<String, Long> vulnsByCwe, long totalVulns) {
 	}
 
 	public Mono<List<GlobalScanSummary>> getGlobalStatistics() {
@@ -75,14 +80,11 @@ public class StatisticsService {
 						scan -> vulnerabilityRepository.findByScanResultId(scan.id()).collectList().map(vulns -> {
 							Map<String, Long> byRisk = vulns.stream()
 								.filter(v -> v.riskLevel() != null)
-								.collect(Collectors.groupingBy(
-										ch.nexsol.orthrusdast.entity.VulnerabilityEntity::riskLevel,
-										Collectors.counting()));
+								.collect(Collectors.groupingBy(VulnerabilityEntity::riskLevel, Collectors.counting()));
 
 							Map<String, Long> byCwe = vulns.stream()
 								.filter(v -> v.cweId() != null)
-								.collect(Collectors.groupingBy(ch.nexsol.orthrusdast.entity.VulnerabilityEntity::cweId,
-										Collectors.counting()));
+								.collect(Collectors.groupingBy(VulnerabilityEntity::cweId, Collectors.counting()));
 
 							return new GlobalScanSummary(scan.id(),
 									scan.targetUrl() != null ? scan.targetUrl() : "Unknown Target",

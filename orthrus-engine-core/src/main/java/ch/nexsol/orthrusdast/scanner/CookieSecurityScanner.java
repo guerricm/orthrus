@@ -30,6 +30,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
+
 /**
  * Scans for missing security attributes in cookies (Secure, HttpOnly, SameSite).
  */
@@ -70,8 +72,7 @@ public class CookieSecurityScanner implements SecurityScanner {
 		});
 	}
 
-	private void checkCookie(String cookie, Operation operation, List<Vulnerability> vulns,
-			ch.nexsol.orthrusdast.http.ScanHttpResponse response) {
+	private void checkCookie(String cookie, Operation operation, List<Vulnerability> vulns, ScanHttpResponse response) {
 		String lowerCookie = cookie.toLowerCase();
 		String cookieName = cookie.split("=")[0].trim();
 

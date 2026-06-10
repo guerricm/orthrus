@@ -28,6 +28,10 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.util.HashMap;
+import java.util.Map;
+import reactor.core.publisher.Mono;
+
 /**
  * Scans for HTTP Request Smuggling (CWE-444).
  */
@@ -60,7 +64,7 @@ public class RequestSmugglingScanner implements SecurityScanner {
 			List<String> malformedTEs = List.of("chunked, cow", "cow, chunked", " chunked", "chunked ");
 
 			return Flux.fromIterable(malformedTEs).concatMap((te) -> {
-				java.util.Map<String, String> newHeaders = new java.util.HashMap<>(operation.headers());
+				Map<String, String> newHeaders = new HashMap<>(operation.headers());
 				newHeaders.put("Transfer-Encoding", te);
 				newHeaders.put("Content-Length", "4"); // Intentionally set conflicting CL
 														// (if http client allows it)
@@ -70,11 +74,11 @@ public class RequestSmugglingScanner implements SecurityScanner {
 						operation.securityRequirements(), operation.expectedContentTypes(), operation.authScheme());
 
 				return httpClient.send(testOp)
-					.onErrorResume((e) -> reactor.core.publisher.Mono.empty()) // Client
-																				// might
-																				// reject
-																				// it
-																				// locally
+					.onErrorResume((e) -> Mono.empty()) // Client
+														// might
+														// reject
+														// it
+														// locally
 					.flatMapMany((response) -> {
 						// If the server accepted the malformed TE header without a 400
 						// Bad Request,

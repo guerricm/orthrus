@@ -31,6 +31,9 @@ import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 
+import ch.nexsol.orthrusdast.scanner.SecurityScanner;
+import java.util.Comparator;
+
 /**
  * High-level orchestration service. Finds the right discoverer and triggers the
  * ScanEngine.
@@ -81,11 +84,7 @@ public class ScanService {
 	 * @return the result
 	 */
 	public List<String> getAvailableScanners() {
-		return scanEngine.getAllScanners()
-			.stream()
-			.map(ch.nexsol.orthrusdast.scanner.SecurityScanner::getId)
-			.sorted()
-			.toList();
+		return scanEngine.getAllScanners().stream().map(SecurityScanner::getId).sorted().toList();
 	}
 
 	/**
@@ -93,11 +92,8 @@ public class ScanService {
 	 * names/descriptions).
 	 * @return the result
 	 */
-	public List<ch.nexsol.orthrusdast.scanner.SecurityScanner> getAvailableScannerObjects() {
-		return scanEngine.getAllScanners()
-			.stream()
-			.sorted(java.util.Comparator.comparing(ch.nexsol.orthrusdast.scanner.SecurityScanner::getId))
-			.toList();
+	public List<SecurityScanner> getAvailableScannerObjects() {
+		return scanEngine.getAllScanners().stream().sorted(Comparator.comparing(SecurityScanner::getId)).toList();
 	}
 
 }

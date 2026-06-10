@@ -35,6 +35,10 @@ import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import java.util.HashMap;
+import org.springframework.http.HttpMethod;
+
 @Component
 public class GraphqlDiscoverer implements EndpointDiscoverer {
 
@@ -56,11 +60,11 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 	}
 
 	@Override
-	public Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-		ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
+	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
+		SecurityScheme authScheme = config != null ? config.authScheme() : null;
 		log.info("Starting GraphQL discovery on {}", target);
 
-		Operation introspectionOp = new Operation(target, org.springframework.http.HttpMethod.POST,
+		Operation introspectionOp = new Operation(target, HttpMethod.POST,
 				Map.of("Content-Type", "application/json", "Accept", "application/json"), Collections.emptyMap(),
 				INTROSPECTION_QUERY, Collections.emptyList(), List.of("application/json"), authScheme);
 
@@ -102,7 +106,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 								String queryBody = buildDummyQuery(typeName.equals(mutationTypeName), fieldName,
 										fieldNode.path("args"));
 
-								Operation op = new Operation(targetUrl, org.springframework.http.HttpMethod.POST,
+								Operation op = new Operation(targetUrl, HttpMethod.POST,
 										Map.of("Content-Type", "application/json"), Collections.emptyMap(), queryBody,
 										Collections.emptyList(), List.of("application/json"), authScheme);
 								operations.add(op);
@@ -123,7 +127,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 		StringBuilder queryBuilder = new StringBuilder();
 		StringBuilder varsDefBuilder = new StringBuilder();
 		StringBuilder varsCallBuilder = new StringBuilder();
-		Map<String, Object> variablesMap = new java.util.HashMap<>();
+		Map<String, Object> variablesMap = new HashMap<>();
 
 		queryBuilder.append(isMutation ? "mutation" : "query");
 
@@ -156,7 +160,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 			.append(" { __typename } }");
 
 		try {
-			Map<String, Object> payload = new java.util.HashMap<>();
+			Map<String, Object> payload = new HashMap<>();
 			payload.put("query", queryBuilder.toString());
 			if (!variablesMap.isEmpty()) {
 				payload.put("variables", variablesMap);

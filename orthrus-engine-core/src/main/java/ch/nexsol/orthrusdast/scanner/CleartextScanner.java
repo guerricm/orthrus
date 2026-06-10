@@ -28,6 +28,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import reactor.core.publisher.Mono;
+
 /**
  * Scans for Cleartext Transmission (CWE-319).
  */
@@ -69,11 +71,11 @@ public class CleartextScanner implements SecurityScanner {
 						operation.expectedContentTypes(), operation.authScheme());
 
 				return httpClient.send(testOp)
-					.onErrorResume((e) -> reactor.core.publisher.Mono.empty()) // Connection
-																				// refused
-																				// is good
-																				// (HTTP
-																				// disabled)
+					.onErrorResume((e) -> Mono.empty()) // Connection
+														// refused
+														// is good
+														// (HTTP
+														// disabled)
 					.flatMapMany((response) -> {
 						if (response.isSuccessful()) {
 							return Flux.just(createCleartextVuln(operation, testOp, false,

@@ -26,6 +26,10 @@ import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.model.Operation;
 
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
+import org.springframework.http.HttpMethod;
+
 /**
  * "Discoverer" that just takes a single URL (like a curl command) and treats it as the
  * only operation.
@@ -41,8 +45,8 @@ public class CurlDiscoverer implements EndpointDiscoverer {
 	}
 
 	@Override
-	public Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-		ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
+	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
+		SecurityScheme authScheme = config != null ? config.authScheme() : null;
 		log.info("Registering single target for curl-like scan: {}", target);
 
 		// Assume GET if not otherwise specified. Advanced curl-like usage (setting
@@ -50,7 +54,7 @@ public class CurlDiscoverer implements EndpointDiscoverer {
 		// would require parsing target string if it contained CLI-like flags,
 		// but for now we just take the URL as target.
 
-		Operation op = Operation.simple(target, org.springframework.http.HttpMethod.GET).withAuth(authScheme);
+		Operation op = Operation.simple(target, HttpMethod.GET).withAuth(authScheme);
 		return Mono.just(List.of(op));
 	}
 

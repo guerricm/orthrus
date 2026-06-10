@@ -16,6 +16,8 @@
 
 package ch.nexsol.orthrusdast.model;
 
+import java.util.Base64;
+
 /**
  * Represents an authentication scheme to apply to scan requests. Supports Bearer tokens,
  * API keys, Basic auth, and OAuth2.
@@ -60,7 +62,7 @@ public record SecurityScheme(AuthType type, String value, String headerName, Str
 	 * Create a Basic Auth scheme from username:password.
 	 */
 	public static SecurityScheme basic(String username, String password) {
-		String encoded = java.util.Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+		String encoded = Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
 		return new SecurityScheme(AuthType.BASIC, encoded, "Authorization", null, ParamLocation.HEADER);
 	}
 

@@ -14,17 +14,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import org.mockito.ArgumentMatchers;
+import reactor.core.publisher.Mono;
+
 class ScanCommandTest {
 
 	@Test
 	void testCallWithValidParameters() throws Exception {
 		ScanService scanService = Mockito.mock(ScanService.class);
-		when(scanService.executeScan(anyString(), any(), any())).thenReturn(reactor.core.publisher.Flux.empty());
+		when(scanService.executeScan(anyString(), any(), any())).thenReturn(Flux.empty());
 
 		ReportGenerator mockGenerator = Mockito.mock(ReportGenerator.class);
 		when(mockGenerator.getFormat()).thenReturn("json");
-		when(mockGenerator.generateReport(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
-			.thenReturn(reactor.core.publisher.Mono.empty());
+		when(mockGenerator.generateReport(any(), any(), ArgumentMatchers.anyBoolean())).thenReturn(Mono.empty());
 
 		OAuth2TokenFetcher mockFetcher = Mockito.mock(OAuth2TokenFetcher.class);
 

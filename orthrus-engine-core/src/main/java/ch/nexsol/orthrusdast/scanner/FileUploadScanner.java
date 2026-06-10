@@ -28,6 +28,9 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Scans for Unrestricted File Upload vulnerabilities (CWE-434).
  */
@@ -95,7 +98,7 @@ public class FileUploadScanner implements SecurityScanner {
 				+ filename + "\"\r\n" + "Content-Type: " + contentType + "\r\n\r\n" + payload + "\r\n" + "--" + boundary
 				+ "--\r\n";
 
-		java.util.Map<String, String> newHeaders = new java.util.HashMap<>(operation.headers());
+		Map<String, String> newHeaders = new HashMap<>(operation.headers());
 		newHeaders.put("Content-Type", "multipart/form-data; boundary=" + boundary);
 
 		Operation testOp = new Operation(operation.url(), operation.method(), newHeaders, operation.queryParams(),

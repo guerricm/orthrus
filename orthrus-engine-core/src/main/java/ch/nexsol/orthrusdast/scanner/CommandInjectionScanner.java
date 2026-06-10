@@ -29,6 +29,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.scanner.oast.OastService;
+
 /**
  * Scans for OS Command Injection vulnerabilities (CWE-78).
  */
@@ -51,10 +53,9 @@ public class CommandInjectionScanner implements SecurityScanner {
 			"& echo " + CALC_PAYLOAD_CONTENT, "$(echo " + CALC_PAYLOAD_CONTENT + ")",
 			"`echo " + CALC_PAYLOAD_CONTENT + "`" };
 
-	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final OastService oastService;
 
-	public CommandInjectionScanner(ScanHttpClient httpClient,
-			ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+	public CommandInjectionScanner(ScanHttpClient httpClient, OastService oastService) {
 		this.httpClient = httpClient;
 		this.oastService = oastService;
 	}

@@ -11,6 +11,8 @@ import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.model.NodeStatus;
 
+import java.time.Instant;
+
 @Repository
 public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, String> {
 
@@ -18,16 +20,15 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 
 	@Modifying
 	@Query("INSERT INTO \"slave_nodes\" (id, url, status, last_seen_at) VALUES (:id, :url, :status, :lastSeenAt)")
-	Mono<Void> insertSlaveNode(String id, String url, NodeStatus status, java.time.Instant lastSeenAt);
+	Mono<Void> insertSlaveNode(String id, String url, NodeStatus status, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
-	Mono<Integer> updateSlaveNodeStatusAndLastSeenAt(String id, String status, java.time.Instant lastSeenAt);
+	Mono<Integer> updateSlaveNodeStatusAndLastSeenAt(String id, String status, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
-	Mono<Integer> updateSlaveNodeUrlStatusAndLastSeenAt(String id, String url, String status,
-			java.time.Instant lastSeenAt);
+	Mono<Integer> updateSlaveNodeUrlStatusAndLastSeenAt(String id, String url, String status, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET max_concurrent_scans = :maxConcurrentScans WHERE id = :id")
@@ -39,6 +40,6 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET status = 'OFFLINE' WHERE status != 'OFFLINE' AND last_seen_at < :cutoff")
-	Mono<Integer> markOfflineSlaves(java.time.Instant cutoff);
+	Mono<Integer> markOfflineSlaves(Instant cutoff);
 
 }

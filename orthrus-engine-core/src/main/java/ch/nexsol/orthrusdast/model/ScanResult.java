@@ -20,6 +20,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import java.time.Duration;
+
 /**
  * Result of a complete scan session.
  */
@@ -31,7 +33,7 @@ public record ScanResult(String id, String targetUrl, Instant scanStartTime, Ins
 		if (scanStartTime == null || scanEndTime == null) {
 			return "0s";
 		}
-		long seconds = java.time.Duration.between(scanStartTime, scanEndTime).getSeconds();
+		long seconds = Duration.between(scanStartTime, scanEndTime).getSeconds();
 		if (seconds == 0) {
 			return "less than 1s";
 		}

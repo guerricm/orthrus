@@ -32,6 +32,10 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.scanner.oast.OastService;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
+
 /**
  * Scans for Cross-Site Scripting (XSS) (CWE-79).
  */
@@ -44,16 +48,14 @@ public class XssScanner implements SecurityScanner {
 
 	private final ObjectMapper mapper = new ObjectMapper();
 
-	private final ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService payloadLoader;
+	private final PayloadLoaderService payloadLoader;
 
-	private final ch.nexsol.orthrusdast.scanner.payload.PayloadMutator payloadMutator;
+	private final PayloadMutator payloadMutator;
 
-	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final OastService oastService;
 
-	public XssScanner(ScanHttpClient httpClient,
-			ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService payloadLoader,
-			ch.nexsol.orthrusdast.scanner.payload.PayloadMutator payloadMutator,
-			ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+	public XssScanner(ScanHttpClient httpClient, PayloadLoaderService payloadLoader, PayloadMutator payloadMutator,
+			OastService oastService) {
 		this.httpClient = httpClient;
 		this.payloadLoader = payloadLoader;
 		this.payloadMutator = payloadMutator;
@@ -77,8 +79,7 @@ public class XssScanner implements SecurityScanner {
 
 				Flux<Vulnerability> scanVulns = payloadLoader.getPayloads("xss").concatMap((rawPayload) -> {
 					String oastPayload = rawPayload.replace("{{OAST_HOST}}", oastSession.domain());
-					String payload = payloadMutator.mutate(oastPayload,
-							ch.nexsol.orthrusdast.scanner.payload.PayloadMutator.Context.URL_PARAM);
+					String payload = payloadMutator.mutate(oastPayload, PayloadMutator.Context.URL_PARAM);
 
 					return InjectionHelper.generateInjectedOperations(operation, payload)
 						.concatMap((test) -> executeAndCheck(test.mutatedOperation(), operation, test.injectionPoint(),

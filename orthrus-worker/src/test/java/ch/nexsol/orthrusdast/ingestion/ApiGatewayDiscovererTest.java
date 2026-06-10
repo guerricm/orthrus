@@ -21,6 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer;
+import java.util.Map;
+import org.springframework.http.HttpMethod;
+import reactor.core.publisher.Mono;
+
 class ApiGatewayDiscovererTest {
 
 	private MockWebServer mockWebServer;
@@ -31,14 +36,12 @@ class ApiGatewayDiscovererTest {
 	void setUp() throws IOException {
 		mockWebServer = new MockWebServer();
 		mockWebServer.start();
-		ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer mockBlackbox = new ch.nexsol.orthrusdast.ingestion.BlackboxDiscoverer(
-				new OrthrusProperties()) {
+		BlackboxDiscoverer mockBlackbox = new BlackboxDiscoverer(new OrthrusProperties()) {
 			@Override
-			public reactor.core.publisher.Mono<List<Operation>> discover(String target,
-					ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-				Operation op = new Operation(target, org.springframework.http.HttpMethod.GET, java.util.Map.of(), java.util.Map.of(), null, List.of(),
-						List.of(), null);
-				return reactor.core.publisher.Mono.just(List.of(op));
+			public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
+				Operation op = new Operation(target, HttpMethod.GET, Map.of(), Map.of(), null, List.of(), List.of(),
+						null);
+				return Mono.just(List.of(op));
 			}
 		};
 		discoverer = new ApiGatewayDiscoverer(mockBlackbox);
@@ -99,7 +102,7 @@ class ApiGatewayDiscovererTest {
 			Operation op = operations.get(0);
 			assertTrue(op.url().endsWith("/api/v2/orders"));
 			// Traefik adds default methods if not specified
-			assertEquals(org.springframework.http.HttpMethod.GET, op.method());
+			assertEquals(HttpMethod.GET, op.method());
 		}).verifyComplete();
 	}
 

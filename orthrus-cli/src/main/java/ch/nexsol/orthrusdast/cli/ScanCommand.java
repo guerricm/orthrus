@@ -24,6 +24,13 @@ import java.util.stream.Collectors;
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.model.OAuth2Config;
 
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.Vulnerability;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.UUID;
+
 @Component
 @Command(name = "scan", description = "Run a VulnAPI security scan", mixinStandardHelpOptions = true,
 		version = "Orthrus DAST CLI 0.0.4-SNAPSHOT")
@@ -153,33 +160,28 @@ public class ScanCommand implements Callable<Integer> {
 
 		try {
 			// Block until scan is complete because this is a CLI command
-			java.time.Instant startTime = java.time.Instant.now();
-			List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = scanService
-				.executeScan(discovererId, target, config)
-				.collectList()
-				.block();
+			Instant startTime = Instant.now();
+			List<ScanAttempt> attempts = scanService.executeScan(discovererId, target, config).collectList().block();
 
 			if (attempts == null) {
 				attempts = List.of();
 			}
 
 			int testsCount = attempts.size();
-			List<ch.nexsol.orthrusdast.model.Vulnerability> vulnerabilities = attempts.stream()
+			List<Vulnerability> vulnerabilities = attempts.stream()
 				.filter(a -> a.vulnerabilities() != null)
 				.flatMap(a -> a.vulnerabilities().stream())
-				.sorted(java.util.Comparator.comparing(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel).reversed())
+				.sorted(Comparator.comparing(Vulnerability::riskLevel).reversed())
 				.toList();
 
-			Map<ch.nexsol.orthrusdast.model.RiskLevel, Long> riskSummary = vulnerabilities.stream()
-				.collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::riskLevel,
-						Collectors.counting()));
+			Map<RiskLevel, Long> riskSummary = vulnerabilities.stream()
+				.collect(Collectors.groupingBy(Vulnerability::riskLevel, Collectors.counting()));
 			Map<String, Integer> scannerSummary = vulnerabilities.stream()
-				.collect(Collectors.groupingBy(ch.nexsol.orthrusdast.model.Vulnerability::scannerId,
+				.collect(Collectors.groupingBy(Vulnerability::scannerId,
 						Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
-			ScanResult result = new ScanResult(java.util.UUID.randomUUID().toString(), target, startTime,
-					java.time.Instant.now(), 0, testsCount, vulnerabilities, riskSummary, scannerSummary, config,
-					attempts, discovererId);
+			ScanResult result = new ScanResult(UUID.randomUUID().toString(), target, startTime, Instant.now(), 0,
+					testsCount, vulnerabilities, riskSummary, scannerSummary, config, attempts, discovererId);
 
 			ReportGenerator generator = reportGenerators.get(format.toLowerCase());
 			if (generator == null) {

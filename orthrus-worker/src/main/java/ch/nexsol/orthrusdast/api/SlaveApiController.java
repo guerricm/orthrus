@@ -12,6 +12,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import ch.nexsol.orthrusdast.model.NodeStatus;
 import java.util.List;
 
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
+
 @RestController
 @RequestMapping("/api/v1/slave")
 @ConditionalOnProperty(name = "orthrus.slave.mode", havingValue = "server", matchIfMissing = true)
@@ -23,7 +32,7 @@ public class SlaveApiController {
 
 	private final ObjectMapper objectMapper;
 
-	private final java.util.Map<Long, reactor.core.Disposable> activeJobs = new java.util.concurrent.ConcurrentHashMap<>();
+	private final Map<Long, Disposable> activeJobs = new ConcurrentHashMap<>();
 
 	public SlaveApiController(ScanService scanService, MasterApiClient masterApiClient, ObjectMapper objectMapper) {
 		this.scanService = scanService;
@@ -38,16 +47,15 @@ public class SlaveApiController {
 
 		return Mono.fromCallable(() -> objectMapper.readValue(request.scanConfigurationJson(), ScanConfiguration.class))
 			.flatMap(config -> {
-				java.time.Instant startTime = java.time.Instant.now();
-				java.util.concurrent.atomic.AtomicInteger testsCount = new java.util.concurrent.atomic.AtomicInteger();
-				java.util.concurrent.atomic.AtomicInteger vulnsCount = new java.util.concurrent.atomic.AtomicInteger();
+				Instant startTime = Instant.now();
+				AtomicInteger testsCount = new AtomicInteger();
+				AtomicInteger vulnsCount = new AtomicInteger();
 
-				reactor.core.Disposable disposable = scanService
-					.executeScan(request.discovererId(), request.target(), config)
-					.bufferTimeout(10, java.time.Duration.ofSeconds(1))
+				Disposable disposable = scanService.executeScan(request.discovererId(), request.target(), config)
+					.bufferTimeout(10, Duration.ofSeconds(1))
 					.flatMap(batch -> {
 						testsCount.addAndGet(batch.size());
-						for (ch.nexsol.orthrusdast.model.ScanAttempt attempt : batch) {
+						for (ScanAttempt attempt : batch) {
 							if (attempt.vulnerabilities() != null) {
 								vulnsCount.addAndGet(attempt.vulnerabilities().size());
 							}
@@ -55,14 +63,13 @@ public class SlaveApiController {
 						return masterApiClient.sendJobAttemptsBatch(request.jobId(), batch);
 					})
 					.then(Mono.defer(() -> {
-						org.slf4j.LoggerFactory.getLogger(SlaveApiController.class)
+						LoggerFactory.getLogger(SlaveApiController.class)
 							.info("Scan job {} completed. {} tests executed, {} vulnerabilities found.",
 									request.jobId(), testsCount.get(), vulnsCount.get());
 						return masterApiClient.completeJob(request.jobId(), startTime);
 					}))
 					.doOnError(e -> {
-						org.slf4j.LoggerFactory.getLogger(SlaveApiController.class)
-							.error("Error executing scan job", e);
+						LoggerFactory.getLogger(SlaveApiController.class).error("Error executing scan job", e);
 						masterApiClient.failJob(request.jobId(), "Slave encountered an error: " + e.getMessage())
 							.subscribe();
 					})
@@ -82,7 +89,7 @@ public class SlaveApiController {
 
 	@DeleteMapping("/scans/{id}")
 	public Mono<ResponseEntity<Void>> cancelScanJob(@PathVariable Long id) {
-		reactor.core.Disposable disposable = activeJobs.remove(id);
+		Disposable disposable = activeJobs.remove(id);
 		if (disposable != null && !disposable.isDisposed()) {
 			disposable.dispose();
 			masterApiClient.setStatus(NodeStatus.IDLE);

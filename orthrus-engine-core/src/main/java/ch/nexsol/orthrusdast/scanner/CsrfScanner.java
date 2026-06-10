@@ -28,6 +28,9 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Scans for Cross-Site Request Forgery (CSRF) vulnerabilities (CWE-352).
  */
@@ -59,8 +62,8 @@ public class CsrfScanner implements SecurityScanner {
 			}
 
 			// Strategy 1: Strip explicit CSRF tokens and set Origin
-			java.util.Map<String, String> noTokenHeaders = new java.util.HashMap<>(
-					operation.headers() != null ? operation.headers() : new java.util.HashMap<>());
+			Map<String, String> noTokenHeaders = new HashMap<>(
+					operation.headers() != null ? operation.headers() : new HashMap<>());
 			noTokenHeaders.keySet()
 				.removeIf((k) -> k.toLowerCase().contains("csrf") || k.toLowerCase().contains("xsrf")
 						|| k.equalsIgnoreCase("X-Requested-With"));
@@ -72,7 +75,7 @@ public class CsrfScanner implements SecurityScanner {
 
 			// Strategy 2: Content-Type bypass. Send text/plain instead of
 			// application/json to bypass preflight CORS checks.
-			java.util.Map<String, String> plainHeaders = new java.util.HashMap<>(noTokenHeaders);
+			Map<String, String> plainHeaders = new HashMap<>(noTokenHeaders);
 			plainHeaders.put("Content-Type", "text/plain");
 
 			Operation testOpPlain = new Operation(operation.url(), operation.method(), plainHeaders,

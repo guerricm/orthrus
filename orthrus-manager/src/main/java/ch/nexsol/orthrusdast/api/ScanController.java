@@ -15,6 +15,11 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
+import ch.nexsol.orthrusdast.entity.ScanJobEntity;
+import ch.nexsol.orthrusdast.model.JobStatus;
+import ch.nexsol.orthrusdast.repository.ScanJobRepository;
+import org.slf4j.LoggerFactory;
+
 /**
  * Reactive REST Controller for triggering scans via HTTP.
  */
@@ -24,12 +29,11 @@ public class ScanController {
 
 	private final OAuth2TokenFetcher tokenFetcher;
 
-	private final ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository;
+	private final ScanJobRepository scanJobRepository;
 
 	private final tools.jackson.databind.ObjectMapper objectMapper;
 
-	public ScanController(OAuth2TokenFetcher tokenFetcher,
-			ch.nexsol.orthrusdast.repository.ScanJobRepository scanJobRepository,
+	public ScanController(OAuth2TokenFetcher tokenFetcher, ScanJobRepository scanJobRepository,
 			tools.jackson.databind.ObjectMapper objectMapper) {
 		this.tokenFetcher = tokenFetcher;
 		this.scanJobRepository = scanJobRepository;
@@ -75,9 +79,8 @@ public class ScanController {
 						request.oauth2(), request.overrideHost());
 
 				return Mono.fromCallable(() -> objectMapper.writeValueAsString(config)).flatMap(configJson -> {
-					ch.nexsol.orthrusdast.entity.ScanJobEntity job = new ch.nexsol.orthrusdast.entity.ScanJobEntity(
-							request.discovererId(), request.target(), configJson,
-							ch.nexsol.orthrusdast.model.JobStatus.PENDING, null);
+					ScanJobEntity job = new ScanJobEntity(request.discovererId(), request.target(), configJson,
+							JobStatus.PENDING, null);
 					return scanJobRepository.save(job);
 				})
 					.map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need
@@ -88,7 +91,7 @@ public class ScanController {
 																						// return
 																						// job
 																						// ID
-					.doOnError(e -> org.slf4j.LoggerFactory.getLogger(ScanController.class)
+					.doOnError(e -> LoggerFactory.getLogger(ScanController.class)
 						.error("Failed to create or save scan job for target: {}", request.target(), e));
 			})
 			.onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()))

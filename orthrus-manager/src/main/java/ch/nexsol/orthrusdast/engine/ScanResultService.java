@@ -24,6 +24,14 @@ import java.util.Map;
 import java.util.Collections;
 import java.util.stream.Collectors;
 
+import ch.nexsol.orthrusdast.model.AttemptStatus;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+
 @Service
 public class ScanResultService {
 
@@ -63,10 +71,10 @@ public class ScanResultService {
 		});
 	}
 
-	public Mono<Void> saveBatch(String resultId, List<ch.nexsol.orthrusdast.model.ScanAttempt> batch) {
-		List<VulnerabilityEntity> vulnEntities = new java.util.ArrayList<>();
-		List<ScanAttemptEntity> attemptEntities = new java.util.ArrayList<>();
-		for (ch.nexsol.orthrusdast.model.ScanAttempt attempt : batch) {
+	public Mono<Void> saveBatch(String resultId, List<ScanAttempt> batch) {
+		List<VulnerabilityEntity> vulnEntities = new ArrayList<>();
+		List<ScanAttemptEntity> attemptEntities = new ArrayList<>();
+		for (ScanAttempt attempt : batch) {
 			attemptEntities.add(new ScanAttemptEntity(null, resultId, attempt.scannerId(), attempt.scannerName(),
 					attempt.operationMethod(), attempt.operationUrl(), attempt.status().name()));
 
@@ -85,14 +93,14 @@ public class ScanResultService {
 		return Mono.when(saveAttempts, saveVulns);
 	}
 
-	public Mono<Void> createPlaceholderResult(String resultId, String targetUrl, java.time.Instant startTime) {
+	public Mono<Void> createPlaceholderResult(String resultId, String targetUrl, Instant startTime) {
 		ScanResultEntity entity = new ScanResultEntity(resultId, targetUrl, startTime, null, 0, 0);
 		// Only insert if it doesn't exist
 		return scanResultRepository.findById(resultId).switchIfEmpty(scanResultRepository.save(entity)).then();
 	}
 
-	public Mono<ScanResult> finalizeJobResult(String resultId, String targetUrl, java.time.Instant startTime,
-			java.time.Instant endTime, int testsCount) {
+	public Mono<ScanResult> finalizeJobResult(String resultId, String targetUrl, Instant startTime, Instant endTime,
+			int testsCount) {
 		return scanResultRepository.finalizeScanResult(resultId, endTime, testsCount)
 			.defaultIfEmpty(0)
 			.flatMap(rows -> {
@@ -139,8 +147,7 @@ public class ScanResultService {
 	}
 
 	public Flux<ScanResult> getHistory(int page, int size) {
-		return scanResultRepository
-			.findAllByOrderByScanStartTimeDesc(org.springframework.data.domain.PageRequest.of(page, size))
+		return scanResultRepository.findAllByOrderByScanStartTimeDesc(PageRequest.of(page, size))
 			.flatMap(entity -> Mono.zip(vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
 					scanAttemptRepository.findByScanResultId(entity.id()).collectList(),
 					scanJobRepository.findByResultId(entity.id()).map(job -> {
@@ -181,7 +188,7 @@ public class ScanResultService {
 				catch (NumberFormatException ignored) {
 				}
 			}
-			return new Vulnerability(java.util.UUID.randomUUID().toString(), ve.vulnerabilityTitle(),
+			return new Vulnerability(UUID.randomUUID().toString(), ve.vulnerabilityTitle(),
 					ve.vulnerabilityDescription(),
 					ve.riskLevel() != null ? RiskLevel.valueOf(ve.riskLevel()) : RiskLevel.INFO,
 					ve.confidence() != null ? Vulnerability.Confidence.valueOf(ve.confidence())
@@ -191,7 +198,7 @@ public class ScanResultService {
 							: Collections.emptyList(),
 					ve.cvssBaseScore(), ve.evidence(), ve.recommendation(), ve.requestSummary(), ve.responseSummary(),
 					ve.attackVector(), ve.technicalImpact());
-		}).sorted(java.util.Comparator.comparing(Vulnerability::riskLevel).reversed()).toList();
+		}).sorted(Comparator.comparing(Vulnerability::riskLevel).reversed()).toList();
 
 		Map<RiskLevel, Long> riskSummary = vulnerabilities.stream()
 			.collect(Collectors.groupingBy(Vulnerability::riskLevel, Collectors.counting()));
@@ -200,13 +207,13 @@ public class ScanResultService {
 			.collect(Collectors.groupingBy(Vulnerability::scannerId,
 					Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
-		List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = attemptEntities.stream().map(ae -> {
+		List<ScanAttempt> attempts = attemptEntities.stream().map(ae -> {
 			List<Vulnerability> relatedVulns = vulnerabilities.stream()
 				.filter(v -> v.scannerId().equals(ae.scannerId()) && v.operationMethod().equals(ae.operationMethod())
 						&& v.operationUrl().equals(ae.operationUrl()))
 				.toList();
-			return new ch.nexsol.orthrusdast.model.ScanAttempt(ae.scannerId(), ae.scannerName(), ae.operationMethod(),
-					ae.operationUrl(), ch.nexsol.orthrusdast.model.AttemptStatus.valueOf(ae.status()), relatedVulns);
+			return new ScanAttempt(ae.scannerId(), ae.scannerName(), ae.operationMethod(), ae.operationUrl(),
+					AttemptStatus.valueOf(ae.status()), relatedVulns);
 		}).toList();
 
 		return new ScanResult(entity.id(), entity.targetUrl(), entity.scanStartTime(), entity.scanEndTime(),

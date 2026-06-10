@@ -35,6 +35,11 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.scanner.oast.OastService;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
+import org.springframework.http.HttpMethod;
+
 /**
  * Scans GraphQL Operations for Injection Vulnerabilities (SQLi, XSS, CmdInj) by injecting
  * payloads into GraphQL variables.
@@ -48,16 +53,14 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	private final ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService payloadLoader;
+	private final PayloadLoaderService payloadLoader;
 
-	private final ch.nexsol.orthrusdast.scanner.payload.PayloadMutator payloadMutator;
+	private final PayloadMutator payloadMutator;
 
-	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final OastService oastService;
 
-	public GraphqlInjectionScanner(ScanHttpClient httpClient,
-			ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService payloadLoader,
-			ch.nexsol.orthrusdast.scanner.payload.PayloadMutator payloadMutator,
-			ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+	public GraphqlInjectionScanner(ScanHttpClient httpClient, PayloadLoaderService payloadLoader,
+			PayloadMutator payloadMutator, OastService oastService) {
 		this.httpClient = httpClient;
 		this.payloadLoader = payloadLoader;
 		this.payloadMutator = payloadMutator;
@@ -77,7 +80,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			if (!org.springframework.http.HttpMethod.POST.equals(operation.method()) || operation.body() == null
+			if (!HttpMethod.POST.equals(operation.method()) || operation.body() == null
 					|| !operation.body().contains("\"variables\"")) {
 				return Flux.empty();
 			}
@@ -102,8 +105,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 					Flux<Vulnerability> scanVulns = Flux.fromIterable(variables.keySet())
 						.flatMap((varName) -> allPayloads.concatMap((rawPayload) -> {
 							String oastPayload = rawPayload.replace("{{OAST_HOST}}", oastSession.domain());
-							String payload = payloadMutator.mutate(oastPayload,
-									ch.nexsol.orthrusdast.scanner.payload.PayloadMutator.Context.JSON_BODY);
+							String payload = payloadMutator.mutate(oastPayload, PayloadMutator.Context.JSON_BODY);
 							return testVariable(operation, bodyMap, variables, varName, payload);
 						}));
 

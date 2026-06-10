@@ -26,6 +26,11 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
+import java.net.URI;
+import java.util.Map;
+
 /**
  * Interface for all security scanners.
  */
@@ -47,7 +52,7 @@ public interface SecurityScanner {
 	 * @param config the scan configuration
 	 * @return a Flux of found vulnerabilities
 	 */
-	default Flux<Vulnerability> scan(Operation operation, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
+	default Flux<Vulnerability> scan(Operation operation, ScanConfiguration config) {
 		return scan(operation);
 	}
 
@@ -111,7 +116,7 @@ public interface SecurityScanner {
 
 		try {
 			if (url != null) {
-				java.net.URI uri = java.net.URI.create(url);
+				URI uri = URI.create(url);
 				if (uri.getHost() != null) {
 					sb.append("Host: ").append(uri.getHost()).append("\n");
 				}
@@ -124,15 +129,14 @@ public interface SecurityScanner {
 		sb.append("User-Agent: Orthrus-DAST/1.0\n");
 		sb.append("Accept: */*\n");
 
-		if (op.authScheme() != null
-				&& op.authScheme().paramLocation() == ch.nexsol.orthrusdast.model.SecurityScheme.ParamLocation.HEADER) {
+		if (op.authScheme() != null && op.authScheme().paramLocation() == SecurityScheme.ParamLocation.HEADER) {
 			String headerName = op.authScheme().headerName() != null ? op.authScheme().headerName() : "Authorization";
 			sb.append(headerName).append(": ").append(op.authScheme().toAuthorizationHeaderValue()).append("\n");
 		}
 
 		boolean hasContentType = false;
 		if (op.headers() != null) {
-			for (java.util.Map.Entry<String, String> entry : op.headers().entrySet()) {
+			for (Map.Entry<String, String> entry : op.headers().entrySet()) {
 				if ("Content-Type".equalsIgnoreCase(entry.getKey())) {
 					hasContentType = true;
 				}

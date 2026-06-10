@@ -29,6 +29,9 @@ import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import org.springframework.http.HttpMethod;
+
 /**
  * Discovers endpoints by checking standard well-known paths.
  */
@@ -53,8 +56,8 @@ public class WellKnownDiscoverer implements EndpointDiscoverer {
 	}
 
 	@Override
-	public Mono<List<Operation>> discover(String targetUrl, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-		ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
+	public Mono<List<Operation>> discover(String targetUrl, ScanConfiguration config) {
+		SecurityScheme authScheme = config != null ? config.authScheme() : null;
 		log.info("Starting well-known path discovery for base URL: {}", targetUrl);
 
 		String baseUrl = targetUrl.endsWith("/") ? targetUrl.substring(0, targetUrl.length() - 1) : targetUrl;
@@ -63,7 +66,7 @@ public class WellKnownDiscoverer implements EndpointDiscoverer {
 	}
 
 	private Mono<Operation> checkPath(String url, SecurityScheme authScheme) {
-		Operation op = Operation.simple(url, org.springframework.http.HttpMethod.GET).withAuth(authScheme);
+		Operation op = Operation.simple(url, HttpMethod.GET).withAuth(authScheme);
 		return httpClient.send(op).flatMap((response) -> {
 			// Only consider it "discovered" if it returns a 200 OK
 			if (response.isSuccessful()) {

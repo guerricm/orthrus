@@ -16,6 +16,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
+import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.Vulnerability;
+import java.time.Duration;
+import java.util.stream.IntStream;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import reactor.core.publisher.Mono;
+
 class ScanEngineTest {
 
 	@Test
@@ -35,13 +49,13 @@ class ScanEngineTest {
 			}
 
 			@Override
-			public Flux<ch.nexsol.orthrusdast.model.Vulnerability> scan(Operation operation) {
+			public Flux<Vulnerability> scan(Operation operation) {
 				return scan(operation, null);
 			}
 
 			@Override
-			public Flux<ch.nexsol.orthrusdast.model.Vulnerability> scan(Operation operation, ScanConfiguration config) {
-				return reactor.core.publisher.Mono.delay(java.time.Duration.ofMillis(50)).doOnSubscribe(s -> {
+			public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config) {
+				return Mono.delay(Duration.ofMillis(50)).doOnSubscribe(s -> {
 					int current = activeScans.incrementAndGet();
 					synchronized (maxScans) {
 						if (current > maxScans.get()) {
@@ -52,39 +66,34 @@ class ScanEngineTest {
 			}
 		};
 
-		ch.nexsol.orthrusdast.http.ScanHttpClient mockHttpClient = org.mockito.Mockito
-			.mock(ch.nexsol.orthrusdast.http.ScanHttpClient.class);
-		org.mockito.Mockito.when(mockHttpClient.send(org.mockito.ArgumentMatchers.any()))
-			.thenReturn(reactor.core.publisher.Mono.just(new ch.nexsol.orthrusdast.http.ScanHttpResponse(
-					org.springframework.http.HttpStatus.OK, new org.springframework.http.HttpHeaders(), "", 0L)));
+		ScanHttpClient mockHttpClient = Mockito.mock(ScanHttpClient.class);
+		Mockito.when(mockHttpClient.send(ArgumentMatchers.any()))
+			.thenReturn(Mono.just(new ScanHttpResponse(HttpStatus.OK, new HttpHeaders(), "", 0L)));
 
 		ScanEngine engine = new ScanEngine(List.of(mockScanner), mockHttpClient);
 
 		// Create 20 operations
-		Operation op = new Operation("http://localhost", org.springframework.http.HttpMethod.GET, Map.of(), Map.of(), null, List.of(), List.of(), null,
-				null, null);
-		List<Operation> operations = java.util.stream.IntStream.range(0, 20).mapToObj(i -> op).toList();
+		Operation op = new Operation("http://localhost", HttpMethod.GET, Map.of(), Map.of(), null, List.of(), List.of(),
+				null, null, null);
+		List<Operation> operations = IntStream.range(0, 20).mapToObj(i -> op).toList();
 
 		// Concurrency set to 5
 		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 5, 5000, 10000, false, "json", null,
 				null, "en", false, GatewayType.AUTO, null, null, null, null);
 
-		ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer mockDiscoverer = new ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer() {
+		EndpointDiscoverer mockDiscoverer = new EndpointDiscoverer() {
 			@Override
 			public String getId() {
 				return "mock-disc";
 			}
 
 			@Override
-			public reactor.core.publisher.Mono<List<Operation>> discover(String target, ScanConfiguration cfg) {
-				return reactor.core.publisher.Mono.just(operations);
+			public Mono<List<Operation>> discover(String target, ScanConfiguration cfg) {
+				return Mono.just(operations);
 			}
 		};
 
-		List<ch.nexsol.orthrusdast.model.ScanAttempt> attempts = engine
-			.runScan(mockDiscoverer, "http://localhost", config)
-			.collectList()
-			.block();
+		List<ScanAttempt> attempts = engine.runScan(mockDiscoverer, "http://localhost", config).collectList().block();
 
 		assertNotNull(attempts);
 		assertEquals(20, attempts.size());

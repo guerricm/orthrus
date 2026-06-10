@@ -31,6 +31,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import org.springframework.http.HttpMethod;
+
 /**
  * Scans for CORS misconfigurations (CWE-346, CWE-942).
  */
@@ -76,7 +78,7 @@ public class CorsScanner implements SecurityScanner {
 			return Flux.fromIterable(payloads)
 				.concatMap(
 						(origin) -> httpClient
-							.sendRaw(operation.url(), org.springframework.http.HttpMethod.OPTIONS,
+							.sendRaw(operation.url(), HttpMethod.OPTIONS,
 									Map.of("Origin", origin, "Access-Control-Request-Method",
 											operation.method().name()),
 									null)

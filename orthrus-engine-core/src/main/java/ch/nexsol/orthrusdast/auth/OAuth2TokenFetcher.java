@@ -34,6 +34,8 @@ import reactor.core.publisher.Mono;
 import ch.nexsol.orthrusdast.model.OAuth2Config;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
+import java.util.Map;
+
 @Service
 public class OAuth2TokenFetcher {
 
@@ -100,7 +102,7 @@ public class OAuth2TokenFetcher {
 			.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
 			.body(BodyInserters.fromFormData(formData))
 			.retrieve()
-			.bodyToMono(java.util.Map.class)
+			.bodyToMono(Map.class)
 			.map((json) -> {
 				String token = (String) json.get("access_token");
 				if (token == null || token.isEmpty() || "null".equals(token)) {

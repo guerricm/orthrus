@@ -43,6 +43,9 @@ import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import org.springframework.http.HttpMethod;
+
 @Component
 public class BlackboxDiscoverer implements EndpointDiscoverer {
 
@@ -60,8 +63,8 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 	}
 
 	@Override
-	public Mono<List<Operation>> discover(String target, ch.nexsol.orthrusdast.model.ScanConfiguration config) {
-		ch.nexsol.orthrusdast.model.SecurityScheme authScheme = config != null ? config.authScheme() : null;
+	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
+		SecurityScheme authScheme = config != null ? config.authScheme() : null;
 		int maxDepth = properties.getDiscovery().getBlackboxMaxDepth();
 		log.info("Starting black-box discovery from: {} (Max Depth: {})", target, maxDepth);
 
@@ -103,8 +106,7 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 				String cleanPath = path.startsWith("/") ? path.substring(1) : path;
 				return client.head().uri(cleanPath).exchangeToMono((response) -> {
 					if (isValidResponse(response.statusCode().value())) {
-						return Mono.just(Operation.simple(baseUrl + cleanPath, org.springframework.http.HttpMethod.GET)
-							.withAuth(authScheme));
+						return Mono.just(Operation.simple(baseUrl + cleanPath, HttpMethod.GET).withAuth(authScheme));
 					}
 					return Mono.<Operation>empty();
 				})
@@ -112,16 +114,14 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 					.switchIfEmpty(client.get().uri(cleanPath).exchangeToMono((response) -> {
 						if (isValidResponse(response.statusCode().value())) {
 							return Mono
-								.just(Operation.simple(baseUrl + cleanPath, org.springframework.http.HttpMethod.GET)
-									.withAuth(authScheme));
+								.just(Operation.simple(baseUrl + cleanPath, HttpMethod.GET).withAuth(authScheme));
 						}
 						return Mono.<Operation>empty();
 					}).onErrorResume((e) -> Mono.empty()))
 					.switchIfEmpty(client.post().uri(cleanPath).exchangeToMono((response) -> {
 						if (isValidResponse(response.statusCode().value())) {
 							return Mono
-								.just(Operation.simple(baseUrl + cleanPath, org.springframework.http.HttpMethod.POST)
-									.withAuth(authScheme));
+								.just(Operation.simple(baseUrl + cleanPath, HttpMethod.POST).withAuth(authScheme));
 						}
 						return Mono.<Operation>empty();
 					}).onErrorResume((e) -> Mono.empty()));
@@ -191,8 +191,7 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 			Document doc = Jsoup.connect(url).timeout(timeoutMs).ignoreHttpErrors(true).ignoreContentType(true).get();
 
 			// Register this page as an endpoint
-			discoveredEndpoints
-				.add(Operation.simple(url, org.springframework.http.HttpMethod.GET).withAuth(authScheme));
+			discoveredEndpoints.add(Operation.simple(url, HttpMethod.GET).withAuth(authScheme));
 
 			// Extract Links
 			Elements links = doc.select("a[href]");
@@ -213,8 +212,7 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 				}
 				if (actionUrl != null && !actionUrl.isEmpty()) {
 					discoveredEndpoints
-						.add(Operation.simple(actionUrl, org.springframework.http.HttpMethod.valueOf(method))
-							.withAuth(authScheme));
+						.add(Operation.simple(actionUrl, HttpMethod.valueOf(method)).withAuth(authScheme));
 					// Follow form action as GET if applicable
 					if ("GET".equals(method)) {
 						crawl(actionUrl, targetHost, depth + 1, visitedUrls, discoveredEndpoints, authScheme);

@@ -28,6 +28,10 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.scanner.oast.OastService;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Scans for XML External Entity (XXE) vulnerabilities.
  */
@@ -40,9 +44,9 @@ public class XxeScanner implements SecurityScanner {
 	private static final String XXE_PAYLOAD = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
 			+ "<!DOCTYPE foo [ <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>" + "<foo>&xxe;</foo>";
 
-	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final OastService oastService;
 
-	public XxeScanner(ScanHttpClient httpClient, ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+	public XxeScanner(ScanHttpClient httpClient, OastService oastService) {
 		this.httpClient = httpClient;
 		this.oastService = oastService;
 	}
@@ -70,7 +74,7 @@ public class XxeScanner implements SecurityScanner {
 						+ "<!DOCTYPE foo [ <!ENTITY xxe SYSTEM \"http://" + oastSession.domain() + "/xxe\"> ]>"
 						+ "<foo>&xxe;</foo>";
 
-				java.util.Map<String, String> newHeaders = new java.util.HashMap<>(operation.headers());
+				Map<String, String> newHeaders = new HashMap<>(operation.headers());
 				newHeaders.put("Content-Type", "application/xml");
 
 				Operation testOpPasswd = new Operation(operation.url(), operation.method(), newHeaders,

@@ -28,6 +28,8 @@ import reactor.core.scheduler.Schedulers;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.time.Duration;
+
 /**
  * Prints a summary report to the console.
  */
@@ -60,7 +62,7 @@ public class ConsoleReportGenerator implements ReportGenerator {
 				writer.println("Target:     " + result.targetUrl());
 				writer.println("Operations: " + result.operationsDiscovered());
 				writer.println("Duration:   "
-						+ java.time.Duration.between(result.scanStartTime(), result.scanEndTime()).toSeconds() + "s");
+						+ Duration.between(result.scanStartTime(), result.scanEndTime()).toSeconds() + "s");
 				writer.println("Total Vulns:"
 						+ (result.vulnerabilities().isEmpty() ? " 0 🎉" : " " + result.vulnerabilities().size()));
 				writer.println();

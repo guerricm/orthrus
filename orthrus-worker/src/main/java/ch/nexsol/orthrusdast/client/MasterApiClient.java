@@ -19,6 +19,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import ch.nexsol.orthrusdast.model.NodeStatus;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Component
 @EnableScheduling
 @ConditionalOnProperty(name = "orthrus.slave.mode", havingValue = "server", matchIfMissing = true)
@@ -34,7 +37,7 @@ public class MasterApiClient {
 
 	private NodeStatus currentStatus = NodeStatus.IDLE;
 
-	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MasterApiClient.class);
+	private static final Logger log = LoggerFactory.getLogger(MasterApiClient.class);
 
 	private boolean masterDownLogged = false;
 

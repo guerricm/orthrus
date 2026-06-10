@@ -30,6 +30,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import org.springframework.http.HttpMethod;
+
 /**
  * Scans for HTTP Method Tampering (CWE-650).
  */
@@ -75,8 +77,8 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 				overrideHeaders.put("X-HTTP-Method", originalMethod);
 				overrideHeaders.put("X-Method-Override", originalMethod);
 
-				Operation overrideOp = new Operation(operation.url(), org.springframework.http.HttpMethod.GET,
-						overrideHeaders, operation.queryParams(), operation.body(), operation.securityRequirements(),
+				Operation overrideOp = new Operation(operation.url(), HttpMethod.GET, overrideHeaders,
+						operation.queryParams(), operation.body(), operation.securityRequirements(),
 						operation.expectedContentTypes(), operation.authScheme());
 
 				overrideVulns = httpClient.send(overrideOp).flatMapMany((response) -> {
@@ -102,8 +104,8 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 	}
 
 	private Flux<Vulnerability> testMethod(Operation operation, String method) {
-		Operation testOp = new Operation(operation.url(), org.springframework.http.HttpMethod.valueOf(method),
-				operation.headers(), operation.queryParams(), null, // No
+		Operation testOp = new Operation(operation.url(), HttpMethod.valueOf(method), operation.headers(),
+				operation.queryParams(), null, // No
 				// body
 				// for
 				// these

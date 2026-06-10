@@ -29,6 +29,11 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import ch.nexsol.orthrusdast.scanner.oast.OastService;
+import java.io.ObjectInputStream;
+import java.lang.Class;
+import java.net.URL;
+
 /**
  * Scans for Insecure Deserialization vulnerabilities by sending known magic bytes or
  * serialized payloads.
@@ -38,15 +43,14 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 
 	private final ScanHttpClient httpClient;
 
-	private final ch.nexsol.orthrusdast.scanner.oast.OastService oastService;
+	private final OastService oastService;
 
 	// Common magic payloads that cause predictable errors if deserialized
 	private static final Map<String, String> PAYLOADS = Map.of("Java Serialized (Hex encoded header)", "rO0ABXNyAA...",
 			"Python Pickle", "c__builtin__\neval\n(Vprint(1)\ntR.", "Jackson/Fastjson Gadget (Error-Based)",
-			"{\"@type\":\"java.lang.Class\",\"val\":\"com.sun.rowset.JdbcRowSetImpl\"}");
+			"{\"@type\":\"Class\",\"val\":\"com.sun.rowset.JdbcRowSetImpl\"}");
 
-	public InsecureDeserializationScanner(ScanHttpClient httpClient,
-			ch.nexsol.orthrusdast.scanner.oast.OastService oastService) {
+	public InsecureDeserializationScanner(ScanHttpClient httpClient, OastService oastService) {
 		this.httpClient = httpClient;
 		this.oastService = oastService;
 	}
@@ -71,7 +75,7 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 			return oastService.createSession().flatMapMany((oastSession) -> {
 
 				// OAST Gadget Payload (Fastjson / Jackson DNS lookup)
-				String oastGadget = "{\"@type\":\"java.net.URL\",\"val\":\"http://" + oastSession.domain() + "\"}";
+				String oastGadget = "{\"@type\":\"URL\",\"val\":\"http://" + oastSession.domain() + "\"}";
 
 				Operation oastOp = new Operation(operation.url(), operation.method(), operation.headers(),
 						operation.queryParams(), oastGadget, operation.securityRequirements(),
@@ -88,11 +92,9 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 					return httpClient.send(testOp).flatMapMany((response) -> {
 						// If the server returns a 500 or stack trace containing
 						// deserialization errors, flag it
-						if (response.statusCode().is5xxServerError()
-								&& (response.bodyContains("java.io.ObjectInputStream")
-										|| response.bodyContains("ClassCastException")
-										|| response.bodyContains("cPickle") || response.bodyContains("fastjson")
-										|| response.bodyContains("Jackson"))) {
+						if (response.statusCode().is5xxServerError() && (response.bodyContains("ObjectInputStream")
+								|| response.bodyContains("ClassCastException") || response.bodyContains("cPickle")
+								|| response.bodyContains("fastjson") || response.bodyContains("Jackson"))) {
 
 							Vulnerability vuln = createVulnerabilityWithTrace("Insecure Deserialization",
 									"The endpoint appears to blindly deserialize the request body. Sending a "
@@ -114,7 +116,7 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 																		// response body
 					.concatWith(oastService.pollInteractions(oastSession)
 						.map((interaction) -> createVulnerabilityWithTrace("Blind Insecure Deserialization (OAST)",
-								"The endpoint successfully deserialized a gadget payload (java.net.URL) and made an out-of-band request to the OAST server.",
+								"The endpoint successfully deserialized a gadget payload (URL) and made an out-of-band request to the OAST server.",
 								RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_502,
 								List.of("CAPEC-586"), 9.8,
 								"An interaction was received from " + interaction.remoteAddress() + " via "

@@ -32,6 +32,15 @@ import reactor.core.publisher.Mono;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.util.UriComponentsBuilder;
+import reactor.util.retry.Retry;
+
 /**
  * Reactive HTTP client wrapper around WebClient. Centralizes all HTTP interactions for
  * scanners: - Timeout management - Auth header injection - Response capture (status,
@@ -114,7 +123,7 @@ public class ScanHttpClient {
 
 		String body = bodyOverride != null ? bodyOverride : operation.body();
 
-		java.util.function.Function<ClientResponse, Mono<ScanHttpResponse>> responseHandler = (clientResponse) -> {
+		Function<ClientResponse, Mono<ScanHttpResponse>> responseHandler = (clientResponse) -> {
 			int status = clientResponse.statusCode().value();
 			if (retryTransientErrors && (status == 429 || status == 502 || status == 503 || status == 504)) {
 				return Mono.error(new TransientHttpException("Transient HTTP error (" + status + ")"));
@@ -135,7 +144,7 @@ public class ScanHttpClient {
 			if (cType == null)
 				cType = extraHeaders.get("Content-Type");
 			if (cType != null) {
-				requestSpec.contentType(org.springframework.http.MediaType.parseMediaType(cType));
+				requestSpec.contentType(MediaType.parseMediaType(cType));
 			}
 			resultMono = requestSpec.bodyValue(body).exchangeToMono(responseHandler);
 		}
@@ -143,16 +152,16 @@ public class ScanHttpClient {
 			resultMono = requestSpec.exchangeToMono(responseHandler);
 		}
 
-		return resultMono.retryWhen(reactor.util.retry.Retry.backoff(4, Duration.ofSeconds(1)) // Retries
-																								// 4
-																								// times
-																								// with
-																								// exp
-																								// backoff
-																								// (1s,
-																								// 2s,
-																								// 4s,
-																								// 8s)
+		return resultMono.retryWhen(Retry.backoff(4, Duration.ofSeconds(1)) // Retries
+																			// 4
+																			// times
+																			// with
+																			// exp
+																			// backoff
+																			// (1s,
+																			// 2s,
+																			// 4s,
+																			// 8s)
 			.filter((e) -> e instanceof TransientHttpException || (retryTransientErrors && isTransientNetworkError(e)))
 			.onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> retrySignal.failure()))
 			.timeout(Duration.ofSeconds(30))
@@ -163,13 +172,13 @@ public class ScanHttpClient {
 				}
 
 				String errorMsg = e.getMessage();
-				if (e instanceof java.util.concurrent.TimeoutException) {
+				if (e instanceof TimeoutException) {
 					errorMsg = "Request timed out after 15 seconds";
 				}
 
 				log.warn("HTTP request failed for {} {}: {}", operation.method().name(), logUrl, errorMsg);
-				return Mono.just(new ScanHttpResponse(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
-						new HttpHeaders(), "Error: " + errorMsg, System.currentTimeMillis() - startTime));
+				return Mono.just(new ScanHttpResponse(HttpStatus.SERVICE_UNAVAILABLE, new HttpHeaders(),
+						"Error: " + errorMsg, System.currentTimeMillis() - startTime));
 			});
 	}
 
@@ -179,7 +188,7 @@ public class ScanHttpClient {
 	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> sendGet(String url) {
-		return send(Operation.simple(url, org.springframework.http.HttpMethod.GET));
+		return send(Operation.simple(url, HttpMethod.GET));
 	}
 
 	/**
@@ -190,8 +199,7 @@ public class ScanHttpClient {
 	 * @param body the body
 	 * @return the result
 	 */
-	public Mono<ScanHttpResponse> sendRaw(String url, org.springframework.http.HttpMethod method,
-			Map<String, String> headers, String body) {
+	public Mono<ScanHttpResponse> sendRaw(String url, HttpMethod method, Map<String, String> headers, String body) {
 		Operation op = Operation.withHeaders(url, method, headers, body);
 		return send(op);
 	}
@@ -206,9 +214,8 @@ public class ScanHttpClient {
 		return Mono.defer(() -> send(operation)).repeat(count - 1).last();
 	}
 
-	private java.net.URI buildUri(Operation operation) {
-		org.springframework.web.util.UriComponentsBuilder builder = org.springframework.web.util.UriComponentsBuilder
-			.fromUriString(operation.url());
+	private URI buildUri(Operation operation) {
+		UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(operation.url());
 		if (operation.queryParams() != null) {
 			operation.queryParams().forEach(builder::queryParam);
 		}
@@ -230,7 +237,7 @@ public class ScanHttpClient {
 	private boolean isTransientNetworkError(Throwable e) {
 		if (e == null)
 			return false;
-		if (e instanceof java.io.IOException || e instanceof java.util.concurrent.TimeoutException
+		if (e instanceof IOException || e instanceof TimeoutException
 				|| e.getClass().getName().contains("TimeoutException")
 				|| e.getClass().getName().contains("PrematureCloseException")) {
 			return true;

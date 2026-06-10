@@ -20,6 +20,10 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import java.util.List;
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/internal")
 public class MasterInternalApiController {
@@ -87,17 +91,17 @@ public class MasterInternalApiController {
 	 */
 	@PostMapping("/jobs/{id}/attempts")
 	public Mono<ResponseEntity<Void>> postJobAttemptsBatch(@PathVariable Long id,
-			@RequestBody java.util.List<ch.nexsol.orthrusdast.model.ScanAttempt> batch) {
+			@RequestBody List<ScanAttempt> batch) {
 		return scanJobRepository.findById(id).flatMap(job -> {
 			Mono<Void> ensureResultExists = Mono.empty();
 			if (job.getResultId() == null) {
-				job.setResultId(java.util.UUID.randomUUID().toString());
+				job.setResultId(UUID.randomUUID().toString());
 				ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(),
 						job.getCreatedAt() != null ? job.getCreatedAt() : Instant.now());
 			}
 
 			int vulnsInBatch = 0;
-			for (ch.nexsol.orthrusdast.model.ScanAttempt attempt : batch) {
+			for (ScanAttempt attempt : batch) {
 				if (attempt.vulnerabilities() != null) {
 					vulnsInBatch += attempt.vulnerabilities().size();
 				}
@@ -126,7 +130,7 @@ public class MasterInternalApiController {
 
 			Mono<Void> ensureResultExists = Mono.empty();
 			if (job.getResultId() == null) {
-				job.setResultId(java.util.UUID.randomUUID().toString());
+				job.setResultId(UUID.randomUUID().toString());
 				ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(),
 						request.startTime() != null ? request.startTime() : Instant.now());
 			}

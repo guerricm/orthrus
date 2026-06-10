@@ -28,6 +28,11 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import org.springframework.http.HttpMethod;
+
 /**
  * Scans for Broken Function Level Authorization (BFLA) (API5:2023).
  */
@@ -53,20 +58,19 @@ public class BflaScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
-			org.springframework.http.HttpMethod method = operation.method();
-			List<org.springframework.http.HttpMethod> stateChangingMethods = List.of(
-					org.springframework.http.HttpMethod.POST, org.springframework.http.HttpMethod.PUT,
-					org.springframework.http.HttpMethod.PATCH, org.springframework.http.HttpMethod.DELETE);
+			HttpMethod method = operation.method();
+			List<HttpMethod> stateChangingMethods = List.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH,
+					HttpMethod.DELETE);
 
-			List<org.springframework.http.HttpMethod> methodsToTestDirectly = new java.util.ArrayList<>();
-			List<org.springframework.http.HttpMethod> methodsToTestViaHeader = new java.util.ArrayList<>();
+			List<HttpMethod> methodsToTestDirectly = new ArrayList<>();
+			List<HttpMethod> methodsToTestViaHeader = new ArrayList<>();
 
-			List<org.springframework.http.HttpMethod> supportedMethods = operation.supportedMethods();
+			List<HttpMethod> supportedMethods = operation.supportedMethods();
 			if (supportedMethods == null) {
 				supportedMethods = List.of(method);
 			}
 
-			for (org.springframework.http.HttpMethod sm : stateChangingMethods) {
+			for (HttpMethod sm : stateChangingMethods) {
 				if (sm.equals(method)) {
 					continue;
 				}
@@ -83,8 +87,8 @@ public class BflaScanner implements SecurityScanner {
 						"Using " + testMethod.name() + " method directly"));
 
 			Flux<Vulnerability> headerTests = Flux.fromIterable(methodsToTestViaHeader).flatMap(testMethod -> {
-				java.util.Map<String, String> overrideHeaders = new java.util.HashMap<>(
-						operation.headers() != null ? operation.headers() : new java.util.HashMap<>());
+				Map<String, String> overrideHeaders = new HashMap<>(
+						operation.headers() != null ? operation.headers() : new HashMap<>());
 				overrideHeaders.put("X-HTTP-Method-Override", testMethod.name());
 				overrideHeaders.put("X-HTTP-Method", testMethod.name());
 
@@ -96,8 +100,8 @@ public class BflaScanner implements SecurityScanner {
 		});
 	}
 
-	private Flux<Vulnerability> executeBflaCheck(Operation operation, org.springframework.http.HttpMethod testMethod,
-			java.util.Map<String, String> testHeaders, String context) {
+	private Flux<Vulnerability> executeBflaCheck(Operation operation, HttpMethod testMethod,
+			Map<String, String> testHeaders, String context) {
 		Operation testOp = new Operation(operation.url(), testMethod, testHeaders, operation.queryParams(),
 				operation.body(), operation.securityRequirements(), operation.expectedContentTypes(),
 				operation.authScheme());

@@ -42,6 +42,10 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.cert.Certificate;
+
 /**
  * Scans the SSL/TLS configuration and certificate of the target. Caches the results per
  * hostname to avoid redundant connections.
@@ -111,7 +115,7 @@ public class SslCertificateScanner implements SecurityScanner {
 			} };
 
 			SSLContext sc = SSLContext.getInstance("TLS");
-			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+			sc.init(null, trustAllCerts, new SecureRandom());
 			SSLSocketFactory factory = sc.getSocketFactory();
 
 			try (SSLSocket socket = (SSLSocket) factory.createSocket(hostname, port)) {
@@ -137,7 +141,7 @@ public class SslCertificateScanner implements SecurityScanner {
 				}
 
 				// 2. Check Certificate
-				java.security.cert.Certificate[] peerCerts = session.getPeerCertificates();
+				Certificate[] peerCerts = session.getPeerCertificates();
 				if (peerCerts.length > 0 && peerCerts[0] instanceof X509Certificate cert) {
 
 					// 2a. Expiration
@@ -195,7 +199,7 @@ public class SslCertificateScanner implements SecurityScanner {
 					}
 
 					// 2d. Weak Key Size
-					java.security.PublicKey pubKey = cert.getPublicKey();
+					PublicKey pubKey = cert.getPublicKey();
 					if (pubKey instanceof RSAPublicKey rsaPubKey) {
 						int keySize = rsaPubKey.getModulus().bitLength();
 						if (keySize < 2048) {

@@ -7,6 +7,9 @@ import java.time.Instant;
 
 import ch.nexsol.orthrusdast.model.JobStatus;
 
+import java.time.Duration;
+import org.springframework.data.annotation.Transient;
+
 @Table("scan_jobs")
 public class ScanJobEntity {
 
@@ -39,7 +42,7 @@ public class ScanJobEntity {
 
 	private Integer testsCount;
 
-	@org.springframework.data.annotation.Transient
+	@Transient
 	private String planName;
 
 	public ScanJobEntity() {
@@ -171,7 +174,7 @@ public class ScanJobEntity {
 		if (startedAt == null)
 			return "-";
 		Instant end = (completedAt != null) ? completedAt : Instant.now();
-		long seconds = java.time.Duration.between(startedAt, end).getSeconds();
+		long seconds = Duration.between(startedAt, end).getSeconds();
 		if (seconds < 60)
 			return seconds + "s";
 		return (seconds / 60) + "m " + (seconds % 60) + "s";

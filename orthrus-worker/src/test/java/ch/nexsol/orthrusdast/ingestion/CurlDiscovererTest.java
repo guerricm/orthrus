@@ -5,6 +5,8 @@ import reactor.test.StepVerifier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.springframework.http.HttpMethod;
+
 class CurlDiscovererTest {
 
 	@Test
@@ -19,7 +21,7 @@ class CurlDiscovererTest {
 		StepVerifier.create(discoverer.discover("http://example.com/api", null)).assertNext(ops -> {
 			assertEquals(1, ops.size());
 			assertEquals("http://example.com/api", ops.get(0).url());
-			assertEquals(org.springframework.http.HttpMethod.GET, ops.get(0).method());
+			assertEquals(HttpMethod.GET, ops.get(0).method());
 		}).verifyComplete();
 	}
 

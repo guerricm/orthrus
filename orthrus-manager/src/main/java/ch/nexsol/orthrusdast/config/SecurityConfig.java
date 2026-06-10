@@ -63,9 +63,9 @@ public class SecurityConfig {
 			.formLogin(form -> form.loginPage("/login"))
 			.logout(logout -> logout.requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout")))
 			.csrf(ServerHttpSecurity.CsrfSpec::disable)
-			.exceptionHandling(exceptionHandling -> exceptionHandling
-				.accessDeniedHandler((exchange, denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy().sendRedirect(exchange, java.net.URI.create("/error/403")))
-			);
+			.exceptionHandling(exceptionHandling -> exceptionHandling.accessDeniedHandler(
+					(exchange, denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
+						.sendRedirect(exchange, java.net.URI.create("/error/403"))));
 
 		if (clientRegistrations.getIfAvailable() != null) {
 			http.oauth2Login(oauth2 -> {
@@ -73,7 +73,8 @@ public class SecurityConfig {
 				oauth2.authenticationFailureHandler((webFilterExchange, exception) -> {
 					System.err.println("OIDC Login Failed: " + exception.getMessage());
 					exception.printStackTrace();
-					return new org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler("/login?error_oauth2")
+					return new org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler(
+							"/login?error_oauth2")
 						.onAuthenticationFailure(webFilterExchange, exception);
 				});
 			});
@@ -81,9 +82,10 @@ public class SecurityConfig {
 
 		if (jwtDecoder.getIfAvailable() != null) {
 			http.oauth2ResourceServer(oauth2 -> oauth2
-					.jwt(jwt -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
-					.authenticationEntryPoint(new org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint("/error/401"))
-			);
+				.jwt(jwt -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
+				.authenticationEntryPoint(
+						new org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint(
+								"/error/401")));
 		}
 
 		return http.build();

@@ -33,6 +33,9 @@ import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.model.AttemptStatus;
+
 /**
  * Core engine that orchestrates the scanning process reactively.
  */
@@ -43,9 +46,9 @@ public class ScanEngine {
 
 	private final List<SecurityScanner> allScanners;
 
-	private final ch.nexsol.orthrusdast.http.ScanHttpClient httpClient;
+	private final ScanHttpClient httpClient;
 
-	public ScanEngine(List<SecurityScanner> scanners, ch.nexsol.orthrusdast.http.ScanHttpClient httpClient) {
+	public ScanEngine(List<SecurityScanner> scanners, ScanHttpClient httpClient) {
 		this.allScanners = scanners;
 		this.httpClient = httpClient;
 	}
@@ -101,22 +104,19 @@ public class ScanEngine {
 						operation.url(), response.statusCode().value());
 				return Flux.fromIterable(scanners)
 					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-							operation.url(), ch.nexsol.orthrusdast.model.AttemptStatus.AUTH_ERROR, List.of()));
+							operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
 			}
 
 			return Flux.fromIterable(scanners)
 				.flatMap((scanner) -> scanner.scan(operation, config)
 					.collectList()
 					.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-							operation.url(),
-							vulns.isEmpty() ? ch.nexsol.orthrusdast.model.AttemptStatus.PASSED
-									: ch.nexsol.orthrusdast.model.AttemptStatus.FAILED,
-							vulns))
+							operation.url(), vulns.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED, vulns))
 					.onErrorResume((e) -> {
 						log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(),
 								e.getMessage());
 						return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-								operation.url(), ch.nexsol.orthrusdast.model.AttemptStatus.ERROR, List.of()));
+								operation.url(), AttemptStatus.ERROR, List.of()));
 					}));
 		});
 	}
