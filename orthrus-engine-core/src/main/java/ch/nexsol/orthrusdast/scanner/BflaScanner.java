@@ -67,6 +67,9 @@ public class BflaScanner implements SecurityScanner {
 			}
 
 			for (org.springframework.http.HttpMethod sm : stateChangingMethods) {
+				if (sm.equals(method)) {
+					continue;
+				}
 				if (supportedMethods.contains(sm)) {
 					methodsToTestViaHeader.add(sm);
 				}
