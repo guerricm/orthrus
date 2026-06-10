@@ -22,6 +22,8 @@ import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Flux;
 
+import org.springframework.web.reactive.function.client.WebClient;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
@@ -36,10 +38,14 @@ import reactor.core.publisher.Mono;
 @Component
 public class CleartextScanner implements SecurityScanner {
 
-	private final ScanHttpClient httpClient;
+	private final WebClient noRedirectClient;
 
 	public CleartextScanner(ScanHttpClient httpClient) {
-		this.httpClient = httpClient;
+
+		this.noRedirectClient = WebClient.builder()
+			.clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(
+					reactor.netty.http.client.HttpClient.create().followRedirect(false)))
+			.build();
 	}
 
 	@Override
@@ -56,12 +62,31 @@ public class CleartextScanner implements SecurityScanner {
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			String url = operation.url().toLowerCase();
+			boolean isLocal = url.contains("localhost") || url.contains("127.0.0.1");
 
 			if (url.startsWith("http://")) {
-				// Already cleartext
-				boolean isLocal = url.contains("localhost") || url.contains("127.0.0.1");
-				return Flux.just(
-						createCleartextVuln(operation, operation, isLocal, "Endpoint uses 'http://' scheme natively."));
+				// Verify if the server redirects to HTTPS
+				return noRedirectClient.method(operation.method()).uri(operation.url()).exchangeToMono(response -> {
+					if (response.statusCode().is3xxRedirection()) {
+						String location = response.headers()
+							.header(org.springframework.http.HttpHeaders.LOCATION)
+							.stream()
+							.findFirst()
+							.orElse(null);
+						if (location != null && location.toLowerCase().startsWith("https://")) {
+							// False positive: server properly redirects cleartext traffic
+							// to HTTPS
+							return Mono.empty();
+						}
+					}
+					// Either 2xx/4xx/5xx (handled in cleartext) or redirects to another
+					// cleartext endpoint
+					return Mono.just(createCleartextVuln(operation, operation, isLocal,
+							"Endpoint uses 'http://' scheme natively and does not enforce a redirect to HTTPS."));
+				})
+					.onErrorResume(e -> Mono.just(createCleartextVuln(operation, operation, isLocal,
+							"Endpoint uses 'http://' scheme natively.")))
+					.flatMapMany(Flux::just);
 			}
 			else if (url.startsWith("https://")) {
 				// Test if it allows HTTP downgrade without redirect
@@ -70,19 +95,14 @@ public class CleartextScanner implements SecurityScanner {
 						operation.queryParams(), operation.body(), operation.securityRequirements(),
 						operation.expectedContentTypes(), operation.authScheme());
 
-				return httpClient.send(testOp)
-					.onErrorResume((e) -> Mono.empty()) // Connection
-														// refused
-														// is good
-														// (HTTP
-														// disabled)
-					.flatMapMany((response) -> {
-						if (response.isSuccessful()) {
-							return Flux.just(createCleartextVuln(operation, testOp, false,
-									"Endpoint was accessed over HTTPS but successfully responded to HTTP (port 80) without a redirect to HTTPS."));
-						}
-						return Flux.empty();
-					});
+				return noRedirectClient.method(operation.method()).uri(httpUrl).exchangeToMono(response -> {
+					if (response.statusCode().is2xxSuccessful() || response.statusCode().is4xxClientError()
+							|| response.statusCode().is5xxServerError()) {
+						return Mono.just(createCleartextVuln(operation, testOp, false,
+								"Endpoint was accessed over HTTPS but successfully responded to HTTP (port 80) without a redirect to HTTPS."));
+					}
+					return Mono.empty();
+				}).onErrorResume(e -> Mono.empty()).flatMapMany(Flux::just);
 			}
 
 			return Flux.empty();
