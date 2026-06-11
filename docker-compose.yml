@@ -13,6 +13,7 @@ services:
       # Uncomment and configure these variables to enable Single Sign-On (SSO) with OpenID Connect (e.g. Keycloak, Auth0)
       # - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID=orthrus-client
       # - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET=your_client_secret
+      # - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_SCOPE=openid,profile,email
       # - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI=https://your-idp.example.com/realms/master
       # Enable Resource Server to accept JWT Bearer tokens on the API:
       # - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://your-idp.example.com/realms/master
