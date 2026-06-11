@@ -76,9 +76,17 @@ public class MasterInternalApiController {
 	 */
 	@PostMapping("/slaves/{id}/heartbeat")
 	public Mono<ResponseEntity<Void>> slaveHeartbeat(@PathVariable String id,
-			@RequestParam(defaultValue = "IDLE") NodeStatus status) {
-		return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(id, status.name(), Instant.now())
-			.flatMap(rows -> {
+			@RequestParam(defaultValue = "IDLE") NodeStatus status,
+			@RequestParam(required = false) String url) {
+		
+		Mono<Integer> updateMono;
+		if (url != null && !url.trim().isEmpty()) {
+			updateMono = slaveNodeRepository.updateSlaveNodeUrlStatusAndLastSeenAt(id, url, status.name(), Instant.now());
+		} else {
+			updateMono = slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(id, status.name(), Instant.now());
+		}
+		
+		return updateMono.flatMap(rows -> {
 				if (rows == 0) {
 					return Mono.just(ResponseEntity.notFound().build());
 				}

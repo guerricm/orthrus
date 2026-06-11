@@ -90,7 +90,7 @@ public class MasterApiClient {
 	@Scheduled(fixedDelayString = "${orthrus.master.heartbeat-interval-ms:10000}")
 	public void sendHeartbeat() {
 		webClient.post()
-			.uri(masterUrl + "/api/internal/slaves/" + slaveId + "/heartbeat?status=" + currentStatus)
+			.uri(masterUrl + "/api/internal/slaves/" + slaveId + "/heartbeat?status=" + currentStatus + "&url=" + slaveUrl)
 			.retrieve()
 			.bodyToMono(Void.class)
 			.subscribe(success -> {
