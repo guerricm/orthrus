@@ -48,30 +48,59 @@ public class PayloadMutator {
 		};
 	}
 
+	/**
+	 * Escapes a payload so it can be embedded as a JSON string value when the body is
+	 * built by raw string templating (i.e. not through Jackson, which already escapes).
+	 * This keeps the resulting document well-formed so the payload reaches the backend as
+	 * a value rather than corrupting the surrounding structure. Backslashes and double
+	 * quotes are escaped and control characters are stripped.
+	 * @param rawPayload the raw payload
+	 * @return the JSON-string-safe payload
+	 */
 	private String escapeForJson(String rawPayload) {
-		// If the payload itself contains double quotes, we might want to break out of the
-		// JSON string.
-		// E.g., rawPayload: " OR 1=1 --
-		// If it's going into {"field": "PAYLOAD"}, we want it to be {"field": "" OR 1=1
-		// --"}
-		// But since Jackson will serialize our injected string safely, if we WANT to
-		// break out,
-		// we actually shouldn't just let Jackson escape it.
-		// Wait, the scanner injects the payload into an ObjectNode. Jackson will safely
-		// escape it:
-		// jsonBody.put("field", payload) -> {"field": "\" OR 1=1"} (safe)
-		// To do an actual JSON injection, the payload must break the JSON structure,
-		// meaning it needs to be
-		// passed raw into the JSON string, not via Jackson's put().
-		// For now, since the scanners use Jackson to build the body, we will just return
-		// the payload.
-		// A true JSON mutator would modify the raw JSON string directly, bypassing
-		// Jackson.
-		return rawPayload;
+		StringBuilder sb = new StringBuilder(rawPayload.length() + 16);
+		for (int i = 0; i < rawPayload.length(); i++) {
+			char c = rawPayload.charAt(i);
+			switch (c) {
+				case '"' -> sb.append("\\\"");
+				case '\\' -> sb.append("\\\\");
+				case '\n' -> sb.append("\\n");
+				case '\r' -> sb.append("\\r");
+				case '\t' -> sb.append("\\t");
+				default -> {
+					if (c < 0x20) {
+						sb.append(String.format("\\u%04x", (int) c));
+					}
+					else {
+						sb.append(c);
+					}
+				}
+			}
+		}
+		return sb.toString();
 	}
 
+	/**
+	 * Escapes a payload so it can be embedded safely as XML character data or an
+	 * attribute value. This is used when fuzzing XML request bodies so the surrounding
+	 * markup stays well-formed and the payload is delivered as data.
+	 * @param rawPayload the raw payload
+	 * @return the XML-safe payload
+	 */
 	private String escapeForXml(String rawPayload) {
-		return rawPayload;
+		StringBuilder sb = new StringBuilder(rawPayload.length() + 16);
+		for (int i = 0; i < rawPayload.length(); i++) {
+			char c = rawPayload.charAt(i);
+			switch (c) {
+				case '&' -> sb.append("&amp;");
+				case '<' -> sb.append("&lt;");
+				case '>' -> sb.append("&gt;");
+				case '"' -> sb.append("&quot;");
+				case '\'' -> sb.append("&apos;");
+				default -> sb.append(c);
+			}
+		}
+		return sb.toString();
 	}
 
 }

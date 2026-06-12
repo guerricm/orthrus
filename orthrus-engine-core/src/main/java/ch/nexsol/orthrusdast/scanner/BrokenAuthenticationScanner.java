@@ -125,11 +125,4 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
 		});
 	}
 
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
-	}
-
 }

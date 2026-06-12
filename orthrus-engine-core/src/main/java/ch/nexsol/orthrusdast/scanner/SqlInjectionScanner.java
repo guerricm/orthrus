@@ -23,8 +23,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
@@ -79,60 +81,61 @@ public class SqlInjectionScanner implements SecurityScanner {
 			log.debug("Scanning for SQL Injection: {}", operation.url());
 
 			return oastService.createSession().flatMapMany((oastSession) -> {
-				Flux<Vulnerability> scanVulns = Flux.empty();
+				// Gather the error signatures and a timing baseline once per endpoint.
+				Mono<List<String>> sqlErrors = payloadLoader.getPayloads("sql-errors").collectList();
+				Mono<Long> baseline = httpClient.send(operation)
+					.map(ScanHttpResponse::responseTimeMs)
+					.onErrorReturn(0L);
 
-				scanVulns = payloadLoader.getPayloads("sqli").concatMap((rawPayload) -> {
-					String oastPayload = rawPayload.replace("{{OAST_HOST}}", oastSession.domain());
-					String payload = payloadMutator.mutate(oastPayload, PayloadMutator.Context.URL_PARAM);
-					return InjectionHelper.generateInjectedOperations(operation, payload)
-						.concatMap((test) -> executeSqlInjectionTest(operation, test.mutatedOperation(),
-								test.injectionPoint(), payload));
+				return Mono.zip(sqlErrors, baseline).flatMapMany((ctx) -> {
+					List<String> signatures = ctx.getT1();
+					long baselineMs = ctx.getT2();
+
+					Flux<Vulnerability> scanVulns = payloadLoader.getPayloads("sqli").concatMap((rawPayload) -> {
+						String oastPayload = rawPayload.replace("{{OAST_HOST}}", oastSession.domain());
+						String payload = payloadMutator.mutate(oastPayload, PayloadMutator.Context.URL_PARAM);
+						return InjectionHelper.generateInjectedOperations(operation, payload)
+							.concatMap((test) -> executeSqlInjectionTest(operation, test.mutatedOperation(),
+									test.injectionPoint(), payload, baselineMs, signatures));
+					});
+
+					return scanVulns.concatWith(oastService.pollInteractions(oastSession)
+						.map((interaction) -> createVulnerabilityWithTrace("Out-Of-Band (Blind) SQL Injection",
+								"The endpoint triggered a DNS/HTTP request to the OAST server during SQL injection payload execution.",
+								RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_89,
+								List.of("CAPEC-66"), 9.8,
+								"An interaction was received from " + interaction.remoteAddress() + " via "
+										+ interaction.protocol() + " for query: " + interaction.queryType(),
+								"Use parameterized queries or prepared statements.", operation, null,
+								"API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
 				});
-
-				return scanVulns.concatWith(oastService.pollInteractions(oastSession)
-					.map((interaction) -> createVulnerabilityWithTrace("Out-Of-Band (Blind) SQL Injection",
-							"The endpoint triggered a DNS/HTTP request to the OAST server during SQL injection payload execution.",
-							RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_89,
-							List.of("CAPEC-66"), 9.8,
-							"An interaction was received from " + interaction.remoteAddress() + " via "
-									+ interaction.protocol() + " for query: " + interaction.queryType(),
-							"Use parameterized queries or prepared statements.", operation, null,
-							"API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
 			});
 		});
 	}
 
 	private Flux<Vulnerability> executeSqlInjectionTest(Operation originalOp, Operation testOp, String injectionPoint,
-			String payload) {
+			String payload, long baselineMs, List<String> sqlErrorSignatures) {
 		return httpClient.send(testOp).flatMapMany((response) -> {
-			// Time-Based Blind Detection (Duration > 4000ms)
+			// Time-Based Blind Detection, validated against the measured baseline.
 			boolean isTimeBasedPayload = payload.toLowerCase().contains("sleep")
 					|| payload.toLowerCase().contains("waitfor");
 			int status = response.statusCode().value();
-			boolean isClientError = status >= 400 && status < 500;
-			if (isTimeBasedPayload && response.responseTimeMs() > 4000 && status != 503 && status != 504
-					&& !isClientError) {
+			if (isTimeBasedPayload && DetectionUtils.isTimeBasedHit(response.responseTimeMs(), baselineMs, status)) {
 				Vulnerability vuln = createVulnerabilityWithTrace("Time-Based Blind SQL Injection",
-						"The endpoint took " + response.responseTimeMs()
-								+ "ms to respond, indicating a potential Time-Based Blind SQL Injection in "
-								+ injectionPoint + ".",
+						"The endpoint took " + response.responseTimeMs() + "ms to respond (baseline " + baselineMs
+								+ "ms), indicating a potential Time-Based Blind SQL Injection in " + injectionPoint
+								+ ".",
 						RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, originalOp, CWEReference.CWE_89,
 						List.of("CAPEC-66"), 9.8,
-						"Response was delayed by " + response.responseTimeMs() + "ms when payload '" + payload
-								+ "' was injected.",
+						"Response was delayed by " + response.responseTimeMs() + "ms (baseline " + baselineMs
+								+ "ms) when payload '" + payload + "' was injected.",
 						"Use parameterized queries or prepared statements.", testOp, response, "API Endpoint (Network)",
 						"Unauthorized Access / Data Exposure");
 				return Flux.just(vuln);
 			}
 
-			// Content-Based Detection (SQL Errors)
-			String bodyLower = response.body() != null ? response.body().toLowerCase() : "";
-			boolean hasSqlError = bodyLower.contains("syntax error") || bodyLower.contains("mysql_fetch")
-					|| bodyLower.contains("you have an error in your sql syntax") || bodyLower.contains("ora-")
-					|| bodyLower.contains("postgresql") || bodyLower.contains("java.sql.sqlexception")
-					|| bodyLower.contains("sqlite/m");
-
-			if (hasSqlError) {
+			// Content-Based Detection (database error signatures).
+			if (DetectionUtils.containsAny(response.body(), sqlErrorSignatures)) {
 				Vulnerability vuln = createVulnerabilityWithTrace("Potential Error-Based SQL Injection",
 						"The endpoint might be vulnerable to Error-Based SQL Injection in " + injectionPoint + ".",
 						RiskLevel.HIGH, Vulnerability.Confidence.MEDIUM, originalOp, CWEReference.CWE_89,
@@ -144,13 +147,6 @@ public class SqlInjectionScanner implements SecurityScanner {
 			}
 			return Flux.empty();
 		});
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

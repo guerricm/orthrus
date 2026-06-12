@@ -1,0 +1,58 @@
+# Database error signatures used for content-based SQL Injection detection.
+# One lowercase signature per line. Lines starting with '#' are ignored.
+# In production, extend this list (e.g. from the SQLMap errors.xml dataset).
+
+# Generic
+syntax error
+unexpected end of sql command
+sql syntax
+unterminated quoted string
+quoted string not properly terminated
+
+# MySQL / MariaDB
+you have an error in your sql syntax
+warning: mysqli
+warning: mysql_
+mysql_fetch
+mysql_num_rows
+com.mysql.jdbc
+mariadb
+
+# PostgreSQL
+postgresql
+pg_query
+pg_exec
+npgsql
+org.postgresql.util.psqlexception
+
+# Oracle
+ora-00933
+ora-00921
+ora-01756
+ora-00936
+quoted string not properly terminated
+oracle.jdbc
+
+# Microsoft SQL Server
+unclosed quotation mark after the character string
+microsoft ole db provider for sql server
+microsoft sql native client
+incorrect syntax near
+system.data.sqlclient.sqlexception
+
+# SQLite
+sqlite3.operationalerror
+sqlite_error
+unrecognized token
+sqlitemanager
+near "
+org.sqlite
+
+# Java / generic JDBC
+java.sql.sqlexception
+javax.sql
+
+# ODBC
+microsoft odbc
+odbc driver
+[odbc sql server driver]

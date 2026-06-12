@@ -22,9 +22,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -42,10 +43,10 @@ public class JsonReportGenerator implements ReportGenerator {
 	private final ObjectMapper objectMapper;
 
 	public JsonReportGenerator() {
-		this.objectMapper = new ObjectMapper();
-		this.objectMapper.registerModule(new JavaTimeModule());
-		this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-		this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+		this.objectMapper = JsonMapper.builder()
+			.disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+			.enable(SerializationFeature.INDENT_OUTPUT)
+			.build();
 	}
 
 	/**

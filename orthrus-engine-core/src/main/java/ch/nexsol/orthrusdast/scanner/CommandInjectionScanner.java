@@ -22,8 +22,10 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
@@ -91,10 +93,16 @@ public class CommandInjectionScanner implements SecurityScanner {
 					allPayloads.add(prefix + timePayloadContent + suffix);
 				}
 
-				Flux<Vulnerability> scanVulns = Flux.fromIterable(allPayloads)
+				// Measure a timing baseline once so time-based detection can compare
+				// against the endpoint's natural latency instead of a fixed threshold.
+				Mono<Long> baseline = httpClient.send(operation)
+					.map(ScanHttpResponse::responseTimeMs)
+					.onErrorReturn(0L);
+
+				Flux<Vulnerability> scanVulns = baseline.flatMapMany((baselineMs) -> Flux.fromIterable(allPayloads)
 					.concatMap((payload) -> InjectionHelper.generateInjectedOperations(operation, payload)
 						.concatMap((test) -> executeCommandInjectionTest(operation, test.mutatedOperation(),
-								test.injectionPoint(), payload)));
+								test.injectionPoint(), payload, baselineMs))));
 
 				return scanVulns.concatWith(oastService.pollInteractions(oastSession)
 					.map((interaction) -> createVulnerabilityWithTrace("Out-Of-Band (Blind) OS Command Injection",
@@ -110,21 +118,20 @@ public class CommandInjectionScanner implements SecurityScanner {
 	}
 
 	private Flux<Vulnerability> executeCommandInjectionTest(Operation originalOp, Operation testOp,
-			String injectionPoint, String payload) {
+			String injectionPoint, String payload, long baselineMs) {
 		return httpClient.send(testOp).flatMapMany((response) -> {
-			// Time-Based Blind Detection (Duration > 4500ms)
+			// Time-Based Blind Detection, validated against the measured baseline.
 			int status = response.statusCode().value();
-			boolean isClientError = status >= 400 && status < 500;
-			if (response.responseTimeMs() > 4500 && payload.contains("sleep") && status != 503 && status != 504
-					&& !isClientError) {
+			if (payload.contains("sleep")
+					&& DetectionUtils.isTimeBasedHit(response.responseTimeMs(), baselineMs, status)) {
 				Vulnerability vuln = createVulnerabilityWithTrace("Time-Based Blind OS Command Injection",
-						"The endpoint took " + response.responseTimeMs()
-								+ "ms to respond, indicating a potential Time-Based Blind Command Injection in "
-								+ injectionPoint + ".",
+						"The endpoint took " + response.responseTimeMs() + "ms to respond (baseline " + baselineMs
+								+ "ms), indicating a potential Time-Based Blind Command Injection in " + injectionPoint
+								+ ".",
 						RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, originalOp, CWEReference.CWE_78,
 						List.of("CAPEC-88"), 9.8,
-						"Response was delayed by " + response.responseTimeMs() + "ms when payload '" + payload
-								+ "' was injected.",
+						"Response was delayed by " + response.responseTimeMs() + "ms (baseline " + baselineMs
+								+ "ms) when payload '" + payload + "' was injected.",
 						"Avoid invoking OS commands directly. Strictly sanitize and parameterize all input.", testOp,
 						response, "API Endpoint (Network)", "Unauthorized Access / Data Exposure");
 				return Flux.just(vuln);
@@ -144,13 +151,6 @@ public class CommandInjectionScanner implements SecurityScanner {
 			}
 			return Flux.empty();
 		});
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

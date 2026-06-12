@@ -20,26 +20,40 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
 
 /**
  * Utility class to assist with injecting payloads into Operations. Generates test
  * operations by injecting a payload into: 1. Query parameters 2. High-risk HTTP headers
- * 3. JSON Body properties
+ * 3. JSON body properties (both as a safe value and as a raw structural breakout) 4. XML
+ * body text nodes.
  */
 public class InjectionHelper {
 
 	private static final ObjectMapper mapper = new ObjectMapper();
 
-	private static final List<String> RISK_HEADERS = List.of("User-Agent", "Referer", "X-Forwarded-For",
-			"Authorization");
+	private static final PayloadMutator MUTATOR = new PayloadMutator();
+
+	// Placeholder used to splice a raw, unescaped payload into an otherwise
+	// well-formed JSON document for structural breakout testing.
+	private static final String RAW_PLACEHOLDER = "__ORTHRUS_RAW_PLACEHOLDER__";
+
+	// Matches XML text nodes (the content between an opening and a closing tag).
+	private static final Pattern XML_TEXT_NODE = Pattern.compile(">([^<>]+)<");
+
+	// The Authorization header is intentionally excluded: overwriting it would drop the
+	// authenticated session, yielding 401s that mask real findings (false negatives).
+	private static final List<String> RISK_HEADERS = List.of("User-Agent", "Referer", "X-Forwarded-For");
 
 	public static Flux<InjectionTest> generateInjectedOperations(Operation baseOp, String payload) {
 		List<InjectionTest> testOps = new ArrayList<>();
@@ -73,15 +87,29 @@ public class InjectionHelper {
 			try {
 				JsonNode rootNode = mapper.readTree(baseOp.body());
 				if (rootNode.isObject()) {
-					List<String> fieldNames = new ArrayList<>();
-					rootNode.fieldNames().forEachRemaining(fieldNames::add);
-					for (String field : fieldNames) {
+					for (String field : rootNode.propertyNames()) {
+						// (a) Value-context injection: Jackson safely escapes the payload
+						// for transport, and the backend decodes it back to the raw value
+						// before using it (correct for SQLi/XSS/cmd in a field value).
 						ObjectNode clonedNode = ((ObjectNode) rootNode).deepCopy();
 						clonedNode.put(field, payload);
 						testOps.add(new InjectionTest(new Operation(baseOp.url(), baseOp.method(), baseOp.headers(),
 								baseOp.queryParams(), mapper.writeValueAsString(clonedNode),
 								baseOp.securityRequirements(), baseOp.expectedContentTypes(), baseOp.authScheme(),
 								baseOp.templateUrl(), baseOp.sourceNode()), "JSON Body Field '" + field + "'"));
+
+						// (b) Structural breakout: splice the raw, unescaped payload
+						// directly into the value position. Reaches backends that read
+						// the
+						// JSON without strictly re-parsing it.
+						String rawBody = buildRawBreakoutBody((ObjectNode) rootNode, field, payload);
+						if (rawBody != null) {
+							testOps.add(new InjectionTest(
+									new Operation(baseOp.url(), baseOp.method(), baseOp.headers(), baseOp.queryParams(),
+											rawBody, baseOp.securityRequirements(), baseOp.expectedContentTypes(),
+											baseOp.authScheme(), baseOp.templateUrl(), baseOp.sourceNode()),
+									"JSON Body Field '" + field + "' (raw breakout)"));
+						}
 					}
 				}
 			}
@@ -90,7 +118,50 @@ public class InjectionHelper {
 			}
 		}
 
+		// 4. XML Body (inject the payload, XML-escaped, into each text node)
+		String body = baseOp.body() != null ? baseOp.body().trim() : "";
+		if (body.startsWith("<") && !body.startsWith("<!") && !body.startsWith("<?xml-stylesheet")) {
+			String escaped = MUTATOR.mutate(payload, PayloadMutator.Context.XML_BODY);
+			Matcher matcher = XML_TEXT_NODE.matcher(baseOp.body());
+			int nodeIndex = 0;
+			while (matcher.find()) {
+				nodeIndex++;
+				String original = baseOp.body();
+				String mutated = original.substring(0, matcher.start(1)) + escaped + original.substring(matcher.end(1));
+				testOps
+					.add(new InjectionTest(
+							new Operation(baseOp.url(), baseOp.method(), baseOp.headers(), baseOp.queryParams(),
+									mutated, baseOp.securityRequirements(), baseOp.expectedContentTypes(),
+									baseOp.authScheme(), baseOp.templateUrl(), baseOp.sourceNode()),
+							"XML Body Text Node #" + nodeIndex));
+			}
+		}
+
 		return Flux.fromIterable(testOps);
+	}
+
+	/**
+	 * Rebuilds a JSON document where the target field's value is the raw, unescaped
+	 * payload, enabling structural breakout testing. Returns {@code null} if the document
+	 * cannot be rebuilt safely.
+	 * @param rootNode the parsed JSON object
+	 * @param field the field whose value is replaced
+	 * @param payload the raw payload to splice in
+	 * @return the raw JSON body, or {@code null} on failure
+	 */
+	private static String buildRawBreakoutBody(ObjectNode rootNode, String field, String payload) {
+		try {
+			ObjectNode clonedNode = rootNode.deepCopy();
+			clonedNode.put(field, RAW_PLACEHOLDER);
+			String serialized = mapper.writeValueAsString(clonedNode);
+			// Replace the quoted placeholder with the raw payload wrapped in quotes so
+			// the
+			// payload's own quotes can break out of the string literal.
+			return serialized.replace("\"" + RAW_PLACEHOLDER + "\"", "\"" + payload + "\"");
+		}
+		catch (Exception ex) {
+			return null;
+		}
 	}
 
 	public record InjectionTest(Operation mutatedOperation, String injectionPoint) {

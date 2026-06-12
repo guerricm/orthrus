@@ -76,40 +76,53 @@ public class CrossUserBolaScanner implements SecurityScanner {
 			return Flux.empty();
 		}
 
-		// We assume the endpoints discovered by the engine are accessible by the primary
-		// user.
-		// We will replay the exact same request using User B's token.
-		Operation crossUserOp = new Operation(operation.url(), operation.method(), operation.headers(),
-				operation.queryParams(), operation.body(), operation.securityRequirements(),
-				operation.expectedContentTypes(), config.secondaryAuthScheme() // Inject
-																				// User
-																				// B's
-																				// token!
-		);
+		// Replay the exact same request with User A's token (baseline) and User B's token
+		// (cross-user), then compare. A successful response for User B whose body matches
+		// User A's response means User B was served User A's private object: a confirmed
+		// BOLA. A successful-but-different response is only a weaker signal.
+		Operation userAOp = operation
+			.withAuth(config.authScheme() != null ? config.authScheme() : operation.authScheme());
+		Operation crossUserOp = operation.withAuth(config.secondaryAuthScheme());
 
-		return httpClient.send(crossUserOp).flatMapMany((response) -> {
-			// If User B gets a successful response with data, it's highly suspicious
-			// (potential BOLA)
-			if (response.isSuccessful() && response.body() != null && response.body().length() > 10) {
+		return httpClient.send(userAOp)
+			.flatMapMany((responseA) -> httpClient.send(crossUserOp).flatMapMany((response) -> {
+				boolean userBHasData = response.isSuccessful() && response.body() != null
+						&& response.body().length() > 10;
+				if (!userBHasData) {
+					return Flux.empty();
+				}
+
+				boolean sameObject = responseA.body() != null && bodiesMatch(responseA.body(), response.body());
+
+				RiskLevel risk = sameObject ? RiskLevel.HIGH : RiskLevel.MEDIUM;
+				Vulnerability.Confidence confidence = sameObject ? Vulnerability.Confidence.HIGH
+						: Vulnerability.Confidence.LOW;
+				String detail = sameObject
+						? "User B received the SAME object data as User A, confirming cross-user object access."
+						: "User B received a successful response, but its content differs from User A's; review whether it still exposes data User B should not access.";
+
 				Vulnerability vuln = createVulnerabilityWithTrace("Cross-User Broken Object Level Authorization (BOLA)",
-						"The endpoint returned a successful response when accessed with a secondary user's token. If this resource contains private data belonging to the primary user, this is a critical BOLA vulnerability.",
-						RiskLevel.HIGH, Vulnerability.Confidence.MEDIUM, operation, CWEReference.CWE_639,
-						List.of("CAPEC-17"), 7.5,
+						"The endpoint returned a successful response when accessed with a secondary user's token. "
+								+ detail,
+						risk, confidence, operation, CWEReference.CWE_639, List.of("CAPEC-17"), 7.5,
 						"Server returned " + response.statusCode()
-								+ " OK when requesting User A's resource using User B's authentication token.",
+								+ " when requesting User A's resource using User B's authentication token. " + detail,
 						"Verify ownership of the requested resource. Ensure the authenticated user has explicit permission to access this specific object ID.",
 						operation, response, "API Endpoint (Network)", "Unauthorized Access / Data Exposure");
 				return Flux.just(vuln);
-			}
-			return Flux.empty();
-		});
+			}));
 	}
 
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
+	/**
+	 * Compares two response bodies to decide whether they represent the same object. Uses
+	 * exact equality after collapsing whitespace, so identical payloads served to two
+	 * different users are recognised as the same private resource.
+	 * @param a the first body
+	 * @param b the second body
+	 * @return true if the bodies represent the same object
+	 */
+	private boolean bodiesMatch(String a, String b) {
+		return a.replaceAll("\\s+", " ").trim().equals(b.replaceAll("\\s+", " ").trim());
 	}
 
 }

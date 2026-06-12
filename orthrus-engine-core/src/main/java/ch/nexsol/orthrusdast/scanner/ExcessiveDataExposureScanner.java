@@ -22,16 +22,15 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -114,7 +113,7 @@ public class ExcessiveDataExposureScanner implements SecurityScanner {
 						JsonNode root = objectMapper.readTree(body);
 						checkNode(root, sensitiveKeys, findings, "");
 					}
-					catch (JsonProcessingException e) {
+					catch (JacksonException e) {
 						log.debug("Failed to parse JSON response for {}", operation.url());
 					}
 				}
@@ -150,9 +149,7 @@ public class ExcessiveDataExposureScanner implements SecurityScanner {
 
 	private void checkNode(JsonNode node, List<String> sensitiveKeys, List<String> findings, String path) {
 		if (node.isObject()) {
-			Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-			while (fields.hasNext()) {
-				Map.Entry<String, JsonNode> field = fields.next();
+			for (Map.Entry<String, JsonNode> field : node.properties()) {
 				String keyName = field.getKey();
 				JsonNode valueNode = field.getValue();
 
