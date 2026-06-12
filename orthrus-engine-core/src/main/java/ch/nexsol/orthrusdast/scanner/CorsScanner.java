@@ -58,6 +58,11 @@ public class CorsScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.CONFIGURATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			String targetHost = "target.com";

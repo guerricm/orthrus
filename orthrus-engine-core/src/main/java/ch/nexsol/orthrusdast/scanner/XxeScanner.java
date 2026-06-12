@@ -62,6 +62,11 @@ public class XxeScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.INJECTION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			// Only target POST/PUT/PATCH endpoints that might accept XML

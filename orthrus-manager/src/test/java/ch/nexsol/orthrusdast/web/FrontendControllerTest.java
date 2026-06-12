@@ -70,9 +70,9 @@ class FrontendControllerTest {
 
 	@BeforeEach
 	void setUp() {
-		controller = new FrontendController(scanResultService, pdfReportGenerator, htmlReportGenerator, tokenFetcher,
-				statisticsService, scanJobRepository, testPlanRepository, slaveNodeRepository, objectMapper,
-				jobEventPublisher, clientRegistrations);
+		controller = new FrontendController(scanResultService, pdfReportGenerator, htmlReportGenerator,
+				tokenFetcher, statisticsService, scanJobRepository, testPlanRepository, slaveNodeRepository,
+				objectMapper, jobEventPublisher, clientRegistrations, org.mockito.Mockito.mock(ch.nexsol.orthrusdast.repository.ScanTaskRepository.class));
 	}
 
 	@Test

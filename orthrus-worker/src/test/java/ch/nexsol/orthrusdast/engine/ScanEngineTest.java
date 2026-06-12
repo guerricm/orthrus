@@ -49,6 +49,11 @@ class ScanEngineTest {
 			}
 
 			@Override
+			public ch.nexsol.orthrusdast.scanner.ScannerFamily getFamily() {
+				return ch.nexsol.orthrusdast.scanner.ScannerFamily.MISC;
+			}
+
+			@Override
 			public Flux<Vulnerability> scan(Operation operation) {
 				return scan(operation, null);
 			}

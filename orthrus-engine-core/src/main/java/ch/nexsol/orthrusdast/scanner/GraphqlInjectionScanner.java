@@ -78,6 +78,11 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.INJECTION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (!HttpMethod.POST.equals(operation.method()) || operation.body() == null

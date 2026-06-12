@@ -92,12 +92,15 @@ public class FrontendController {
 
 	private final ObjectProvider<ReactiveClientRegistrationRepository> clientRegistrations;
 
+	private final ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository;
+
 	public FrontendController(ScanResultService scanResultService, PdfReportGenerator pdfReportGenerator,
 			HtmlReportGenerator htmlReportGenerator, OAuth2TokenFetcher tokenFetcher,
 			StatisticsService statisticsService, ScanJobRepository scanJobRepository,
 			TestPlanRepository testPlanRepository, SlaveNodeRepository slaveNodeRepository,
 			tools.jackson.databind.ObjectMapper objectMapper, JobEventPublisher jobEventPublisher,
-			ObjectProvider<ReactiveClientRegistrationRepository> clientRegistrations) {
+			ObjectProvider<ReactiveClientRegistrationRepository> clientRegistrations,
+			ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository) {
 		this.scanResultService = scanResultService;
 		this.pdfReportGenerator = pdfReportGenerator;
 		this.htmlReportGenerator = htmlReportGenerator;
@@ -110,6 +113,7 @@ public class FrontendController {
 		this.webClient = WebClient.builder().build();
 		this.jobEventPublisher = jobEventPublisher;
 		this.clientRegistrations = clientRegistrations;
+		this.scanTaskRepository = scanTaskRepository;
 	}
 
 	@GetMapping("/login")
@@ -134,7 +138,8 @@ public class FrontendController {
 
 	@GetMapping("/system")
 	public Mono<String> systemStatus(Model model) {
-		return Mono.zip(scanJobRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
+		return Mono.zip(scanJobRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList(),
+				scanTaskRepository.findAll().collectList())
 			.map(tuple -> {
 				List<ScanJobEntity> jobs = tuple.getT1()
 					.stream()
@@ -142,11 +147,12 @@ public class FrontendController {
 					.collect(Collectors.toList());
 				jobs.sort((j1, j2) -> Long.compare(j2.getId(), j1.getId()));
 				List<SlaveNodeEntity> slaves = tuple.getT2();
+				List<ch.nexsol.orthrusdast.entity.ScanTaskEntity> tasks = tuple.getT3();
 
 				Map<String, Long> activeJobsCount = new HashMap<>();
 				for (SlaveNodeEntity slave : slaves) {
-					long count = jobs.stream()
-						.filter(j -> slave.getId().equals(j.getAssignedSlaveId()) && j.getStatus() == JobStatus.RUNNING)
+					long count = tasks.stream()
+						.filter(t -> slave.getId().equals(t.getAssignedSlaveId()) && t.getStatus() == JobStatus.RUNNING)
 						.count();
 					activeJobsCount.put(slave.getId(), count);
 				}
@@ -396,10 +402,11 @@ public class FrontendController {
 
 	@GetMapping("/plans/new")
 	public Mono<String> newTestPlan(Model model) {
-		return Mono.zip(scanJobRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
+		return Mono.zip(scanJobRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList(), scanTaskRepository.findAll().collectList())
 			.flatMap(tuple -> {
 				List<ScanJobEntity> jobs = tuple.getT1();
 				List<SlaveNodeEntity> slaves = tuple.getT2();
+				List<ch.nexsol.orthrusdast.entity.ScanTaskEntity> tasks = tuple.getT3();
 
 				long totalCapacity = 0;
 				long activeJobsTotal = 0;
@@ -408,14 +415,15 @@ public class FrontendController {
 				for (SlaveNodeEntity slave : slaves) {
 					if (slave.getStatus() != NodeStatus.OFFLINE) {
 						totalCapacity += slave.getMaxConcurrentScans();
-						long activeJobs = jobs.stream()
-							.filter(j -> slave.getId().equals(j.getAssignedSlaveId())
-									&& j.getStatus() == JobStatus.RUNNING)
+						long activeJobs = tasks.stream()
+							.filter(t -> slave.getId().equals(t.getAssignedSlaveId())
+									&& t.getStatus() == JobStatus.RUNNING)
 							.count();
 						activeJobsTotal += activeJobs;
 						availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
 					}
 				}
+
 				model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
 				model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
 

@@ -56,6 +56,11 @@ public class CrossUserBolaScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.AUTHENTICATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			// Fallback if not called with config, do nothing

@@ -61,6 +61,11 @@ public class SensitiveQueryScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			Flux<Vulnerability> passiveVulns = Flux.empty();

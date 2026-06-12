@@ -73,6 +73,11 @@ public class XssScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.XSS;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			return oastService.createSession().flatMapMany((oastSession) -> {

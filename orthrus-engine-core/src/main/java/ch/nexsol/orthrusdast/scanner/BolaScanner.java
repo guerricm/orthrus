@@ -58,6 +58,11 @@ public class BolaScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.AUTHENTICATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			Flux<Vulnerability> pathBola = testPathBola(operation);

@@ -61,6 +61,11 @@ public class JwtBlankSecretScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.AUTHENTICATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (operation.authScheme() == null || operation.authScheme().type() != SecurityScheme.AuthType.BEARER) {

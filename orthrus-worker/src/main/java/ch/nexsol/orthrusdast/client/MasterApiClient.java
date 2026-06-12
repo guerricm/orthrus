@@ -151,6 +151,46 @@ public class MasterApiClient {
 			});
 	}
 
+	public Mono<Void> sendTaskAttemptsBatch(Long taskId, List<ScanAttempt> batch) {
+		return webClient.post()
+			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/attempts")
+			.contentType(MediaType.APPLICATION_JSON)
+			.bodyValue(batch)
+			.retrieve()
+			.bodyToMono(Void.class);
+	}
+
+	public Mono<Void> completeTask(Long taskId, Instant startTime, int testsCount, int vulnsCount) {
+		String payload = String.format("{\"startTime\": \"%s\", \"endTime\": \"%s\", \"testsCount\": %d, \"vulnsCount\": %d}",
+				startTime.toString(), Instant.now().toString(), testsCount, vulnsCount);
+		return webClient.post()
+			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/complete")
+			.contentType(MediaType.APPLICATION_JSON)
+			.bodyValue(payload)
+			.retrieve()
+			.bodyToMono(Void.class)
+			.doOnSuccess(v -> setStatus(NodeStatus.IDLE))
+			.doOnError(e -> {
+				log.error("Failed to send complete task to master: {}", e.getMessage());
+				setStatus(NodeStatus.IDLE);
+			});
+	}
+
+	public Mono<Void> failTask(Long taskId, String reason) {
+		String payload = String.format("{\"reason\": \"%s\"}", reason.replace("\"", "\\\""));
+		return webClient.post()
+			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/fail")
+			.contentType(MediaType.APPLICATION_JSON)
+			.bodyValue(payload)
+			.retrieve()
+			.bodyToMono(Void.class)
+			.doOnSuccess(v -> setStatus(NodeStatus.IDLE))
+			.doOnError(e -> {
+				log.error("Failed to send fail task to master: {}", e.getMessage());
+				setStatus(NodeStatus.IDLE);
+			});
+	}
+
 	public void setStatus(NodeStatus status) {
 		this.currentStatus = status;
 	}

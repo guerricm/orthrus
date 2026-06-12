@@ -68,6 +68,11 @@ public class SslCertificateScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.CONFIGURATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (operation.url() == null || !operation.url().toLowerCase().startsWith("https://")) {

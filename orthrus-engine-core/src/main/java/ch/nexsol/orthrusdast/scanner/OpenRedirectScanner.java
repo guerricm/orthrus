@@ -57,6 +57,11 @@ public class OpenRedirectScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.CONFIGURATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (operation.queryParams() != null && !operation.queryParams().isEmpty()) {

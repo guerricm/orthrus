@@ -55,6 +55,11 @@ public class RequestSmugglingScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (!List.of("POST", "PUT", "PATCH").contains(operation.method().name())) {

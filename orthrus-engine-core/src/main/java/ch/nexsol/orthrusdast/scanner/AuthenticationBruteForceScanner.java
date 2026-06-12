@@ -107,6 +107,11 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.AUTHENTICATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			String urlLower = operation.url().toLowerCase();

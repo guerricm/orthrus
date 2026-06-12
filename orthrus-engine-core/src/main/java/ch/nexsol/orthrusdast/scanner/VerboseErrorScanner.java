@@ -55,6 +55,11 @@ public class VerboseErrorScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			Flux<Vulnerability> bodyVulns = Flux.empty();

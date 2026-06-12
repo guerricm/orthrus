@@ -55,6 +55,11 @@ public class CookieSecurityScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.CONFIGURATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			return httpClient.send(operation).flatMapMany((response) -> {

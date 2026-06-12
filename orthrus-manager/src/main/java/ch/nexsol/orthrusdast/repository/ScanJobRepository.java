@@ -29,4 +29,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 
 	Mono<ScanJobEntity> findByResultId(String resultId);
 
+	@org.springframework.data.r2dbc.repository.Modifying
+	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET vulns_count = COALESCE(vulns_count, 0) + :vulns, tests_count = COALESCE(tests_count, 0) + :tests WHERE id = :id")
+	Mono<Integer> incrementCounts(Long id, int vulns, int tests);
+
 }

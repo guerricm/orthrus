@@ -57,6 +57,11 @@ public class NoSqlInjectionScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.INJECTION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			return Flux.just(PAYLOAD_1, PAYLOAD_2)

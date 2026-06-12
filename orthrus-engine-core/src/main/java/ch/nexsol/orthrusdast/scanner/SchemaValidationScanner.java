@@ -64,6 +64,11 @@ public class SchemaValidationScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (!(operation.sourceNode() instanceof io.swagger.v3.oas.models.Operation openApiOperation)) {

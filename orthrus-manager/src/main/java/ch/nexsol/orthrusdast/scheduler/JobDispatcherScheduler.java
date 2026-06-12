@@ -26,6 +26,8 @@ public class JobDispatcherScheduler {
 
 	private final ScanJobRepository scanJobRepository;
 
+	private final ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository;
+
 	private final SlaveNodeRepository slaveNodeRepository;
 
 	private final WebClient webClient;
@@ -34,31 +36,37 @@ public class JobDispatcherScheduler {
 
 	private final JobEventPublisher jobEventPublisher;
 
-	public JobDispatcherScheduler(ScanJobRepository scanJobRepository, SlaveNodeRepository slaveNodeRepository,
-			OrthrusProperties orthrusProperties, JobEventPublisher jobEventPublisher) {
+	private final ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService;
+
+	public JobDispatcherScheduler(ScanJobRepository scanJobRepository, ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository, SlaveNodeRepository slaveNodeRepository,
+			OrthrusProperties orthrusProperties, JobEventPublisher jobEventPublisher, ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService) {
 		this.scanJobRepository = scanJobRepository;
+		this.scanTaskRepository = scanTaskRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.webClient = WebClient.builder().build();
 		this.orthrusProperties = orthrusProperties;
 		this.jobEventPublisher = jobEventPublisher;
+		this.jobOrchestratorService = jobOrchestratorService;
 	}
 
 	@Scheduled(fixedDelay = 5000)
 	public void dispatchPendingJobs() {
-		// 1. Find a PENDING job
-		scanJobRepository.findByStatus(JobStatus.PENDING).next().flatMap(job ->
-		// 2. Find an eligible slave
-		slaveNodeRepository.findAll()
-			.filter(slave -> Boolean.TRUE.equals(slave.getIsActive()))
-			.filter(slave -> slave.getStatus() != NodeStatus.OFFLINE)
-			.filter(slave -> slave.getLastSeenAt().isAfter(Instant.now().minusSeconds(30)))
-			.filterWhen(slave -> scanJobRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
-				.map(count -> count < slave.getMaxConcurrentScans()))
-			.next()
-			.flatMap(slave -> dispatchJobToSlave(job, slave))).subscribe(); // Fire and
-																			// forget for
-																			// this
-																			// iteration
+		// Orchestrate jobs into tasks
+		jobOrchestratorService.processPendingJobs().subscribe();
+
+		// 1. Find all PENDING tasks and process them sequentially
+		scanTaskRepository.findByStatus(JobStatus.PENDING)
+			.concatMap(task ->
+				// 2. Find an eligible slave for each task
+				slaveNodeRepository.findAll()
+					.filter(slave -> Boolean.TRUE.equals(slave.getIsActive()))
+					.filter(slave -> slave.getStatus() != NodeStatus.OFFLINE)
+					.filter(slave -> slave.getLastSeenAt().isAfter(Instant.now().minusSeconds(30)))
+					.filterWhen(slave -> scanTaskRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
+						.map(count -> count < slave.getMaxConcurrentScans()))
+					.next()
+					.flatMap(slave -> dispatchTaskToSlave(task, slave))
+			).subscribe(); 
 	}
 
 	@Scheduled(fixedDelay = 10000)
@@ -109,21 +117,20 @@ public class JobDispatcherScheduler {
 	}
 
 	private Mono<Void> failZombieScansForSlave(String slaveId) {
-		return scanJobRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap(job -> {
+		return scanTaskRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap(task -> {
 			System.out
-				.println("Failing zombie job " + job.getId() + " because assigned slave " + slaveId + " went OFFLINE.");
-			job.setStatus(JobStatus.FAILED);
-			return scanJobRepository.save(job)
-				.doOnSuccess(j -> jobEventPublisher.emit(j.getId(),
-						JobEvent.failed(j.getId(), j.getTarget(), "Slave node crashed or disconnected")));
+				.println("Failing zombie task " + task.getId() + " because assigned slave " + slaveId + " went OFFLINE.");
+			task.setStatus(JobStatus.FAILED);
+			return scanTaskRepository.save(task)
+				.flatMap(t -> jobOrchestratorService.onTaskFailed(t.getId(), "Slave node crashed or disconnected"));
 		}).then();
 	}
 
-	record ScanJobRequest(Long jobId, String discovererId, String target, String scanConfigurationJson) {
+	record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target, String scanConfigurationJson) {
 	}
 
-	private Mono<Void> dispatchJobToSlave(ScanJobEntity job, SlaveNodeEntity slave) {
-		return scanJobRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
+	private Mono<Void> dispatchTaskToSlave(ch.nexsol.orthrusdast.entity.ScanTaskEntity task, SlaveNodeEntity slave) {
+		return scanTaskRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 			.flatMap(runningCount -> {
 				long newCount = runningCount + 1;
 				if (newCount >= slave.getMaxConcurrentScans()) {
@@ -136,34 +143,27 @@ public class JobDispatcherScheduler {
 						slave.getLastSeenAt());
 			})
 			.flatMap(rows -> {
-				job.setStatus(JobStatus.RUNNING);
-				job.setAssignedSlaveId(slave.getId());
-				job.setStartedAt(Instant.now());
-				return scanJobRepository.save(job);
+				task.setStatus(JobStatus.RUNNING);
+				task.setAssignedSlaveId(slave.getId());
+				task.setStartedAt(Instant.now());
+				return scanTaskRepository.save(task);
 			})
-			.doOnSuccess(j -> {
-				jobEventPublisher.emit(j.getId(), JobEvent.running(j.getId(), j.getTarget()));
-			})
-			.flatMap(j -> {
-				// Send HTTP POST to Slave API using Jackson serialization
-				ScanJobRequest payload = new ScanJobRequest(j.getId(), j.getDiscovererId(), j.getTarget(),
-						j.getScanConfigurationJson());
+			.flatMap(t -> scanJobRepository.findById(t.getScanJobId()).flatMap(job -> {
+				ScanTaskRequest payload = new ScanTaskRequest(t.getId(), job.getId(), t.getPhase(), job.getDiscovererId(), job.getTarget(),
+						job.getScanConfigurationJson());
 
 				return webClient.post()
-					.uri(slave.getUrl() + "/api/v1/slave/scans")
+					.uri(slave.getUrl() + "/api/v1/slave/tasks")
 					.contentType(MediaType.APPLICATION_JSON)
 					.bodyValue(payload)
 					.retrieve()
 					.bodyToMono(Void.class)
 					.onErrorResume(e -> {
 						System.err.println("Dispatch failed to " + slave.getUrl() + ": " + e.getMessage());
-						// If dispatch fails, mark job as FAILED and leave Slave alone (it
-						// might be a
-						// bad job payload)
-						j.setStatus(JobStatus.FAILED);
-						return scanJobRepository.save(j).then(Mono.empty());
+						t.setStatus(JobStatus.FAILED);
+						return scanTaskRepository.save(t).flatMap(saved -> jobOrchestratorService.onTaskFailed(t.getId(), "Dispatch failed")).then(Mono.empty());
 					});
-			});
+			}));
 	}
 
 }

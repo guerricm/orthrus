@@ -47,6 +47,11 @@ public interface SecurityScanner {
 	String getName();
 
 	/**
+	 * @return the family/category of the scanner
+	 */
+	ScannerFamily getFamily();
+
+	/**
 	 * Executes the scan on the given operation with context configuration.
 	 * @param operation the operation to scan
 	 * @param config the scan configuration

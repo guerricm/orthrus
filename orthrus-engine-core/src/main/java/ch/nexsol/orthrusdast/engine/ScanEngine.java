@@ -58,12 +58,18 @@ public class ScanEngine {
 	}
 
 	/**
-	 * Runs a complete scan asynchronously.
+	 * Discovers operations without running scanners.
 	 * @param discoverer the discoverer
 	 * @param targetUrl the targetUrl
 	 * @param config the config
-	 * @return the result
+	 * @return a Mono of discovered operations
 	 */
+	public Mono<List<Operation>> runDiscovery(EndpointDiscoverer discoverer, String targetUrl,
+			ScanConfiguration config) {
+		log.info("Starting discovery on target: {}", targetUrl);
+		return discoverer.discover(targetUrl, config);
+	}
+
 	public Flux<ScanAttempt> runScan(EndpointDiscoverer discoverer, String targetUrl, ScanConfiguration config) {
 		log.info("Starting scan engine with concurrency: {}", config.concurrency());
 		Instant startTime = Instant.now();
@@ -95,30 +101,66 @@ public class ScanEngine {
 		});
 	}
 
+	/**
+	 * Runs specific family of scanners on pre-discovered operations.
+	 * @param operations the operations
+	 * @param family the scanner family to run
+	 * @param config the configuration
+	 * @return the flux of scan attempts
+	 */
+	public Flux<ScanAttempt> runScannersOnOperations(List<Operation> operations,
+			ch.nexsol.orthrusdast.scanner.ScannerFamily family, ScanConfiguration config) {
+		log.info("Starting scan engine for family: {} with concurrency: {}", family, config.concurrency());
+
+		List<SecurityScanner> activeScanners = allScanners.stream()
+			.filter(s -> s.getFamily() == family)
+			.filter(s -> config.shouldRunScanner(s.getId()))
+			.toList();
+
+		log.info("Active scanners for family {}: {}", family,
+				activeScanners.stream().map(SecurityScanner::getId).toList());
+
+		return Flux.fromIterable(operations)
+			.flatMap((op) -> scanOperation(op, activeScanners, config), config.concurrency())
+			.doOnNext((attempt) -> {
+				for (Vulnerability vuln : attempt.vulnerabilities()) {
+					log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
+				}
+			});
+	}
+
 	private Flux<ScanAttempt> scanOperation(Operation operation, List<SecurityScanner> scanners,
 			ScanConfiguration config) {
 		log.debug("Scanning operation: {} {}", operation.method().name(), operation.url());
-		return httpClient.send(operation).flatMapMany((response) -> {
-			if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
-				log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method().name(),
-						operation.url(), response.statusCode().value());
-				return Flux.fromIterable(scanners)
-					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-							operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
-			}
+		return httpClient.send(operation)
+			.retryWhen(reactor.util.retry.Retry.backoff(3, java.time.Duration.ofSeconds(1)))
+			.flatMapMany((response) -> {
+				if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
+					log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method().name(),
+							operation.url(), response.statusCode().value());
+					return Flux.fromIterable(scanners)
+						.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+								operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
+				}
 
-			return Flux.fromIterable(scanners)
-				.flatMap((scanner) -> scanner.scan(operation, config)
-					.collectList()
-					.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-							operation.url(), vulns.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED, vulns))
-					.onErrorResume((e) -> {
-						log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(),
-								e.getMessage());
-						return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-								operation.url(), AttemptStatus.ERROR, List.of()));
-					}));
-		});
+				return Flux.fromIterable(scanners)
+					.flatMap((scanner) -> scanner.scan(operation, config)
+						.collectList()
+						.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+								operation.url(), vulns.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED, vulns))
+						.onErrorResume((e) -> {
+							log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(),
+									e.getMessage());
+							return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(),
+									operation.method().name(), operation.url(), AttemptStatus.ERROR, List.of()));
+						}));
+			})
+			.onErrorResume(e -> {
+				log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
+				return Flux.fromIterable(scanners)
+					.map(scanner -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+							operation.url(), AttemptStatus.ERROR, List.of()));
+			});
 	}
 
 }

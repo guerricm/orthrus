@@ -36,12 +36,20 @@ public class MasterInternalApiController {
 
 	private final JobEventPublisher jobEventPublisher;
 
+	private final ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService;
+
+	private final ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository;
+
 	public MasterInternalApiController(SlaveNodeRepository slaveNodeRepository, ScanJobRepository scanJobRepository,
-			ScanResultService scanResultService, JobEventPublisher jobEventPublisher) {
+			ScanResultService scanResultService, JobEventPublisher jobEventPublisher,
+			ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService,
+			ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository) {
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.scanResultService = scanResultService;
 		this.jobEventPublisher = jobEventPublisher;
+		this.jobOrchestratorService = jobOrchestratorService;
+		this.scanTaskRepository = scanTaskRepository;
 	}
 
 	/**
@@ -212,6 +220,40 @@ public class MasterInternalApiController {
 				}
 			});
 		}).map(j -> ResponseEntity.ok().<Void>build()).defaultIfEmpty(ResponseEntity.notFound().build());
+	}
+
+	@PostMapping("/tasks/{id}/attempts")
+	public Mono<ResponseEntity<Void>> postTaskAttemptsBatch(@PathVariable Long id,
+			@RequestBody List<ScanAttempt> batch) {
+		return scanTaskRepository.findById(id).flatMap(task -> {
+			return scanJobRepository.findById(task.getScanJobId()).flatMap(job -> {
+				int vulnsInBatch = 0;
+				for (ScanAttempt attempt : batch) {
+					if (attempt.vulnerabilities() != null) {
+						vulnsInBatch += attempt.vulnerabilities().size();
+					}
+				}
+
+				return scanResultService.saveBatch(job.getResultId(), batch)
+					.then(scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, batch.size()))
+					.thenReturn(ResponseEntity.ok().<Void>build());
+			});
+		}).defaultIfEmpty(ResponseEntity.notFound().build());
+	}
+
+	public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
+	}
+
+	@PostMapping("/tasks/{id}/complete")
+	public Mono<ResponseEntity<Void>> postTaskComplete(@PathVariable Long id, @RequestBody CompleteTaskRequest request) {
+		return jobOrchestratorService.onScanTaskComplete(id, request.testsCount(), request.vulnsCount())
+			.thenReturn(ResponseEntity.ok().<Void>build());
+	}
+
+	@PostMapping("/tasks/{id}/fail")
+	public Mono<ResponseEntity<Void>> postTaskFail(@PathVariable Long id, @RequestBody FailJobRequest request) {
+		return jobOrchestratorService.onTaskFailed(id, request.reason())
+			.thenReturn(ResponseEntity.ok().<Void>build());
 	}
 
 	public record SlaveRegistrationRequest(String id, String url) {

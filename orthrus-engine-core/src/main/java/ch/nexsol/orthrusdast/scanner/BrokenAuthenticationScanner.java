@@ -58,6 +58,11 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.AUTHENTICATION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			log.debug("Scanning for Broken Authentication: {}", operation.url());

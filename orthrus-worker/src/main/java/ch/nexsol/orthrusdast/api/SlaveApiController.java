@@ -87,6 +87,55 @@ public class SlaveApiController {
 			});
 	}
 
+	@PostMapping("/tasks")
+	public Mono<ResponseEntity<Void>> receiveScanTask(@RequestBody ScanTaskRequest request) {
+		masterApiClient.setStatus(NodeStatus.BUSY);
+
+		return Mono.fromCallable(() -> objectMapper.readValue(request.scanConfigurationJson(), ScanConfiguration.class))
+			.flatMap(config -> {
+				Instant startTime = Instant.now();
+
+				ch.nexsol.orthrusdast.scanner.ScannerFamily family = ch.nexsol.orthrusdast.scanner.ScannerFamily.valueOf(request.phase());
+				AtomicInteger testsCount = new AtomicInteger();
+				AtomicInteger vulnsCount = new AtomicInteger();
+
+				Disposable disposable = scanService.executeDiscovery(request.discovererId(), request.target(), config)
+					.flatMapMany(parsedEndpoints -> scanService.executeScanFamily(parsedEndpoints, family, config))
+					.bufferTimeout(10, Duration.ofSeconds(1))
+					.flatMap(batch -> {
+						testsCount.addAndGet(batch.size());
+						for (ScanAttempt attempt : batch) {
+							if (attempt.vulnerabilities() != null) {
+								vulnsCount.addAndGet(attempt.vulnerabilities().size());
+							}
+						}
+						return masterApiClient.sendTaskAttemptsBatch(request.taskId(), batch);
+					})
+					.then(Mono.defer(() -> {
+							LoggerFactory.getLogger(SlaveApiController.class)
+								.info("Scan task {} completed. {} tests executed, {} vulnerabilities found.",
+										request.taskId(), testsCount.get(), vulnsCount.get());
+							return masterApiClient.completeTask(request.taskId(), startTime, testsCount.get(), vulnsCount.get());
+					}))
+					.doOnError(e -> {
+						LoggerFactory.getLogger(SlaveApiController.class).error("Error executing scan task", e);
+						masterApiClient.failTask(request.taskId(), "Slave encountered an error: " + e.getMessage())
+							.subscribe();
+					})
+					.doFinally(signalType -> activeJobs.remove(request.taskId()))
+					.subscribeOn(Schedulers.boundedElastic())
+					.subscribe();
+
+				activeJobs.put(request.taskId(), disposable);
+
+				return Mono.just(ResponseEntity.accepted().<Void>build());
+			})
+			.onErrorResume(e -> {
+				masterApiClient.setStatus(NodeStatus.IDLE);
+				return Mono.just(ResponseEntity.badRequest().<Void>build());
+			});
+	}
+
 	@DeleteMapping("/scans/{id}")
 	public Mono<ResponseEntity<Void>> cancelScanJob(@PathVariable Long id) {
 		Disposable disposable = activeJobs.remove(id);
@@ -114,6 +163,9 @@ public class SlaveApiController {
 	}
 
 	public record ScanJobRequest(Long jobId, String discovererId, String target, String scanConfigurationJson) {
+	}
+
+	public record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target, String scanConfigurationJson) {
 	}
 
 }

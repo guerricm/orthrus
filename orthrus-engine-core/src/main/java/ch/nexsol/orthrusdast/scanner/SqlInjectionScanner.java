@@ -69,6 +69,11 @@ public class SqlInjectionScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.INJECTION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			log.debug("Scanning for SQL Injection: {}", operation.url());

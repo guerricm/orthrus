@@ -64,6 +64,11 @@ public class GraphqlIntrospectionScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			// Very basic heuristic: if it looks like a GraphQL operation
