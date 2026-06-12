@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
+        <version>4.0.7</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -24,7 +24,7 @@
     </modules>
 
     <properties>
-        <revision>0.0.4-SNAPSHOT</revision>
+        <revision>1.0.0-SNAPSHOT</revision>
         <java.version>25</java.version>
         <swagger-parser.version>2.1.43</swagger-parser.version>
         <jjwt.version>0.13.0</jjwt.version>
