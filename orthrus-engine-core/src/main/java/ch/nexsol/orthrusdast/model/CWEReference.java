@@ -24,6 +24,9 @@ public enum CWEReference {
 
 	// Input Validation
 	CWE_20("Improper Input Validation", 20, OwaspReference.A05_INJECTION),
+	CWE_114("Process Control", 114, OwaspReference.A05_INJECTION),
+	CWE_235("Improper Handling of Extra Parameters", 235, OwaspReference.A05_INJECTION),
+	CWE_644("Improper Neutralization of HTTP Headers for Scripting Syntax", 644, OwaspReference.A05_INJECTION),
 
 	// XSS
 	CWE_79("Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')", 79,
