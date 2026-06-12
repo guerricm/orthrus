@@ -27,7 +27,7 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 - HAProxy (`/v2/services/haproxy/configuration/acls`)
 - Kubernetes Ingress (`/apis/networking.k8s.io/v1/ingresses`)
 
-### 39 Specialized Scanners
+### 41 Specialized Scanners
 
 | Scanner ID | Description | Associated CWE |
 | --- | --- | --- |
@@ -57,8 +57,10 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 | `method-tampering` | Exposure of unsafe HTTP methods like TRACE | CWE-650 (Trusting HTTP Permission Methods on the Server Side) |
 | `nosql-injection` | MongoDB operator injection | CWE-943 (Improper Neutralization of Special Elements in Data Query Logic) |
 | `open-redirect` | Unvalidated redirects | CWE-601 (URL Redirection to Untrusted Site ('Open Redirect')) |
+| `pagination-dos` | Tests for excessive pagination size parameters causing database resource exhaustion | CWE-770 (Allocation of Resources Without Limits or Throttling) |
 | `path-traversal` | Directory Traversal for arbitrary file reads | CWE-22 (Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')) |
 | `rate-limiting` | Lack of rate limiting on sensitive endpoints | CWE-770 (Allocation of Resources Without Limits or Throttling) |
+| `redos` | Regular Expression Denial of Service via malicious backtracking payloads | CWE-400 (Uncontrolled Resource Consumption) |
 | `request-smuggling` | Detects HTTP Request Smuggling vulnerabilities using malformed Transfer-Encoding headers | CWE-444 (Inconsistent Interpretation of HTTP Requests) |
 | `schema-validation` | Enforces OpenAPI schema constraints (maxLength, required properties, data types) | CWE-20 (Improper Input Validation) |
 | `security-headers` | Missing critical security headers (HSTS, CSP, etc.) | CWE-693 (Protection Mechanism Failure) |
