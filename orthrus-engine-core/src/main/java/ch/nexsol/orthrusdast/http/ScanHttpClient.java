@@ -16,30 +16,28 @@
 
 package ch.nexsol.orthrusdast.http;
 
+import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
-
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-
-import java.io.IOException;
-import java.net.URI;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.web.util.UriComponentsBuilder;
-import reactor.util.retry.Retry;
 
 /**
  * Reactive HTTP client wrapper around WebClient. Centralizes all HTTP interactions for
@@ -60,7 +58,6 @@ public class ScanHttpClient {
 	/**
 	 * Send a request based on an Operation and return the captured response.
 	 * @param operation the operation
-	 * @param retryTransientErrors the retryTransientErrors
 	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation) {
@@ -71,8 +68,7 @@ public class ScanHttpClient {
 	 * Send a request based on an Operation and return the captured response, optionally
 	 * handling 429s.
 	 * @param operation the operation
-	 * @param extraHeaders the extraHeaders
-	 * @param bodyOverride the bodyOverride
+	 * @param retryTransientErrors whether to retry transient errors
 	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, boolean retryTransientErrors) {
@@ -82,8 +78,8 @@ public class ScanHttpClient {
 	/**
 	 * Send a request with extra headers (used by scanners to inject payloads).
 	 * @param operation the operation
-	 * @param extraHeaders the extraHeaders
-	 * @param bodyOverride the bodyOverride
+	 * @param extraHeaders extra headers
+	 * @param bodyOverride body override
 	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride) {
@@ -92,7 +88,11 @@ public class ScanHttpClient {
 
 	/**
 	 * Send a request with extra headers, optionally handling 429s.
-	 * @param retryTransientErrors the retryTransientErrors
+	 * @param operation the operation
+	 * @param extraHeaders extra headers
+	 * @param bodyOverride body override
+	 * @param retryTransientErrors whether to retry transient errors
+	 * @return the result
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride,
 			boolean retryTransientErrors) {
@@ -121,7 +121,7 @@ public class ScanHttpClient {
 			});
 		});
 
-		String body = bodyOverride != null ? bodyOverride : operation.body();
+		String body = (bodyOverride != null) ? bodyOverride : operation.body();
 
 		Function<ClientResponse, Mono<ScanHttpResponse>> responseHandler = (clientResponse) -> {
 			int status = clientResponse.statusCode().value();
@@ -140,9 +140,10 @@ public class ScanHttpClient {
 
 		Mono<ScanHttpResponse> resultMono;
 		if (body != null && !body.isEmpty()) {
-			String cType = operation.headers() != null ? operation.headers().get("Content-Type") : null;
-			if (cType == null)
+			String cType = (operation.headers() != null) ? operation.headers().get("Content-Type") : null;
+			if (cType == null) {
 				cType = extraHeaders.get("Content-Type");
+			}
 			if (cType != null) {
 				requestSpec.contentType(MediaType.parseMediaType(cType));
 			}
@@ -224,7 +225,7 @@ public class ScanHttpClient {
 
 	private void applyAuth(HttpHeaders headers, SecurityScheme scheme) {
 		if (scheme.paramLocation() == SecurityScheme.ParamLocation.HEADER) {
-			String headerName = scheme.headerName() != null ? scheme.headerName() : "Authorization";
+			String headerName = (scheme.headerName() != null) ? scheme.headerName() : "Authorization";
 			String headerValue = scheme.toAuthorizationHeaderValue();
 			if (headerValue != null) {
 				headerValue = headerValue.replaceAll("[\\x00-\\x08\\x0A-\\x1F\\x7F]", "").trim();
@@ -235,8 +236,9 @@ public class ScanHttpClient {
 	}
 
 	private boolean isTransientNetworkError(Throwable e) {
-		if (e == null)
+		if (e == null) {
 			return false;
+		}
 		if (e instanceof IOException || e instanceof TimeoutException
 				|| e.getClass().getName().contains("TimeoutException")
 				|| e.getClass().getName().contains("PrematureCloseException")) {
@@ -251,7 +253,7 @@ public class ScanHttpClient {
 
 	private static class TransientHttpException extends RuntimeException {
 
-		public TransientHttpException(String message) {
+		TransientHttpException(String message) {
 			super(message);
 		}
 

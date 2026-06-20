@@ -16,10 +16,11 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -27,10 +28,7 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Scans for XML External Entity (XXE) vulnerabilities.

@@ -17,6 +17,7 @@
 package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
+import java.util.Map;
 
 import reactor.core.publisher.Flux;
 
@@ -24,12 +25,9 @@ import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-import java.net.URI;
-import java.util.Map;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Interface for all security scanners.
@@ -64,34 +62,34 @@ public interface SecurityScanner {
 	/**
 	 * Executes the scan on the given operation.
 	 * @param operation the operation to scan
-	 * @param confidence the confidence
-	 * @param originalOp the originalOp
-	 * @param cwe the cwe
-	 * @param capecs the capecs
-	 * @param name the name
-	 * @param description the description
-	 * @param riskLevel the riskLevel
 	 * @return a Flux of found vulnerabilities
-	 * @return the result
 	 */
 	Flux<Vulnerability> scan(Operation operation);
 
 	/**
 	 * Helper to create a Vulnerability with formatted HTTP traces.
-	 * @param attackVector the attackVector
-	 * @param technicalImpact the technicalImpact
+	 * @param name the name
+	 * @param description the description
+	 * @param riskLevel the riskLevel
+	 * @param confidence the confidence
+	 * @param originalOp the originalOp
+	 * @param cwe the cwe
+	 * @param capecs the capecs
 	 * @param cvssScore the cvssScore
 	 * @param evidence the evidence
 	 * @param remediation the remediation
 	 * @param testOp the testOp
 	 * @param response the response
+	 * @param attackVector the attackVector
+	 * @param technicalImpact the technicalImpact
+	 * @return the Vulnerability
 	 */
 	default Vulnerability createVulnerabilityWithTrace(String name, String description, RiskLevel riskLevel,
 			Vulnerability.Confidence confidence, Operation originalOp, CWEReference cwe, List<String> capecs,
 			Double cvssScore, String evidence, String remediation, Operation testOp, ScanHttpResponse response,
 			String attackVector, String technicalImpact) {
 		String reqDetails = formatRequest(testOp);
-		String resDetails = response != null ? formatResponse(response) : "No Response";
+		String resDetails = (response != null) ? formatResponse(response) : "No Response";
 
 		return Vulnerability.createWithDetails(name, description, riskLevel, confidence, getId(), originalOp, cwe,
 				capecs, cvssScore, evidence, remediation, reqDetails, resDetails, attackVector, technicalImpact);
@@ -105,13 +103,14 @@ public interface SecurityScanner {
 		}
 
 		// Reconstruct URL with query params
-		StringBuilder fullUrl = new StringBuilder(url != null ? url : "");
+		StringBuilder fullUrl = new StringBuilder((url != null) ? url : "");
 		if (op.queryParams() != null && !op.queryParams().isEmpty() && op.url() != null && !op.url().contains("?")) {
 			fullUrl.append("?");
 			op.queryParams().forEach((k, v) -> {
 				String val = v;
-				if (val != null && val.length() > 100)
+				if (val != null && val.length() > 100) {
 					val = val.substring(0, 100) + "...[TRUNCATED]";
+				}
 				fullUrl.append(k).append("=").append(val).append("&");
 			});
 			fullUrl.setLength(fullUrl.length() - 1); // remove last &
@@ -119,23 +118,30 @@ public interface SecurityScanner {
 
 		sb.append(op.method().name()).append(" ").append(fullUrl).append(" HTTP/1.1\n");
 
-		try {
-			if (url != null) {
-				URI uri = URI.create(url);
-				if (uri.getHost() != null) {
-					sb.append("Host: ").append(uri.getHost()).append("\n");
+		if (url != null) {
+			int protocolEnd = url.indexOf("://");
+			if (protocolEnd != -1) {
+				int hostStart = protocolEnd + 3;
+				int hostEnd = url.indexOf('/', hostStart);
+				if (hostEnd == -1) {
+					hostEnd = url.length();
+				}
+				int portStart = url.indexOf(':', hostStart);
+				if (portStart != -1 && portStart < hostEnd) {
+					hostEnd = portStart;
+				}
+				if (hostStart < hostEnd) {
+					String host = url.substring(hostStart, hostEnd);
+					sb.append("Host: ").append(host).append("\n");
 				}
 			}
-		}
-		catch (Exception ex) {
-			// Ignore URI parsing errors
 		}
 
 		sb.append("User-Agent: Orthrus-DAST/1.0\n");
 		sb.append("Accept: */*\n");
 
 		if (op.authScheme() != null && op.authScheme().paramLocation() == SecurityScheme.ParamLocation.HEADER) {
-			String headerName = op.authScheme().headerName() != null ? op.authScheme().headerName() : "Authorization";
+			String headerName = (op.authScheme().headerName() != null) ? op.authScheme().headerName() : "Authorization";
 			sb.append(headerName).append(": ").append(op.authScheme().toAuthorizationHeaderValue()).append("\n");
 		}
 
@@ -164,9 +170,8 @@ public interface SecurityScanner {
 		StringBuilder sb = new StringBuilder();
 		sb.append("Status: ").append(res.statusCode()).append("\n");
 		if (res.headers() != null) {
-			res.headers().forEach((k, values) -> {
-				values.forEach((v) -> sb.append(k).append(": ").append(v).append("\n"));
-			});
+			res.headers()
+				.forEach((k, values) -> values.forEach((v) -> sb.append(k).append(": ").append(v).append("\n")));
 		}
 		sb.append("\n");
 		if (res.body() != null) {

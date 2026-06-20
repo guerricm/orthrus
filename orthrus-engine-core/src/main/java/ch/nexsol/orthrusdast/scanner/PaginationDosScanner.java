@@ -24,7 +24,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -87,7 +86,7 @@ public class PaginationDosScanner implements SecurityScanner {
 
 		return Flux.defer(() -> {
 			// Get a baseline response time
-			return httpClient.send(operation, false).flatMapMany(baselineResponse -> {
+			return httpClient.send(operation, false).flatMapMany((baselineResponse) -> {
 				long baselineTime = baselineResponse.responseTimeMs();
 
 				List<Mono<Vulnerability>> checks = new ArrayList<>();
@@ -107,14 +106,14 @@ public class PaginationDosScanner implements SecurityScanner {
 					}
 				}
 
-				return Flux.fromIterable(checks).flatMap(mono -> mono).filter(vuln -> vuln != null);
+				return Flux.fromIterable(checks).flatMap((mono) -> mono).filter((vuln) -> vuln != null);
 			});
 		});
 	}
 
 	private Mono<Vulnerability> executeAndCheck(Operation testOp, Operation originalOp, String injectionPoint,
 			String payload, long baselineTime) {
-		return httpClient.send(testOp, false).flatMap(response -> {
+		return httpClient.send(testOp, false).flatMap((response) -> {
 			long testTime = response.responseTimeMs();
 
 			// Detect if the server crashed (e.g. Out of Memory or Database Error)

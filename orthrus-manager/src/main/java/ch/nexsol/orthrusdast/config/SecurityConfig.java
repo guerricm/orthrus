@@ -1,4 +1,26 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.config;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,12 +51,6 @@ import org.springframework.security.web.server.util.matcher.NegatedServerWebExch
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
@@ -50,7 +66,7 @@ public class SecurityConfig {
 			ObjectProvider<ReactiveClientRegistrationRepository> clientRegistrations,
 			ObjectProvider<ReactiveJwtDecoder> jwtDecoder) {
 
-		http.authorizeExchange(exchanges -> exchanges
+		http.authorizeExchange((exchanges) -> exchanges
 			// Public paths
 			.pathMatchers("/css/**", "/js/**", "/images/**", "/vendor/**", "/webjars/**", "/favicon.ico", "/login**",
 					"/error/**")
@@ -64,26 +80,26 @@ public class SecurityConfig {
 			// Everything else requires USER or ADMIN
 			.anyExchange()
 			.hasAnyRole("ADMIN", "USER"))
-			.formLogin(form -> form.loginPage("/login"))
-			.logout(logout -> logout.requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout")))
+			.formLogin((form) -> form.loginPage("/login"))
+			.logout((logout) -> logout.requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout")))
 			// CSRF protects the session-cookie UI. Internal API uses a shared-secret
 			// filter and /api/v1 uses bearer tokens; neither has a session to ride.
-			.csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AndServerWebExchangeMatcher(
-					CsrfWebFilter.DEFAULT_CSRF_MATCHER,
-					new NegatedServerWebExchangeMatcher(
-							ServerWebExchangeMatchers.pathMatchers("/api/internal/**", "/api/v1/**")))))
+			.csrf((csrf) -> csrf
+				.requireCsrfProtectionMatcher(new AndServerWebExchangeMatcher(CsrfWebFilter.DEFAULT_CSRF_MATCHER,
+						new NegatedServerWebExchangeMatcher(
+								ServerWebExchangeMatchers.pathMatchers("/api/internal/**", "/api/v1/**")))))
 			// All assets are served from this origin (vendored libs); 'unsafe-inline'
 			// is still required by the inline scripts/styles in the templates.
-			.headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+			.headers((headers) -> headers.contentSecurityPolicy((csp) -> csp.policyDirectives(
 					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
 							+ "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
 							+ "base-uri 'self'; form-action 'self'; frame-ancestors 'none'")))
-			.exceptionHandling(exceptionHandling -> exceptionHandling.accessDeniedHandler(
+			.exceptionHandling((exceptionHandling) -> exceptionHandling.accessDeniedHandler(
 					(exchange, denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
 						.sendRedirect(exchange, java.net.URI.create("/error/403"))));
 
 		if (clientRegistrations.getIfAvailable() != null) {
-			http.oauth2Login(oauth2 -> {
+			http.oauth2Login((oauth2) -> {
 				oauth2.loginPage("/login");
 				oauth2.authenticationFailureHandler((webFilterExchange, exception) -> {
 					System.err.println("OIDC Login Failed: " + exception.getMessage());
@@ -96,8 +112,8 @@ public class SecurityConfig {
 		}
 
 		if (jwtDecoder.getIfAvailable() != null) {
-			http.oauth2ResourceServer(oauth2 -> oauth2
-				.jwt(jwt -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
+			http.oauth2ResourceServer((oauth2) -> oauth2
+				.jwt((jwt) -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
 				.authenticationEntryPoint(
 						new org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint(
 								"/error/401")));

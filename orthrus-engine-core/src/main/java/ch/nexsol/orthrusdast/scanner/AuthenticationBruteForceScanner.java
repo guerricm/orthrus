@@ -27,8 +27,8 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -36,8 +36,6 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import org.springframework.http.HttpMethod;
 
 /**
  * Scans authentication endpoints for susceptibility to brute force / weak passwords.
@@ -68,30 +66,29 @@ public class AuthenticationBruteForceScanner implements SecurityScanner {
 	}
 
 	private List<String> loadPasswords() {
+		List<String> defaultPasswords = List.of("123456", "password", "admin", "root", "qwerty");
 		List<String> passwords = new ArrayList<>();
-		try {
-			ClassPathResource resource = new ClassPathResource("passwords.txt");
-			if (resource.exists()) {
-				try (BufferedReader reader = new BufferedReader(
-						new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
-					String line;
-					while ((line = reader.readLine()) != null) {
-						String pw = line.trim();
-						if (!pw.isEmpty()) {
-							passwords.add(pw);
-						}
+		ClassPathResource resource = new ClassPathResource("passwords.txt");
+		if (resource.exists()) {
+			try (BufferedReader reader = new BufferedReader(
+					new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					String pw = line.trim();
+					if (!pw.isEmpty()) {
+						passwords.add(pw);
 					}
 				}
-				log.info("Loaded {} passwords for brute force scanning", passwords.size());
 			}
-			else {
-				log.warn("passwords.txt not found on classpath, using minimal fallback list");
-				passwords.addAll(List.of("123456", "password", "admin", "root", "qwerty"));
+			catch (Exception ex) {
+				log.error("Failed to load passwords.txt", ex);
+				return new ArrayList<>(defaultPasswords);
 			}
+			log.info("Loaded {} passwords for brute force scanning", passwords.size());
 		}
-		catch (Exception ex) {
-			log.error("Failed to load passwords.txt", ex);
-			passwords.addAll(List.of("123456", "password", "admin", "root", "qwerty"));
+		else {
+			log.warn("passwords.txt not found on classpath, using minimal fallback list");
+			passwords.addAll(defaultPasswords);
 		}
 		return passwords;
 	}

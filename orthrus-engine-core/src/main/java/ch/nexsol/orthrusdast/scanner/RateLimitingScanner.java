@@ -20,8 +20,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -29,8 +29,6 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import org.springframework.http.HttpMethod;
 
 /**
  * Scans for missing Rate Limiting (CWE-799).
@@ -99,7 +97,7 @@ public class RateLimitingScanner implements SecurityScanner {
 						// Rate limit was hit! Now test if we can bypass it by spoofing
 						// the IP
 						Map<String, String> spoofedHeaders = new HashMap<>(
-								operation.headers() != null ? operation.headers() : new HashMap<>());
+								(operation.headers() != null) ? operation.headers() : new HashMap<>());
 						String randomIp = "203.0.113." + (int) (Math.random() * 255);
 						spoofedHeaders.put("X-Forwarded-For", randomIp);
 						spoofedHeaders.put("X-Real-IP", randomIp);

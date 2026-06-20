@@ -20,13 +20,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.GatewayType;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-import ch.nexsol.orthrusdast.model.Vulnerability;
-import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -36,6 +29,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.model.GatewayType;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
+import ch.nexsol.orthrusdast.model.Vulnerability;
+import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

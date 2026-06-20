@@ -1,9 +1,28 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.client;
 
-import ch.nexsol.orthrusdast.model.ScanAttempt;
-import java.util.List;
 import java.time.Instant;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.List;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
@@ -13,14 +32,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-
-import ch.nexsol.orthrusdast.model.NodeStatus;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import ch.nexsol.orthrusdast.model.NodeStatus;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
 
 @Component
 @EnableScheduling
@@ -68,7 +82,7 @@ public class MasterApiClient {
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.subscribe(success -> {
+			.subscribe((success) -> {
 				if (masterDownLogged) {
 					log.info("Successfully reconnected and registered to master with ID: {}", slaveId);
 					masterDownLogged = false;
@@ -76,7 +90,7 @@ public class MasterApiClient {
 				else {
 					log.info("Successfully registered to master with ID: {}", slaveId);
 				}
-			}, error -> {
+			}, (error) -> {
 				if (!masterDownLogged) {
 					log.warn("Failed to register to master: {}", error.getMessage());
 					masterDownLogged = true;
@@ -90,15 +104,16 @@ public class MasterApiClient {
 	@Scheduled(fixedDelayString = "${orthrus.master.heartbeat-interval-ms:10000}")
 	public void sendHeartbeat() {
 		webClient.post()
-			.uri(masterUrl + "/api/internal/slaves/" + slaveId + "/heartbeat?status=" + currentStatus + "&url=" + slaveUrl)
+			.uri(masterUrl + "/api/internal/slaves/" + slaveId + "/heartbeat?status=" + currentStatus + "&url="
+					+ slaveUrl)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.subscribe(success -> {
+			.subscribe((success) -> {
 				if (masterDownLogged) {
 					log.info("Heartbeat successful. Master is back online.");
 					masterDownLogged = false;
 				}
-			}, error -> {
+			}, (error) -> {
 				if (!masterDownLogged) {
 					log.warn("Heartbeat failed ({}). Attempting to re-register...", error.getMessage());
 				}
@@ -129,8 +144,8 @@ public class MasterApiClient {
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess(v -> setStatus(NodeStatus.IDLE))
-			.doOnError(e -> {
+			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
+			.doOnError((e) -> {
 				log.error("Failed to send complete job to master: {}", e.getMessage());
 				setStatus(NodeStatus.IDLE);
 			});
@@ -144,8 +159,8 @@ public class MasterApiClient {
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess(v -> setStatus(NodeStatus.IDLE))
-			.doOnError(e -> {
+			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
+			.doOnError((e) -> {
 				log.error("Failed to send fail job to master: {}", e.getMessage());
 				setStatus(NodeStatus.IDLE);
 			});
@@ -161,7 +176,8 @@ public class MasterApiClient {
 	}
 
 	public Mono<Void> completeTask(Long taskId, Instant startTime, int testsCount, int vulnsCount) {
-		String payload = String.format("{\"startTime\": \"%s\", \"endTime\": \"%s\", \"testsCount\": %d, \"vulnsCount\": %d}",
+		String payload = String.format(
+				"{\"startTime\": \"%s\", \"endTime\": \"%s\", \"testsCount\": %d, \"vulnsCount\": %d}",
 				startTime.toString(), Instant.now().toString(), testsCount, vulnsCount);
 		return webClient.post()
 			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/complete")
@@ -169,8 +185,8 @@ public class MasterApiClient {
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess(v -> setStatus(NodeStatus.IDLE))
-			.doOnError(e -> {
+			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
+			.doOnError((e) -> {
 				log.error("Failed to send complete task to master: {}", e.getMessage());
 				setStatus(NodeStatus.IDLE);
 			});
@@ -184,8 +200,8 @@ public class MasterApiClient {
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess(v -> setStatus(NodeStatus.IDLE))
-			.doOnError(e -> {
+			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
+			.doOnError((e) -> {
 				log.error("Failed to send fail task to master: {}", e.getMessage());
 				setStatus(NodeStatus.IDLE);
 			});

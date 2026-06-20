@@ -16,10 +16,11 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -27,9 +28,6 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Scans for Cross-Site Request Forgery (CSRF) vulnerabilities (CWE-352).
@@ -68,7 +66,7 @@ public class CsrfScanner implements SecurityScanner {
 
 			// Strategy 1: Strip explicit CSRF tokens and set Origin
 			Map<String, String> noTokenHeaders = new HashMap<>(
-					operation.headers() != null ? operation.headers() : new HashMap<>());
+					(operation.headers() != null) ? operation.headers() : new HashMap<>());
 			noTokenHeaders.keySet()
 				.removeIf((k) -> k.toLowerCase().contains("csrf") || k.toLowerCase().contains("xsrf")
 						|| k.equalsIgnoreCase("X-Requested-With"));

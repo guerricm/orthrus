@@ -24,12 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
-
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
@@ -107,15 +105,13 @@ public class HppScanner implements SecurityScanner {
 		}
 
 		// 2. JSON Body HPP
+		Mono<List<Mono<Vulnerability>>> jsonChecksMono = Mono.just(new ArrayList<>());
 		if (operation.body() != null && operation.body().trim().startsWith("{")) {
-			try {
+			jsonChecksMono = Mono.fromCallable(() -> {
+				List<Mono<Vulnerability>> jsonChecks = new ArrayList<>();
 				JsonNode rootNode = mapper.readTree(operation.body());
 				if (rootNode.isObject()) {
 					for (String field : rootNode.propertyNames()) {
-						// To simulate JSON HPP, we need a raw string since JsonNode
-						// doesn't allow duplicate keys
-						// We'll replace the first occurrence of the key-value pair with a
-						// duplicated version
 						String bodyStr = operation.body();
 						JsonNode valueNode = rootNode.get(field);
 						String valueStr = valueNode.isTextual() ? "\"" + valueNode.asText() + "\""
@@ -125,7 +121,6 @@ public class HppScanner implements SecurityScanner {
 						String replacementStr = "\"" + field + "\":" + valueStr + ", \"" + field + "\":\"" + PAYLOAD
 								+ "\"";
 
-						// Replace using regex to handle spacing
 						String pollutedBody = bodyStr.replaceFirst(
 								"\"" + field + "\"\\s*:\\s*" + java.util.regex.Pattern.quote(valueStr), replacementStr);
 
@@ -135,21 +130,22 @@ public class HppScanner implements SecurityScanner {
 									operation.expectedContentTypes(), operation.authScheme(), operation.templateUrl(),
 									operation.sourceNode());
 
-							checks.add(executeAndCheck(testOp, operation, "JSON Body Field '" + field + "'"));
+							jsonChecks.add(executeAndCheck(testOp, operation, "JSON Body Field '" + field + "'"));
 						}
 					}
 				}
-			}
-			catch (Exception ex) {
-				log.debug("Failed to parse or mutate JSON body for HPP in {}", operation.url());
-			}
+				return jsonChecks;
+			}).onErrorReturn(new ArrayList<>());
 		}
 
-		return Flux.fromIterable(checks).flatMap(mono -> mono).filter(vuln -> vuln != null);
+		return jsonChecksMono.flatMapMany((jsonChecks) -> {
+			checks.addAll(jsonChecks);
+			return Flux.fromIterable(checks).flatMap((mono) -> mono).filter((vuln) -> vuln != null);
+		});
 	}
 
 	private Mono<Vulnerability> executeAndCheck(Operation testOp, Operation originalOp, String injectionPoint) {
-		return httpClient.send(testOp, false).flatMap(response -> {
+		return httpClient.send(testOp, false).flatMap((response) -> {
 			boolean is500 = response.statusCode().value() == 500;
 			boolean is2xx = response.statusCode().value() >= 200 && response.statusCode().value() < 300;
 			boolean reflectsPayload = response.bodyContainsExact(PAYLOAD);

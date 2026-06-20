@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;

@@ -19,18 +19,16 @@ package ch.nexsol.orthrusdast.auth;
 import java.io.IOException;
 import java.util.List;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import reactor.test.StepVerifier;
-
-import ch.nexsol.orthrusdast.model.OAuth2Config;
-
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import reactor.test.StepVerifier;
+
+import ch.nexsol.orthrusdast.model.OAuth2Config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

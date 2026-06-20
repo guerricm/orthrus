@@ -36,7 +36,6 @@ public interface EndpointDiscoverer {
 	/**
 	 * Executes the discovery process.
 	 * @param target the target to discover (URL, OpenAPI spec, etc.)
-	 * @param overrideHost optional host to override
 	 * @param config the scan configuration
 	 * @return a Mono emitting a List of discovered operations
 	 */

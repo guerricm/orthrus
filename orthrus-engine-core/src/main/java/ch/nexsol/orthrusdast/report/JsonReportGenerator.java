@@ -21,14 +21,12 @@ import java.io.OutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import ch.nexsol.orthrusdast.model.ScanResult;
 
@@ -66,15 +64,13 @@ public class JsonReportGenerator implements ReportGenerator {
 	 */
 	@Override
 	public Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed) {
-		return Mono.fromRunnable(() -> {
-			try {
-				log.debug("Generating JSON report...");
-				objectMapper.writeValue(output, result);
-			}
-			catch (Exception ex) {
-				log.error("Failed to generate JSON report", ex);
-				throw new RuntimeException("JSON generation failed", ex);
-			}
+		return Mono.fromCallable(() -> {
+			log.debug("Generating JSON report...");
+			objectMapper.writeValue(output, result);
+			return null;
+		}).onErrorMap((ex) -> {
+			log.error("Failed to generate JSON report", ex);
+			return new RuntimeException("JSON generation failed", ex);
 		}).subscribeOn(Schedulers.boundedElastic()).then();
 	}
 

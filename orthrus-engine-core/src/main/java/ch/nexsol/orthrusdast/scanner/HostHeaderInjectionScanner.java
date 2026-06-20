@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -63,39 +62,37 @@ public class HostHeaderInjectionScanner implements SecurityScanner {
 
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
-		return Flux.defer(() -> {
-			return oastService.createSession().flatMapMany((session) -> {
+		return Flux.defer(() -> oastService.createSession().flatMapMany((session) -> {
 
-				String oastDomain = session.domain();
+			String oastDomain = session.domain();
 
-				// Payload 1: Overriding the Host header directly
-				Map<String, String> payload1Headers = Map.of("Host", oastDomain);
+			// Payload 1: Overriding the Host header directly
+			Map<String, String> payload1Headers = Map.of("Host", oastDomain);
 
-				// Payload 2: Using X-Forwarded-Host and Forwarded headers
-				Map<String, String> payload2Headers = Map.of("X-Forwarded-Host", oastDomain, "Forwarded",
-						"host=" + oastDomain);
+			// Payload 2: Using X-Forwarded-Host and Forwarded headers
+			Map<String, String> payload2Headers = Map.of("X-Forwarded-Host", oastDomain, "Forwarded",
+					"host=" + oastDomain);
 
-				Mono<Vulnerability> check1 = executeAndCheck(operation, payload1Headers, "Host header", oastDomain);
-				Mono<Vulnerability> check2 = executeAndCheck(operation, payload2Headers, "X-Forwarded-Host header",
-						oastDomain);
+			Mono<Vulnerability> check1 = executeAndCheck(operation, payload1Headers, "Host header", oastDomain);
+			Mono<Vulnerability> check2 = executeAndCheck(operation, payload2Headers, "X-Forwarded-Host header",
+					oastDomain);
 
-				Flux<Vulnerability> directChecks = Flux.concat(check1, check2).filter(vuln -> vuln != null);
+			Flux<Vulnerability> directChecks = Flux.concat(check1, check2).filter((vuln) -> vuln != null);
 
-				Flux<Vulnerability> blindChecks = oastService.pollInteractions(session)
-					.map((interaction) -> createVulnerabilityWithTrace(
-							"Host Header Injection - Cache Poisoning / Blind SSRF",
-							"The endpoint attempted to contact the injected Host header domain (" + oastDomain
-									+ "). This indicates a severe vulnerability where the backend trusts the Host header for internal routing or caching.",
-							RiskLevel.HIGH, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_114,
-							List.of("CAPEC-141"), 7.5,
-							"Received an interaction from " + interaction.remoteAddress() + " via "
-									+ interaction.protocol() + " to the injected OAST domain.",
-							"Validate and sanitize all HTTP headers. Avoid reflecting the Host header in links, password resets, or cache keys without strict allowlist validation.",
-							operation, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
+			Flux<Vulnerability> blindChecks = oastService.pollInteractions(session)
+				.map((interaction) -> createVulnerabilityWithTrace(
+						"Host Header Injection - Cache Poisoning / Blind SSRF",
+						"The endpoint attempted to contact the injected Host header domain (" + oastDomain
+								+ "). This indicates a severe vulnerability where the backend trusts the Host header for internal routing or caching.",
+						RiskLevel.HIGH, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_114,
+						List.of("CAPEC-141"), 7.5,
+						"Received an interaction from " + interaction.remoteAddress() + " via " + interaction.protocol()
+								+ " to the injected OAST domain.",
+						"Validate and sanitize all HTTP headers. Avoid reflecting the Host header in links, password resets, or cache keys without strict allowlist validation.",
+						operation, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
 
-				return Flux.concat(directChecks, blindChecks);
-			});
-		});
+			return Flux.concat(directChecks, blindChecks);
+		}));
 	}
 
 	private Mono<Vulnerability> executeAndCheck(Operation operation, Map<String, String> extraHeaders,
@@ -105,7 +102,7 @@ public class HostHeaderInjectionScanner implements SecurityScanner {
 
 				// Generate a testOp containing the extra headers for evidence formatting
 				Map<String, String> mergedHeaders = new java.util.HashMap<>(
-						operation.headers() != null ? operation.headers() : Map.of());
+						(operation.headers() != null) ? operation.headers() : Map.of());
 				mergedHeaders.putAll(extraHeaders);
 				Operation testOp = new Operation(operation.url(), operation.method(), mergedHeaders,
 						operation.queryParams(), operation.body(), operation.securityRequirements(),

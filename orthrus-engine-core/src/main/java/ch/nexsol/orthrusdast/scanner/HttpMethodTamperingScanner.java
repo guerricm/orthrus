@@ -20,8 +20,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -29,8 +29,6 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import org.springframework.http.HttpMethod;
 
 /**
  * Scans for HTTP Method Tampering (CWE-650).
@@ -77,7 +75,7 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 					|| "PATCH".equals(originalMethod)) {
 				// Send as GET but with X-HTTP-Method-Override: POST
 				Map<String, String> overrideHeaders = new HashMap<>(
-						operation.headers() != null ? operation.headers() : new HashMap<>());
+						(operation.headers() != null) ? operation.headers() : new HashMap<>());
 				overrideHeaders.put("X-HTTP-Method-Override", originalMethod);
 				overrideHeaders.put("X-HTTP-Method", originalMethod);
 				overrideHeaders.put("X-Method-Override", originalMethod);

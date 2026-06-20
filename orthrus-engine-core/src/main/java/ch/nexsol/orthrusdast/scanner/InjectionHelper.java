@@ -23,11 +23,11 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
-
-import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
@@ -38,7 +38,11 @@ import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
  * 3. JSON body properties (both as a safe value and as a raw structural breakout) 4. XML
  * body text nodes.
  */
-public class InjectionHelper {
+public final class InjectionHelper {
+
+	private InjectionHelper() {
+		// Private constructor for utility class
+	}
 
 	private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -73,7 +77,7 @@ public class InjectionHelper {
 		}
 
 		// 2. Headers (Focus on common injection headers)
-		Map<String, String> baseHeaders = baseOp.headers() != null ? baseOp.headers() : new HashMap<>();
+		Map<String, String> baseHeaders = (baseOp.headers() != null) ? baseOp.headers() : new HashMap<>();
 		for (String header : RISK_HEADERS) {
 			Map<String, String> newHeaders = new HashMap<>(baseHeaders);
 			newHeaders.put(header, payload);
@@ -83,28 +87,23 @@ public class InjectionHelper {
 		}
 
 		// 3. JSON Body
+		Mono<List<InjectionTest>> jsonTestsMono = Mono.just(new ArrayList<>());
 		if (baseOp.body() != null && baseOp.body().trim().startsWith("{")) {
-			try {
+			jsonTestsMono = Mono.fromCallable(() -> {
+				List<InjectionTest> jsonTests = new ArrayList<>();
 				JsonNode rootNode = mapper.readTree(baseOp.body());
 				if (rootNode.isObject()) {
 					for (String field : rootNode.propertyNames()) {
-						// (a) Value-context injection: Jackson safely escapes the payload
-						// for transport, and the backend decodes it back to the raw value
-						// before using it (correct for SQLi/XSS/cmd in a field value).
 						ObjectNode clonedNode = ((ObjectNode) rootNode).deepCopy();
 						clonedNode.put(field, payload);
-						testOps.add(new InjectionTest(new Operation(baseOp.url(), baseOp.method(), baseOp.headers(),
+						jsonTests.add(new InjectionTest(new Operation(baseOp.url(), baseOp.method(), baseOp.headers(),
 								baseOp.queryParams(), mapper.writeValueAsString(clonedNode),
 								baseOp.securityRequirements(), baseOp.expectedContentTypes(), baseOp.authScheme(),
 								baseOp.templateUrl(), baseOp.sourceNode()), "JSON Body Field '" + field + "'"));
 
-						// (b) Structural breakout: splice the raw, unescaped payload
-						// directly into the value position. Reaches backends that read
-						// the
-						// JSON without strictly re-parsing it.
 						String rawBody = buildRawBreakoutBody((ObjectNode) rootNode, field, payload);
 						if (rawBody != null) {
-							testOps.add(new InjectionTest(
+							jsonTests.add(new InjectionTest(
 									new Operation(baseOp.url(), baseOp.method(), baseOp.headers(), baseOp.queryParams(),
 											rawBody, baseOp.securityRequirements(), baseOp.expectedContentTypes(),
 											baseOp.authScheme(), baseOp.templateUrl(), baseOp.sourceNode()),
@@ -112,32 +111,34 @@ public class InjectionHelper {
 						}
 					}
 				}
-			}
-			catch (Exception ex) {
-				// Ignore body parsing errors
-			}
+				return jsonTests;
+			}).onErrorReturn(new ArrayList<>());
 		}
 
-		// 4. XML Body (inject the payload, XML-escaped, into each text node)
-		String body = baseOp.body() != null ? baseOp.body().trim() : "";
-		if (body.startsWith("<") && !body.startsWith("<!") && !body.startsWith("<?xml-stylesheet")) {
-			String escaped = MUTATOR.mutate(payload, PayloadMutator.Context.XML_BODY);
-			Matcher matcher = XML_TEXT_NODE.matcher(baseOp.body());
-			int nodeIndex = 0;
-			while (matcher.find()) {
-				nodeIndex++;
-				String original = baseOp.body();
-				String mutated = original.substring(0, matcher.start(1)) + escaped + original.substring(matcher.end(1));
-				testOps
-					.add(new InjectionTest(
+		return jsonTestsMono.flatMapMany((jsonTests) -> {
+			testOps.addAll(jsonTests);
+
+			// 4. XML Body (inject the payload, XML-escaped, into each text node)
+			String body = (baseOp.body() != null) ? baseOp.body().trim() : "";
+			if (body.startsWith("<") && !body.startsWith("<!") && !body.startsWith("<?xml-stylesheet")) {
+				String escaped = MUTATOR.mutate(payload, PayloadMutator.Context.XML_BODY);
+				Matcher matcher = XML_TEXT_NODE.matcher(baseOp.body());
+				int nodeIndex = 0;
+				while (matcher.find()) {
+					nodeIndex++;
+					String original = baseOp.body();
+					String mutated = original.substring(0, matcher.start(1)) + escaped
+							+ original.substring(matcher.end(1));
+					testOps.add(new InjectionTest(
 							new Operation(baseOp.url(), baseOp.method(), baseOp.headers(), baseOp.queryParams(),
 									mutated, baseOp.securityRequirements(), baseOp.expectedContentTypes(),
 									baseOp.authScheme(), baseOp.templateUrl(), baseOp.sourceNode()),
 							"XML Body Text Node #" + nodeIndex));
+				}
 			}
-		}
 
-		return Flux.fromIterable(testOps);
+			return Flux.fromIterable(testOps);
+		});
 	}
 
 	/**
@@ -149,19 +150,12 @@ public class InjectionHelper {
 	 * @param payload the raw payload to splice in
 	 * @return the raw JSON body, or {@code null} on failure
 	 */
-	private static String buildRawBreakoutBody(ObjectNode rootNode, String field, String payload) {
-		try {
-			ObjectNode clonedNode = rootNode.deepCopy();
-			clonedNode.put(field, RAW_PLACEHOLDER);
-			String serialized = mapper.writeValueAsString(clonedNode);
-			// Replace the quoted placeholder with the raw payload wrapped in quotes so
-			// the
-			// payload's own quotes can break out of the string literal.
-			return serialized.replace("\"" + RAW_PLACEHOLDER + "\"", "\"" + payload + "\"");
-		}
-		catch (Exception ex) {
-			return null;
-		}
+	private static String buildRawBreakoutBody(ObjectNode rootNode, String field, String payload) throws Exception {
+		ObjectNode clonedNode = rootNode.deepCopy();
+		clonedNode.put(field, RAW_PLACEHOLDER);
+		String serialized = mapper.writeValueAsString(clonedNode);
+		String res = serialized.replace("\"" + RAW_PLACEHOLDER + "\"", "\"" + payload + "\"");
+		return res.isEmpty() ? null : res;
 	}
 
 	public record InjectionTest(Operation mutatedOperation, String injectionPoint) {

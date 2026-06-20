@@ -21,25 +21,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import net.datafaker.Faker;
-
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 @Component
 public class OpenApiDiscoverer implements EndpointDiscoverer {
@@ -55,7 +52,7 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 
 	@Override
 	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
-		SecurityScheme authScheme = config != null ? config.authScheme() : null;
+		SecurityScheme authScheme = (config != null) ? config.authScheme() : null;
 		log.info("Parsing OpenAPI spec from: {}", target);
 
 		// Parsing OpenAPI can be blocking, so we wrap it in Mono.fromCallable and
@@ -64,7 +61,7 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 	}
 
 	private List<Operation> parseSpec(String specUrl, ScanConfiguration config) {
-		SecurityScheme authScheme = config != null ? config.authScheme() : null;
+		SecurityScheme authScheme = (config != null) ? config.authScheme() : null;
 		List<Operation> endpoints = new ArrayList<>();
 
 		OpenAPI openAPI = new OpenAPIV3Parser().read(specUrl);
@@ -93,18 +90,24 @@ public class OpenApiDiscoverer implements EndpointDiscoverer {
 				PathItem pathItem = entry.getValue();
 
 				List<HttpMethod> supportedMethods = new ArrayList<>();
-				if (pathItem.getGet() != null)
+				if (pathItem.getGet() != null) {
 					supportedMethods.add(HttpMethod.GET);
-				if (pathItem.getPost() != null)
+				}
+				if (pathItem.getPost() != null) {
 					supportedMethods.add(HttpMethod.POST);
-				if (pathItem.getPut() != null)
+				}
+				if (pathItem.getPut() != null) {
 					supportedMethods.add(HttpMethod.PUT);
-				if (pathItem.getDelete() != null)
+				}
+				if (pathItem.getDelete() != null) {
 					supportedMethods.add(HttpMethod.DELETE);
-				if (pathItem.getPatch() != null)
+				}
+				if (pathItem.getPatch() != null) {
 					supportedMethods.add(HttpMethod.PATCH);
-				if (pathItem.getOptions() != null)
+				}
+				if (pathItem.getOptions() != null) {
 					supportedMethods.add(HttpMethod.OPTIONS);
+				}
 
 				if (pathItem.getGet() != null) {
 					endpoints.add(buildOperation(baseUrl, path, HttpMethod.GET, pathItem.getGet(), openAPI, authScheme,

@@ -16,6 +16,7 @@
 
 package ch.nexsol.orthrusdast.engine;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -24,16 +25,13 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
-import java.util.Comparator;
 
 /**
  * High-level orchestration service. Finds the right discoverer and triggers the

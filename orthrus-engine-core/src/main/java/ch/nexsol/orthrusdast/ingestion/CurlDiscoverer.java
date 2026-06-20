@@ -20,15 +20,13 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.model.Operation;
-
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-import org.springframework.http.HttpMethod;
 
 /**
  * "Discoverer" that just takes a single URL (like a curl command) and treats it as the
@@ -46,7 +44,7 @@ public class CurlDiscoverer implements EndpointDiscoverer {
 
 	@Override
 	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
-		SecurityScheme authScheme = config != null ? config.authScheme() : null;
+		SecurityScheme authScheme = (config != null) ? config.authScheme() : null;
 		log.info("Registering single target for curl-like scan: {}", target);
 
 		// Assume GET if not otherwise specified. Advanced curl-like usage (setting

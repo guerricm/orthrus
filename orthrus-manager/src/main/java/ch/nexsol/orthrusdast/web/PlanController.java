@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.web;
 
 import java.util.ArrayList;
@@ -16,6 +32,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
@@ -33,8 +52,6 @@ import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.repository.TestPlanRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
-import reactor.core.publisher.Mono;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Test-plan pages: listing, creation, edition and execution.
@@ -81,7 +98,7 @@ public class PlanController {
 		return Mono
 			.zip(slaveNodeRepository.findAll().collectList(),
 					scanTaskRepository.findByStatus(JobStatus.RUNNING).collectList())
-			.flatMap(tuple -> {
+			.flatMap((tuple) -> {
 				List<SlaveNodeEntity> slaves = tuple.getT1();
 				List<ch.nexsol.orthrusdast.entity.ScanTaskEntity> runningTasks = tuple.getT2();
 
@@ -92,7 +109,7 @@ public class PlanController {
 					if (slave.getStatus() != NodeStatus.OFFLINE) {
 						totalCapacity += slave.getMaxConcurrentScans();
 						long activeJobs = runningTasks.stream()
-							.filter(t -> slave.getId().equals(t.getAssignedSlaveId()))
+							.filter((t) -> slave.getId().equals(t.getAssignedSlaveId()))
 							.count();
 						availableCapacity += Math.max(0, slave.getMaxConcurrentScans() - activeJobs);
 					}
@@ -102,16 +119,16 @@ public class PlanController {
 				model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
 
 				SlaveNodeEntity activeSlave = slaves.stream()
-					.filter(s -> s.getStatus() != NodeStatus.OFFLINE)
+					.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
 					.findFirst()
 					.orElse(null);
 
 				if (activeSlave != null) {
-					return fetchCapabilities(activeSlave).map(caps -> {
+					return fetchCapabilities(activeSlave).map((caps) -> {
 						model.addAttribute("discoverers", caps.discoverers());
 						model.addAttribute("scanners", caps.scanners());
 						return "plans/edit";
-					}).onErrorResume(e -> {
+					}).onErrorResume((e) -> {
 						log.warn("Failed to fetch capabilities from slave {}", activeSlave.getId(), e);
 						model.addAttribute("discoverers", DEFAULT_DISCOVERERS);
 						model.addAttribute("scanners", List.of());
@@ -131,62 +148,65 @@ public class PlanController {
 	@GetMapping("/plans")
 	public Mono<String> listTestPlans(Model model) {
 		return Mono.zip(testPlanRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
-			.flatMap(tuple -> {
+			.flatMap((tuple) -> {
 				List<TestPlanEntity> plans = tuple.getT1();
 				List<SlaveNodeEntity> slaves = tuple.getT2();
 
-				boolean hasOnlineSlaves = slaves.stream().anyMatch(slave -> slave.getStatus() != NodeStatus.OFFLINE);
+				boolean hasOnlineSlaves = slaves.stream().anyMatch((slave) -> slave.getStatus() != NodeStatus.OFFLINE);
 
 				// Get capabilities if slaves are online to know total scanners
 				Mono<Integer> totalScannersMono = Mono.just(0);
 				if (hasOnlineSlaves) {
 					SlaveNodeEntity activeSlave = slaves.stream()
-						.filter(s -> s.getStatus() != NodeStatus.OFFLINE)
+						.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
 						.findFirst()
 						.orElse(null);
 					if (activeSlave != null) {
 						totalScannersMono = fetchCapabilities(activeSlave)
-							.map(caps -> caps.scanners() != null ? caps.scanners().size() : 0)
+							.map((caps) -> caps.scanners() != null ? caps.scanners().size() : 0)
 							.onErrorReturn(0);
 					}
 				}
 
-				return totalScannersMono.map(totalScanners -> {
-					List<Map<String, Object>> mappedPlans = new ArrayList<>();
-					for (TestPlanEntity plan : plans) {
-						Map<String, Object> map = new HashMap<>();
-						map.put("plan", plan);
-						try {
-							ScanConfiguration conf = objectMapper.readValue(plan.getScanConfigurationJson(),
-									ScanConfiguration.class);
-							if (conf.includeScanners() == null || conf.includeScanners().isEmpty()) {
-								map.put("scannersCount", totalScanners > 0 ? totalScanners : "All");
-							}
-							else {
-								map.put("scannersCount", conf.includeScanners().size());
-							}
-						}
-						catch (Exception e) {
-							log.warn("Failed to parse configuration of plan {}", plan.getId(), e);
-							map.put("scannersCount", "All");
-						}
-						map.put("totalScanners", totalScanners > 0 ? totalScanners : "?");
-						mappedPlans.add(map);
-					}
-
-					model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
-					model.addAttribute("mappedPlans", mappedPlans);
-					return "plans/list";
-				});
+				return totalScannersMono
+					.flatMap((totalScanners) -> Flux.fromIterable(plans)
+						.flatMapSequential((plan) -> Mono.fromCallable(
+								() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class))
+							.map((conf) -> {
+								Map<String, Object> map = new HashMap<>();
+								map.put("plan", plan);
+								if (conf.includeScanners() == null || conf.includeScanners().isEmpty()) {
+									map.put("scannersCount", totalScanners > 0 ? totalScanners : "All");
+								}
+								else {
+									map.put("scannersCount", conf.includeScanners().size());
+								}
+								map.put("totalScanners", totalScanners > 0 ? totalScanners : "?");
+								return map;
+							})
+							.onErrorResume((e) -> {
+								log.warn("Failed to parse configuration of plan {}", plan.getId(), e);
+								Map<String, Object> map = new HashMap<>();
+								map.put("plan", plan);
+								map.put("scannersCount", "All");
+								map.put("totalScanners", totalScanners > 0 ? totalScanners : "?");
+								return Mono.just(map);
+							}))
+						.collectList()
+						.map((mappedPlans) -> {
+							model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
+							model.addAttribute("mappedPlans", mappedPlans);
+							return "plans/list";
+						}));
 			});
 	}
 
 	@PostMapping("/plans/{id}/run")
 	public Mono<String> runTestPlan(@PathVariable Long id, ServerWebExchange exchange) {
-		return testPlanRepository.findById(id).flatMap(plan -> {
+		return testPlanRepository.findById(id).flatMap((plan) -> {
 			ScanJobEntity job = new ScanJobEntity(plan.getDiscovererId(), plan.getTarget(),
 					plan.getScanConfigurationJson(), JobStatus.PENDING, plan.getId());
-			return scanJobRepository.save(job).doOnSuccess(savedJob -> {
+			return scanJobRepository.save(job).doOnSuccess((savedJob) -> {
 				jobEventPublisher.emit(savedJob.getId(), JobEvent.queued(savedJob.getId(), savedJob.getTarget()));
 			}).thenReturn("redirect:/scans/all");
 		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Test plan not found")));
@@ -194,7 +214,7 @@ public class PlanController {
 
 	@PostMapping(value = "/web/plans")
 	public Mono<String> createTestPlan(ServerWebExchange exchange, Model model) {
-		return exchange.getFormData().flatMap(formData -> {
+		return exchange.getFormData().flatMap((formData) -> {
 			String target = formData.getFirst("target");
 			String discovererId = formData.getFirst("discovererId");
 			String bearerToken = formData.getFirst("bearerToken");
@@ -233,9 +253,9 @@ public class PlanController {
 			final OAuth2Config finalOauth2Config = oauth2Config;
 
 			return Mono.justOrEmpty(finalOauth2Config)
-				.flatMap(config -> tokenFetcher.fetchTokens(config))
+				.flatMap((config) -> tokenFetcher.fetchTokens(config))
 				.defaultIfEmpty(List.of())
-				.flatMap(fetchedTokens -> {
+				.flatMap((fetchedTokens) -> {
 					SecurityScheme authScheme = null;
 					SecurityScheme secondaryAuthScheme = null;
 
@@ -258,21 +278,24 @@ public class PlanController {
 							GatewayType.fromString(gatewayType), appUrl, k8sToken, finalOauth2Config,
 							openapiOverrideHost);
 
-					return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig)).flatMap(configJson -> {
-						String name = formData.getFirst("name");
-						String description = formData.getFirst("description");
-						if (name == null || name.isBlank()) {
-							name = "Unnamed Plan";
-						}
-						TestPlanEntity plan = new TestPlanEntity(name, description, discovererId, target, configJson);
-						return testPlanRepository.save(plan);
-					}).doOnError(e -> log.error("Failed to create or save test plan for target: {}", target, e));
+					return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig))
+						.flatMap((configJson) -> {
+							String name = formData.getFirst("name");
+							String description = formData.getFirst("description");
+							if (name == null || name.isBlank()) {
+								name = "Unnamed Plan";
+							}
+							TestPlanEntity plan = new TestPlanEntity(name, description, discovererId, target,
+									configJson);
+							return testPlanRepository.save(plan);
+						})
+						.doOnError((e) -> log.error("Failed to create or save test plan for target: {}", target, e));
 				})
-				.map(savedPlan -> {
+				.map((savedPlan) -> {
 					exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
 					return "fragments/scan-queued :: empty";
 				});
-		}).onErrorResume(e -> {
+		}).onErrorResume((e) -> {
 			model.addAttribute("error", "Scan failed: " + e.getMessage());
 			return Mono.just("fragments/results :: errorPanel");
 		});
@@ -290,35 +313,33 @@ public class PlanController {
 	public Mono<String> editPlanDetails(@PathVariable Long id, Model model) {
 		return testPlanRepository.findById(id).flatMap((plan) -> {
 			model.addAttribute("plan", plan);
-			try {
-				ScanConfiguration conf = objectMapper.readValue(plan.getScanConfigurationJson(),
-						ScanConfiguration.class);
-				model.addAttribute("config", conf);
-			}
-			catch (Exception ex) {
-				log.warn("Failed to parse configuration of plan {}", plan.getId(), ex);
-			}
-
-			return slaveNodeRepository.findAll()
-				.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
-				.next()
-				.flatMap(this::fetchCapabilities)
-				.onErrorResume((e) -> {
-					log.warn("Failed to fetch capabilities from active slave", e);
+			return Mono
+				.fromCallable(() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class))
+				.doOnNext((conf) -> model.addAttribute("config", conf))
+				.onErrorResume((ex) -> {
+					log.warn("Failed to parse configuration of plan {}", plan.getId(), ex);
 					return Mono.empty();
 				})
-				.map((caps) -> {
-					model.addAttribute("discoverers", caps.discoverers());
-					model.addAttribute("scanners", caps.scanners());
-					return "fragments/plan-offcanvas :: edit";
-				})
-				.defaultIfEmpty("fragments/plan-offcanvas :: edit")
-				.doOnNext((view) -> {
-					if (!model.containsAttribute("discoverers")) {
-						model.addAttribute("discoverers", DEFAULT_DISCOVERERS);
-						model.addAttribute("scanners", List.of());
-					}
-				});
+				.then(slaveNodeRepository.findAll()
+					.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
+					.next()
+					.flatMap(this::fetchCapabilities)
+					.onErrorResume((e) -> {
+						log.warn("Failed to fetch capabilities from active slave", e);
+						return Mono.empty();
+					})
+					.map((caps) -> {
+						model.addAttribute("discoverers", caps.discoverers());
+						model.addAttribute("scanners", caps.scanners());
+						return "fragments/plan-offcanvas :: edit";
+					})
+					.defaultIfEmpty("fragments/plan-offcanvas :: edit")
+					.doOnNext((view) -> {
+						if (!model.containsAttribute("discoverers")) {
+							model.addAttribute("discoverers", DEFAULT_DISCOVERERS);
+							model.addAttribute("scanners", List.of());
+						}
+					}));
 		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
 	}
 
@@ -363,47 +384,47 @@ public class PlanController {
 				String bearerToken = formData.getFirst("bearerToken");
 				String bearerTokenSecondary = formData.getFirst("bearerTokenSecondary");
 
-				try {
-					ScanConfiguration oldConfig = objectMapper.readValue(existingPlan.getScanConfigurationJson(),
-							ScanConfiguration.class);
+				return Mono
+					.fromCallable(() -> objectMapper.readValue(existingPlan.getScanConfigurationJson(),
+							ScanConfiguration.class))
+					.flatMap((oldConfig) -> {
+						OAuth2Config oauth2Config = oldConfig.oauth2Config();
+						if (oauth2Url != null && !oauth2Url.isBlank() && oauth2Grant != null
+								&& !oauth2Grant.isBlank()) {
+							String secret = (oauth2ClientSecret == null || oauth2ClientSecret.isBlank())
+									? (oauth2Config != null ? oauth2Config.clientSecret() : "") : oauth2ClientSecret;
+							oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, secret, oauth2Grant,
+									oauth2Creds);
+						}
+						else if (oauth2Url != null && oauth2Url.isBlank()) {
+							oauth2Config = null;
+						}
 
-					OAuth2Config oauth2Config = oldConfig.oauth2Config();
-					if (oauth2Url != null && !oauth2Url.isBlank() && oauth2Grant != null && !oauth2Grant.isBlank()) {
-						String secret = (oauth2ClientSecret == null || oauth2ClientSecret.isBlank())
-								? (oauth2Config != null ? oauth2Config.clientSecret() : "") : oauth2ClientSecret;
-						oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, secret, oauth2Grant, oauth2Creds);
-					}
-					else if (oauth2Url != null && oauth2Url.isBlank()) {
-						oauth2Config = null;
-					}
+						SecurityScheme authScheme = oldConfig.authScheme();
+						SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
 
-					SecurityScheme authScheme = oldConfig.authScheme();
-					SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
+						if (bearerToken != null && !bearerToken.isBlank()) {
+							authScheme = SecurityScheme.bearer(bearerToken.trim());
+						}
+						if (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank()) {
+							secondaryAuthScheme = SecurityScheme.bearer(bearerTokenSecondary.trim());
+						}
 
-					if (bearerToken != null && !bearerToken.isBlank()) {
-						authScheme = SecurityScheme.bearer(bearerToken.trim());
-					}
-					if (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank()) {
-						secondaryAuthScheme = SecurityScheme.bearer(bearerTokenSecondary.trim());
-					}
+						ScanConfiguration scanConfig = new ScanConfiguration(includeScanners,
+								oldConfig.excludeScanners(), concurrency, oldConfig.httpConnectTimeoutMs(),
+								oldConfig.httpReadTimeoutMs(), oldConfig.ignoreSslErrors(), oldConfig.reportFormat(),
+								authScheme, secondaryAuthScheme, oldConfig.language(), oldConfig.includePassed(),
+								(gatewayType != null) ? GatewayType.fromString(gatewayType) : oldConfig.gatewayType(),
+								appUrl, k8sToken, oauth2Config, openapiOverrideHost);
 
-					ScanConfiguration scanConfig = new ScanConfiguration(includeScanners, oldConfig.excludeScanners(),
-							concurrency, oldConfig.httpConnectTimeoutMs(), oldConfig.httpReadTimeoutMs(),
-							oldConfig.ignoreSslErrors(), oldConfig.reportFormat(), authScheme, secondaryAuthScheme,
-							oldConfig.language(), oldConfig.includePassed(),
-							(gatewayType != null) ? GatewayType.fromString(gatewayType) : oldConfig.gatewayType(),
-							appUrl, k8sToken, oauth2Config, openapiOverrideHost);
-
-					existingPlan.setScanConfigurationJson(objectMapper.writeValueAsString(scanConfig));
-				}
-				catch (Exception ex) {
-					// Saving without the new configuration would silently discard the
-					// user's changes — fail loudly instead.
-					return Mono.error(new IllegalStateException(
-							"Failed to update the scan configuration of plan " + id, ex));
-				}
-
-				return testPlanRepository.save(existingPlan);
+						return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig));
+					})
+					.flatMap((newConfigJson) -> {
+						existingPlan.setScanConfigurationJson(newConfigJson);
+						return testPlanRepository.save(existingPlan);
+					})
+					.onErrorResume((ex) -> Mono
+						.error(new IllegalStateException("Failed to update the scan configuration of plan " + id, ex)));
 			});
 		}).map((savedPlan) -> {
 			exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");

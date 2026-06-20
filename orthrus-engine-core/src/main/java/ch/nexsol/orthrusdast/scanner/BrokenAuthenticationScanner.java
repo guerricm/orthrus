@@ -23,7 +23,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -84,7 +83,7 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
 
 			// Test 2: Send request with GARBAGE auth
 			Map<String, String> garbageHeaders = new HashMap<>(
-					operation.headers() != null ? operation.headers() : new HashMap<>());
+					(operation.headers() != null) ? operation.headers() : new HashMap<>());
 			garbageHeaders.put("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature");
 			Operation garbageAuthOp = new Operation(operation.url(), operation.method(), garbageHeaders,
 					operation.queryParams(), operation.body(), operation.securityRequirements(),
@@ -92,7 +91,7 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
 
 			// Test 3: SQLi in Auth Header
 			Map<String, String> sqliHeaders = new HashMap<>(
-					operation.headers() != null ? operation.headers() : new HashMap<>());
+					(operation.headers() != null) ? operation.headers() : new HashMap<>());
 			sqliHeaders.put("Authorization", "Bearer ' OR 1=1--");
 			Operation sqliAuthOp = new Operation(operation.url(), operation.method(), sqliHeaders,
 					operation.queryParams(), operation.body(), operation.securityRequirements(),

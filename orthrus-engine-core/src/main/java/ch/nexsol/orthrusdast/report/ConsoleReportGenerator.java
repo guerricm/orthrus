@@ -19,16 +19,14 @@ package ch.nexsol.orthrusdast.report;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import java.time.Duration;
 
 /**
  * Prints a summary report to the console.

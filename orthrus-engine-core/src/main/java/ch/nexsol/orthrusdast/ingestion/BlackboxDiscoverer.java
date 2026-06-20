@@ -19,32 +19,29 @@ package ch.nexsol.orthrusdast.ingestion;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import org.springframework.http.HttpMethod;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 @Component
 public class BlackboxDiscoverer implements EndpointDiscoverer {
@@ -64,96 +61,92 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 
 	@Override
 	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
-		SecurityScheme authScheme = config != null ? config.authScheme() : null;
-		int maxDepth = properties.getDiscovery().getBlackboxMaxDepth();
-		log.info("Starting black-box discovery from: {} (Max Depth: {})", target, maxDepth);
+		SecurityScheme authScheme = (config != null) ? config.authScheme() : null;
+		log.info("Starting Blackbox discovery on {}", target);
 
-		return Mono.fromCallable(() -> {
-			Set<String> visitedUrls = new HashSet<>();
-			List<Operation> discoveredEndpoints = new ArrayList<>();
-			String targetHost = extractHost(target);
+		return extractHost(target).flatMap((targetHost) -> {
+			Set<String> visitedUrls = ConcurrentHashMap.newKeySet();
+			List<Operation> discoveredEndpoints = Collections.synchronizedList(new ArrayList<>());
 
-			if (targetHost != null) {
-				crawl(target, targetHost, 0, visitedUrls, discoveredEndpoints, authScheme);
-			}
-
-			log.info("Discovered {} endpoints via HTML crawling", discoveredEndpoints.size());
-			return discoveredEndpoints;
-		}).subscribeOn(Schedulers.boundedElastic()).flatMap((crawledEndpoints) -> {
-			log.info("Starting API Dictionary Fuzzing on {}", target);
-			List<String> dictionary = new ArrayList<>();
-			try (BufferedReader br = new BufferedReader(
-					new InputStreamReader(new ClassPathResource("api-wordlist.txt").getInputStream()))) {
-				String line;
-				while ((line = br.readLine()) != null) {
-					if (!line.trim().isEmpty()) {
-						dictionary.add(line.trim());
-					}
-				}
-			}
-			catch (Exception ex) {
-				log.warn("Could not load api-wordlist.txt: {}", ex.getMessage());
-			}
-
-			if (dictionary.isEmpty()) {
-				return Mono.just(crawledEndpoints);
-			}
-
-			String baseUrl = target.endsWith("/") ? target : target + "/";
-			WebClient client = WebClient.builder().baseUrl(baseUrl).build();
-
-			return Flux.fromIterable(dictionary).flatMap((path) -> {
-				String cleanPath = path.startsWith("/") ? path.substring(1) : path;
-				return client.head().uri(cleanPath).exchangeToMono((response) -> {
-					if (isValidResponse(response.statusCode().value())) {
-						return Mono.just(Operation.simple(baseUrl + cleanPath, HttpMethod.GET).withAuth(authScheme));
-					}
-					return Mono.<Operation>empty();
-				})
-					.onErrorResume((e) -> Mono.empty())
-					.switchIfEmpty(client.get().uri(cleanPath).exchangeToMono((response) -> {
-						if (isValidResponse(response.statusCode().value())) {
-							return Mono
-								.just(Operation.simple(baseUrl + cleanPath, HttpMethod.GET).withAuth(authScheme));
-						}
-						return Mono.<Operation>empty();
-					}).onErrorResume((e) -> Mono.empty()))
-					.switchIfEmpty(client.post().uri(cleanPath).exchangeToMono((response) -> {
-						if (isValidResponse(response.statusCode().value())) {
-							return Mono
-								.just(Operation.simple(baseUrl + cleanPath, HttpMethod.POST).withAuth(authScheme));
-						}
-						return Mono.<Operation>empty();
-					}).onErrorResume((e) -> Mono.empty()));
-			}, 20) // concurrency of 20
-				.collectList()
-				.map((fuzzedEndpoints) -> {
-					Set<String> urls = new HashSet<>();
-					List<Operation> combined = new ArrayList<>();
-					for (Operation op : crawledEndpoints) {
-						if (urls.add(op.url())) {
-							combined.add(op);
+			return crawl(target, targetHost, 0, visitedUrls, discoveredEndpoints, authScheme).then(Mono.defer(() -> {
+				log.info("Discovered {} endpoints via HTML crawling", discoveredEndpoints.size());
+				return Mono.just(discoveredEndpoints);
+			})).flatMap((crawledEndpoints) -> {
+				log.info("Starting API Dictionary Fuzzing on {}", target);
+				Mono<List<String>> dictionaryMono = Mono.fromCallable(() -> {
+					List<String> list = new ArrayList<>();
+					try (BufferedReader br = new BufferedReader(
+							new InputStreamReader(new ClassPathResource("api-wordlist.txt").getInputStream()))) {
+						String line;
+						while ((line = br.readLine()) != null) {
+							if (!line.trim().isEmpty()) {
+								list.add(line.trim());
+							}
 						}
 					}
-					for (Operation op : fuzzedEndpoints) {
-						if (urls.add(op.url())) {
-							combined.add(op);
-						}
-					}
-					log.info("Discovered {} total endpoints after fuzzing", combined.size());
-					return combined;
+					return list;
+				}).onErrorResume((ex) -> {
+					log.warn("Could not load api-wordlist.txt: {}", ex.getMessage());
+					return Mono.just(new ArrayList<>());
 				});
+
+				return dictionaryMono.flatMap((dictionary) -> {
+					if (dictionary.isEmpty()) {
+						return Mono.just(crawledEndpoints);
+					}
+
+					String baseUrl = target.endsWith("/") ? target : target + "/";
+					WebClient client = WebClient.builder().baseUrl(baseUrl).build();
+
+					return Flux.fromIterable(dictionary).flatMap((path) -> {
+						String cleanPath = path.startsWith("/") ? path.substring(1) : path;
+						return client.head().uri(cleanPath).exchangeToMono((response) -> {
+							if (isValidResponse(response.statusCode().value())) {
+								return Mono
+									.just(Operation.simple(baseUrl + cleanPath, HttpMethod.GET).withAuth(authScheme));
+							}
+							return Mono.<Operation>empty();
+						})
+							.onErrorResume((e) -> Mono.empty())
+							.switchIfEmpty(client.get().uri(cleanPath).exchangeToMono((response) -> {
+								if (isValidResponse(response.statusCode().value())) {
+									return Mono.just(
+											Operation.simple(baseUrl + cleanPath, HttpMethod.GET).withAuth(authScheme));
+								}
+								return Mono.<Operation>empty();
+							}).onErrorResume((e) -> Mono.empty()))
+							.switchIfEmpty(client.post().uri(cleanPath).exchangeToMono((response) -> {
+								if (isValidResponse(response.statusCode().value())) {
+									return Mono.just(Operation.simple(baseUrl + cleanPath, HttpMethod.POST)
+										.withAuth(authScheme));
+								}
+								return Mono.<Operation>empty();
+							}).onErrorResume((e) -> Mono.empty()));
+					}, 20) // concurrency of 20
+						.collectList()
+						.map((fuzzedEndpoints) -> {
+							Set<String> urls = new HashSet<>();
+							List<Operation> combined = new ArrayList<>();
+							for (Operation op : crawledEndpoints) {
+								if (urls.add(op.url())) {
+									combined.add(op);
+								}
+							}
+							for (Operation op : fuzzedEndpoints) {
+								if (urls.add(op.url())) {
+									combined.add(op);
+								}
+							}
+							log.info("Discovered {} total endpoints after fuzzing", combined.size());
+							return combined;
+						});
+				});
+			});
 		});
 	}
 
-	private String extractHost(String url) {
-		try {
-			return new URI(url).getHost();
-		}
-		catch (URISyntaxException ex) {
-			log.error("Invalid root URL: {}", url);
-			return null;
-		}
+	private Mono<String> extractHost(String url) {
+		return Mono.fromCallable(() -> new URI(url).getHost()).onErrorReturn("");
 	}
 
 	private boolean isValidResponse(int statusCode) {
@@ -163,67 +156,65 @@ public class BlackboxDiscoverer implements EndpointDiscoverer {
 				|| statusCode == 401 || statusCode == 403 || statusCode == 415;
 	}
 
-	private void crawl(String url, String targetHost, int depth, Set<String> visitedUrls,
+	private Mono<Void> crawl(String url, String targetHost, int depth, Set<String> visitedUrls,
 			List<Operation> discoveredEndpoints, SecurityScheme authScheme) {
 		int maxDepth = properties.getDiscovery().getBlackboxMaxDepth();
 		if (depth > maxDepth) {
-			return;
+			return Mono.empty();
 		}
 		if (visitedUrls.contains(url)) {
-			return;
+			return Mono.empty();
 		}
 
-		try {
+		return Mono.fromCallable(() -> {
 			URI uri = new URI(url);
-			if (!targetHost.equals(uri.getHost())) {
-				return; // Strictly restrict to the initial target domain
-			}
-		}
-		catch (URISyntaxException ex) {
-			return;
-		}
-
-		visitedUrls.add(url);
-		log.debug("Crawling depth {}: {}", depth, url);
-
-		try {
-			int timeoutMs = properties.getDiscovery().getBlackboxTimeoutMs();
-			Document doc = Jsoup.connect(url).timeout(timeoutMs).ignoreHttpErrors(true).ignoreContentType(true).get();
-
-			// Register this page as an endpoint
-			discoveredEndpoints.add(Operation.simple(url, HttpMethod.GET).withAuth(authScheme));
-
-			// Extract Links
-			Elements links = doc.select("a[href]");
-			for (Element link : links) {
-				String nextUrl = link.absUrl("href");
-				if (nextUrl != null && !nextUrl.isEmpty()) {
-					crawl(nextUrl, targetHost, depth + 1, visitedUrls, discoveredEndpoints, authScheme);
-				}
+			return targetHost.equals(uri.getHost());
+		}).onErrorReturn(false).flatMap((isValid) -> {
+			if (!isValid) {
+				return Mono.empty();
 			}
 
-			// Extract Forms
-			Elements forms = doc.select("form");
-			for (Element form : forms) {
-				String actionUrl = form.absUrl("action");
-				String method = form.attr("method").toUpperCase();
-				if (method.isEmpty()) {
-					method = "GET";
-				}
-				if (actionUrl != null && !actionUrl.isEmpty()) {
-					discoveredEndpoints
-						.add(Operation.simple(actionUrl, HttpMethod.valueOf(method)).withAuth(authScheme));
-					// Follow form action as GET if applicable
-					if ("GET".equals(method)) {
-						crawl(actionUrl, targetHost, depth + 1, visitedUrls, discoveredEndpoints, authScheme);
+			visitedUrls.add(url);
+			return Mono.fromCallable(() -> {
+				org.jsoup.nodes.Document doc = org.jsoup.Jsoup.connect(url).timeout(5000).ignoreContentType(true).get();
+				return doc;
+			}).subscribeOn(Schedulers.boundedElastic()).flatMap((doc) -> {
+				discoveredEndpoints.add(Operation.simple(url, HttpMethod.GET).withAuth(authScheme));
+
+				List<Mono<Void>> recursiveCalls = new ArrayList<>();
+
+				Elements links = doc.select("a[href]");
+				for (Element link : links) {
+					String nextUrl = link.absUrl("href");
+					if (nextUrl != null && !nextUrl.isEmpty()) {
+						recursiveCalls
+							.add(crawl(nextUrl, targetHost, depth + 1, visitedUrls, discoveredEndpoints, authScheme));
 					}
 				}
-			}
 
-		}
-		catch (Exception ex) {
-			log.warn("Failed to fetch or parse URL {}: {}", url, ex.getMessage());
-		}
+				Elements forms = doc.select("form");
+				for (Element form : forms) {
+					String actionUrl = form.absUrl("action");
+					String method = form.attr("method").toUpperCase();
+					if (method.isEmpty()) {
+						method = "GET";
+					}
+					if (actionUrl != null && !actionUrl.isEmpty()) {
+						discoveredEndpoints
+							.add(Operation.simple(actionUrl, HttpMethod.valueOf(method)).withAuth(authScheme));
+						if ("GET".equals(method)) {
+							recursiveCalls.add(crawl(actionUrl, targetHost, depth + 1, visitedUrls, discoveredEndpoints,
+									authScheme));
+						}
+					}
+				}
+
+				return Flux.concat(recursiveCalls).then();
+			}).onErrorResume((ex) -> {
+				log.warn("Failed to fetch or parse URL {}: {}", url, ex.getMessage());
+				return Mono.empty();
+			});
+		});
 	}
 
 }

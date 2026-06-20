@@ -23,17 +23,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import tools.jackson.databind.ObjectMapper;
-
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;

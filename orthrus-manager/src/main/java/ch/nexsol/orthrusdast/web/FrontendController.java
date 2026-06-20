@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.web;
 
 import java.util.LinkedHashMap;
@@ -10,10 +26,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.engine.StatisticsService;
-import reactor.core.publisher.Mono;
 
 /**
  * General pages: home, login, user manual and statistics. Scans, plans, system
@@ -51,14 +67,14 @@ public class FrontendController {
 	}
 
 	@GetMapping("/manual")
-	public String manual(Model model) {
-		return "manual";
+	public Mono<String> manual(Model model) {
+		return Mono.just("manual");
 	}
 
 	@GetMapping("/stats")
 	public Mono<String> stats(Model model) {
 		return Mono.zip(statisticsService.getEvolutionByTargetAndEndpoint(), statisticsService.getGlobalStatistics())
-			.map(tuple -> {
+			.map((tuple) -> {
 				model.addAttribute("endpointStats", tuple.getT1());
 				model.addAttribute("globalStats", tuple.getT2());
 				return "stats";
@@ -80,9 +96,9 @@ public class FrontendController {
 				"Parses raw cURL commands to extract target URLs, HTTP methods, headers, and request payloads, allowing you to easily scan specific endpoints captured from your browser.");
 		model.addAttribute("discoverers", discovererDescriptions);
 
-		return scanResultService.findAll().collectList().map(history -> {
+		return scanResultService.findAll().collectList().map((history) -> {
 			int totalScans = history.size();
-			long totalVulns = history.stream().mapToLong(scan -> scan.vulnerabilities().size()).sum();
+			long totalVulns = history.stream().mapToLong((scan) -> scan.vulnerabilities().size()).sum();
 
 			model.addAttribute("totalScans", totalScans);
 			model.addAttribute("totalVulns", totalVulns);

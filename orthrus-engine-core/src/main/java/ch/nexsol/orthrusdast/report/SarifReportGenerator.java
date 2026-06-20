@@ -21,13 +21,11 @@ import java.io.OutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
-
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.Vulnerability;
@@ -60,61 +58,58 @@ public class SarifReportGenerator implements ReportGenerator {
 	 */
 	@Override
 	public Mono<Void> generateReport(ScanResult result, OutputStream output, boolean includePassed) {
-		return Mono.fromRunnable(() -> {
-			try {
-				ObjectNode root = mapper.createObjectNode();
-				root.put("version", "2.1.0");
-				root.put("$schema",
-						"https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json");
+		return Mono.fromCallable(() -> {
+			ObjectNode root = mapper.createObjectNode();
+			root.put("version", "2.1.0");
+			root.put("$schema", "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json");
 
-				ArrayNode runs = root.putArray("runs");
-				ObjectNode run = runs.addObject();
+			ArrayNode runs = root.putArray("runs");
+			ObjectNode run = runs.addObject();
 
-				ObjectNode tool = run.putObject("tool");
-				ObjectNode driver = tool.putObject("driver");
-				driver.put("name", "Orthrus VulnAPI");
-				driver.put("informationUri", "https://github.com/cerberauth/vulnapi");
-				driver.put("version", "1.0.0");
+			ObjectNode tool = run.putObject("tool");
+			ObjectNode driver = tool.putObject("driver");
+			driver.put("name", "Orthrus VulnAPI");
+			driver.put("informationUri", "https://github.com/cerberauth/vulnapi");
+			driver.put("version", "1.0.0");
 
-				// We need to define rules for each scanner/CWE
-				ArrayNode rules = driver.putArray("rules");
-				ArrayNode results = run.putArray("results");
+			// We need to define rules for each scanner/CWE
+			ArrayNode rules = driver.putArray("rules");
+			ArrayNode results = run.putArray("results");
 
-				for (Vulnerability v : result.vulnerabilities()) {
-					// Add rule if not exists (simplified here by just adding it, real
-					// implementation would deduplicate)
-					ObjectNode rule = rules.addObject();
-					rule.put("id", v.cwe().getCweId());
-					rule.putObject("shortDescription").put("text", v.cwe().getName());
-					rule.putObject("fullDescription").put("text", v.description());
+			for (Vulnerability v : result.vulnerabilities()) {
+				// Add rule if not exists (simplified here by just adding it, real
+				// implementation would deduplicate)
+				ObjectNode rule = rules.addObject();
+				rule.put("id", v.cwe().getCweId());
+				rule.putObject("shortDescription").put("text", v.cwe().getName());
+				rule.putObject("fullDescription").put("text", v.description());
 
-					// Add result
-					ObjectNode res = results.addObject();
-					res.put("ruleId", v.cwe().getCweId());
+				// Add result
+				ObjectNode res = results.addObject();
+				res.put("ruleId", v.cwe().getCweId());
 
-					String sarifLevel = switch (v.riskLevel()) {
-						case CRITICAL, HIGH -> "error";
-						case MEDIUM -> "warning";
-						case LOW, INFO -> "note";
-					};
-					res.put("level", sarifLevel);
+				String sarifLevel = switch (v.riskLevel()) {
+					case CRITICAL, HIGH -> "error";
+					case MEDIUM -> "warning";
+					case LOW, INFO -> "note";
+				};
+				res.put("level", sarifLevel);
 
-					res.putObject("message").put("text", v.name() + ": " + v.evidence());
+				res.putObject("message").put("text", v.name() + ": " + v.evidence());
 
-					ArrayNode locations = res.putArray("locations");
-					ObjectNode location = locations.addObject();
-					ObjectNode physicalLocation = location.putObject("physicalLocation");
-					ObjectNode artifactLocation = physicalLocation.putObject("artifactLocation");
-					// SARIF usually expects a file path, we map the URL to the uri
-					artifactLocation.put("uri", v.operationUrl());
-				}
-
-				mapper.writerWithDefaultPrettyPrinter().writeValue(output, root);
+				ArrayNode locations = res.putArray("locations");
+				ObjectNode location = locations.addObject();
+				ObjectNode physicalLocation = location.putObject("physicalLocation");
+				ObjectNode artifactLocation = physicalLocation.putObject("artifactLocation");
+				// SARIF usually expects a file path, we map the URL to the uri
+				artifactLocation.put("uri", v.operationUrl());
 			}
-			catch (Exception ex) {
-				log.error("Failed to generate SARIF report", ex);
-				throw new RuntimeException("SARIF generation failed", ex);
-			}
+
+			mapper.writerWithDefaultPrettyPrinter().writeValue(output, root);
+			return null;
+		}).onErrorMap((ex) -> {
+			log.error("Failed to generate SARIF report", ex);
+			return new RuntimeException("SARIF generation failed", ex);
 		}).subscribeOn(Schedulers.boundedElastic()).then();
 	}
 

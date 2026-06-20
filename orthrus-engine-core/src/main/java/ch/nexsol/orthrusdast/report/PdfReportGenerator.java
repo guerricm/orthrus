@@ -20,34 +20,31 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
-
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Entities;
-import org.springframework.stereotype.Component;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
+import java.util.Map;
 
 import com.openhtmltopdf.extend.FSSupplier;
 import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
-
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Entities;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.HtmlUtils;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 import reactor.core.publisher.Mono;
-
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.ScanResult;
+import reactor.core.scheduler.Schedulers;
 
 import ch.nexsol.orthrusdast.model.AttemptStatus;
 import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
+import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import org.springframework.util.StringUtils;
-import org.springframework.web.util.HtmlUtils;
-import reactor.core.scheduler.Schedulers;
+import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
  * Generates a PDF report using Thymeleaf and OpenHTMLToPDF.
@@ -81,7 +78,7 @@ public class PdfReportGenerator implements ReportGenerator {
 		return Mono.fromRunnable(() -> {
 			try {
 				// 1. Determine Language
-				String langStr = result.configuration() != null && result.configuration().language() != null
+				String langStr = (result.configuration() != null && result.configuration().language() != null)
 						? result.configuration().language() : "en";
 				Locale locale = StringUtils.parseLocaleString(langStr);
 
@@ -94,7 +91,8 @@ public class PdfReportGenerator implements ReportGenerator {
 				context.setVariable("scanDate", formatter.format(result.scanStartTime()));
 				context.setVariable("targetUrl", result.targetUrl());
 				context.setVariable("config", result.configuration());
-				context.setVariable("discovererId", result.discovererId() != null ? result.discovererId() : "UNKNOWN");
+				context.setVariable("discovererId",
+						(result.discovererId() != null) ? result.discovererId() : "UNKNOWN");
 
 				// Vulnerabilities are already sorted by ScanEngine
 				context.setVariable("vulnerabilities", result.vulnerabilities());

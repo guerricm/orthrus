@@ -25,8 +25,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.http.ScanHttpResponse;
@@ -104,23 +104,21 @@ public class BolaScanner implements SecurityScanner {
 		Operation controlOp = withPathId(operation, originalIdStr, controlId);
 
 		return httpClient.send(controlOp).flatMapMany((control) -> {
-			List<String> testIds = new ArrayList<>();
+			Mono<List<String>> testIdsMono;
 			if (numeric) {
-				try {
+				testIdsMono = Mono.fromCallable(() -> {
+					List<String> ids = new ArrayList<>();
 					long id = Long.parseLong(originalIdStr);
-					testIds.add(String.valueOf(id + 1));
-					testIds.add(String.valueOf(id - 1 > 0 ? id - 1 : id + 2));
-				}
-				catch (NumberFormatException ex) {
-					// Numeric id too large for long: mutate the string form instead.
-					testIds.add(originalIdStr + "0");
-				}
+					ids.add(String.valueOf(id + 1));
+					ids.add(String.valueOf((id - 1 > 0) ? (id - 1) : (id + 2)));
+					return ids;
+				}).onErrorReturn(List.of(originalIdStr + "0"));
 			}
 			else {
-				testIds.add(UUID.randomUUID().toString());
+				testIdsMono = Mono.just(List.of(UUID.randomUUID().toString()));
 			}
 
-			return Flux.fromIterable(testIds)
+			return testIdsMono.flatMapMany(Flux::fromIterable)
 				.concatMap((testId) -> executeBolaCheck(withPathId(operation, originalIdStr, testId), operation,
 						"URL path", originalIdStr, testId, control));
 		});

@@ -25,11 +25,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import tools.jackson.databind.JsonNode;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
 
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
@@ -55,8 +53,8 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
 		log.info("Starting API Gateway Discovery on Admin URL: {}", target);
 
-		GatewayType gatewayType = config.gatewayType() != null ? config.gatewayType() : GatewayType.AUTO;
-		String appUrl = config.appUrl() != null ? config.appUrl() : target;
+		GatewayType gatewayType = (config.gatewayType() != null) ? config.gatewayType() : GatewayType.AUTO;
+		String appUrl = (config.appUrl() != null) ? config.appUrl() : target;
 
 		// Ensure appUrl doesn't end with slash for cleaner concatenation
 		if (appUrl.endsWith("/")) {
@@ -215,32 +213,40 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 			.map((root) -> {
 				List<String> paths = new ArrayList<>();
 				Object itemsObj = root.get("items");
-				if (itemsObj instanceof List) {
-					for (Object itemObj : (List<?>) itemsObj) {
-						if (itemObj instanceof java.util.Map) {
-							Object specObj = ((java.util.Map<?, ?>) itemObj).get("spec");
-							if (specObj instanceof java.util.Map) {
-								Object rulesObj = ((java.util.Map<?, ?>) specObj).get("rules");
-								if (rulesObj instanceof List) {
-									for (Object ruleObj : (List<?>) rulesObj) {
-										if (ruleObj instanceof java.util.Map) {
-											Object httpObj = ((java.util.Map<?, ?>) ruleObj).get("http");
-											if (httpObj instanceof java.util.Map) {
-												Object pathsObj = ((java.util.Map<?, ?>) httpObj).get("paths");
-												if (pathsObj instanceof List) {
-													for (Object pathItemObj : (List<?>) pathsObj) {
-														if (pathItemObj instanceof java.util.Map) {
-															Object p = ((java.util.Map<?, ?>) pathItemObj).get("path");
-															if (p != null) {
-																paths.add(p.toString());
-															}
-														}
-													}
-												}
-											}
-										}
-									}
-								}
+				if (!(itemsObj instanceof List)) {
+					return paths;
+				}
+				for (Object itemObj : (List<?>) itemsObj) {
+					if (!(itemObj instanceof java.util.Map)) {
+						continue;
+					}
+					Object specObj = ((java.util.Map<?, ?>) itemObj).get("spec");
+					if (!(specObj instanceof java.util.Map)) {
+						continue;
+					}
+					Object rulesObj = ((java.util.Map<?, ?>) specObj).get("rules");
+					if (!(rulesObj instanceof List)) {
+						continue;
+					}
+					for (Object ruleObj : (List<?>) rulesObj) {
+						if (!(ruleObj instanceof java.util.Map)) {
+							continue;
+						}
+						Object httpObj = ((java.util.Map<?, ?>) ruleObj).get("http");
+						if (!(httpObj instanceof java.util.Map)) {
+							continue;
+						}
+						Object pathsObj = ((java.util.Map<?, ?>) httpObj).get("paths");
+						if (!(pathsObj instanceof List)) {
+							continue;
+						}
+						for (Object pathItemObj : (List<?>) pathsObj) {
+							if (!(pathItemObj instanceof java.util.Map)) {
+								continue;
+							}
+							Object p = ((java.util.Map<?, ?>) pathItemObj).get("path");
+							if (p != null) {
+								paths.add(p.toString());
 							}
 						}
 					}

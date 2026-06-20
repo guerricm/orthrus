@@ -18,17 +18,15 @@ package ch.nexsol.orthrusdast.config;
 
 import java.time.Duration;
 
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
-
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
-
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 /**
  * WebClient configuration for the scan HTTP client.
@@ -61,15 +59,7 @@ public class WebClientConfig {
 			.followRedirect(true);
 
 		if (ignoreSslErrors) {
-			httpClient = httpClient.secure((spec) -> {
-				try {
-					spec.sslContext(
-							SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build());
-				}
-				catch (Exception ex) {
-					throw new RuntimeException("Failed to configure insecure SSL", ex);
-				}
-			});
+			httpClient = httpClient.secure((spec) -> spec.sslContext(createInsecureSslContext()));
 		}
 
 		// Allow larger response bodies (up to 16MB)
@@ -81,6 +71,15 @@ public class WebClientConfig {
 			.clientConnector(new ReactorClientHttpConnector(httpClient))
 			.exchangeStrategies(strategies)
 			.build();
+	}
+
+	private io.netty.handler.ssl.SslContext createInsecureSslContext() {
+		try {
+			return SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+		}
+		catch (javax.net.ssl.SSLException ex) {
+			throw new RuntimeException("Failed to configure insecure SSL", ex);
+		}
 	}
 
 }

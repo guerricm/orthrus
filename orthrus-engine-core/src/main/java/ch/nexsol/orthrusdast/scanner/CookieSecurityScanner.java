@@ -21,16 +21,14 @@ import java.util.List;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 
 /**
  * Scans for missing security attributes in cookies (Secure, HttpOnly, SameSite).

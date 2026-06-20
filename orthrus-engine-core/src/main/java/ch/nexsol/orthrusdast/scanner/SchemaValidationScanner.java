@@ -21,20 +21,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import org.springframework.stereotype.Component;
-
-import tools.jackson.databind.ObjectMapper;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.parameters.Parameter;
 
 /**
  * Scans for Improper Input Validation (CWE-20) by testing OpenAPI schema constraints. It
@@ -218,8 +216,9 @@ public class SchemaValidationScanner implements SecurityScanner {
 				if (propSchema.getMaxItems() != null) {
 					Map<String, Object> mutated = new HashMap<>(baseline);
 					List<String> list = new ArrayList<>();
-					for (int i = 0; i <= propSchema.getMaxItems(); i++)
+					for (int i = 0; i <= propSchema.getMaxItems(); i++) {
 						list.add("item");
+					}
 					mutated.put(propName, list);
 					scans.add(testBodyPayload(operation, mutated, "Max Items Constraint Violation",
 							"The array property '" + propName + "' has maxItems " + propSchema.getMaxItems()
@@ -228,8 +227,9 @@ public class SchemaValidationScanner implements SecurityScanner {
 				if (propSchema.getMinItems() != null && propSchema.getMinItems() > 0) {
 					Map<String, Object> mutated = new HashMap<>(baseline);
 					List<String> list = new ArrayList<>();
-					for (int i = 0; i < propSchema.getMinItems() - 1; i++)
+					for (int i = 0; i < propSchema.getMinItems() - 1; i++) {
 						list.add("item");
+					}
 					mutated.put(propName, list);
 					scans.add(testBodyPayload(operation, mutated, "Min Items Constraint Violation",
 							"The array property '" + propName + "' has minItems " + propSchema.getMinItems()
@@ -310,8 +310,8 @@ public class SchemaValidationScanner implements SecurityScanner {
 	}
 
 	private Operation removeParameter(Operation op, String in, String name) {
-		Map<String, String> newQuery = op.queryParams() != null ? new HashMap<>(op.queryParams()) : new HashMap<>();
-		Map<String, String> newHeaders = op.headers() != null ? new HashMap<>(op.headers()) : new HashMap<>();
+		Map<String, String> newQuery = (op.queryParams() != null) ? new HashMap<>(op.queryParams()) : new HashMap<>();
+		Map<String, String> newHeaders = (op.headers() != null) ? new HashMap<>(op.headers()) : new HashMap<>();
 
 		if ("query".equals(in)) {
 			newQuery.remove(name);
@@ -325,8 +325,8 @@ public class SchemaValidationScanner implements SecurityScanner {
 	}
 
 	private Operation mutateParameter(Operation op, String in, String name, String value) {
-		Map<String, String> newQuery = op.queryParams() != null ? new HashMap<>(op.queryParams()) : new HashMap<>();
-		Map<String, String> newHeaders = op.headers() != null ? new HashMap<>(op.headers()) : new HashMap<>();
+		Map<String, String> newQuery = (op.queryParams() != null) ? new HashMap<>(op.queryParams()) : new HashMap<>();
+		Map<String, String> newHeaders = (op.headers() != null) ? new HashMap<>(op.headers()) : new HashMap<>();
 		String newUrl = op.url();
 
 		if ("query".equals(in)) {
@@ -391,20 +391,20 @@ public class SchemaValidationScanner implements SecurityScanner {
 
 	private Flux<Vulnerability> testBodyPayload(Operation operation, Map<String, Object> payloadMap, String testName,
 			String description) {
-		String payloadJson;
-		try {
-			payloadJson = objectMapper.writeValueAsString(payloadMap);
-		}
-		catch (Exception ex) {
-			return Flux.empty();
-		}
+		return Mono.fromCallable(() -> objectMapper.writeValueAsString(payloadMap))
+			.onErrorReturn("")
+			.flatMapMany((payloadJson) -> {
+				if (payloadJson.isEmpty()) {
+					return Flux.empty();
+				}
 
-		Operation testOp = new Operation(operation.url(), operation.method(), operation.headers(),
-				operation.queryParams(), payloadJson, operation.securityRequirements(),
-				operation.expectedContentTypes(), operation.authScheme(), operation.templateUrl(),
-				operation.sourceNode());
+				Operation testOp = new Operation(operation.url(), operation.method(), operation.headers(),
+						operation.queryParams(), payloadJson, operation.securityRequirements(),
+						operation.expectedContentTypes(), operation.authScheme(), operation.templateUrl(),
+						operation.sourceNode());
 
-		return testOperation(testOp, testName, description);
+				return testOperation(testOp, testName, description);
+			});
 	}
 
 	private Flux<Vulnerability> testOperation(Operation testOp, String testName, String description) {

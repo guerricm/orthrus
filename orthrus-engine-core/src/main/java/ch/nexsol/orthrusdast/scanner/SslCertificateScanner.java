@@ -17,9 +17,9 @@
 package ch.nexsol.orthrusdast.scanner;
 
 import java.net.URL;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
-import java.security.cert.CertificateParsingException;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
@@ -29,22 +29,23 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.*;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
 
 /**
  * Scans the SSL/TLS configuration and certificate of the target. Caches the results per
@@ -79,34 +80,29 @@ public class SslCertificateScanner implements SecurityScanner {
 				return Flux.empty();
 			}
 
-			try {
+			return Mono.fromCallable(() -> {
 				URL url = new URL(operation.url());
 				String hostname = url.getHost();
-				int port = url.getPort() != -1 ? url.getPort() : url.getDefaultPort();
+				int port = (url.getPort() != -1) ? url.getPort() : url.getDefaultPort();
 				String hostKey = hostname + ":" + port;
 
 				// Only scan each host once
 				if (!scannedHosts.add(hostKey)) {
-					return Flux.empty();
+					return Flux.<Vulnerability>empty();
 				}
 
 				log.debug("Scanning SSL/TLS for host: {}", hostKey);
 				return scanHost(hostname, port, operation);
-
-			}
-			catch (Exception ex) {
+			}).onErrorResume((ex) -> {
 				log.warn("Failed to parse URL for SSL scanning: {}", operation.url());
-				return Flux.empty();
-			}
+				return Mono.just(Flux.<Vulnerability>empty());
+			}).flatMapMany((flux) -> flux);
 		});
 	}
 
 	private Flux<Vulnerability> scanHost(String hostname, int port, Operation operation) {
-		List<Vulnerability> vulnerabilities = new ArrayList<>();
-
-		try {
-			// Create a custom trust manager that trusts all certificates so we can
-			// inspect them
+		return Mono.fromCallable(() -> {
+			List<Vulnerability> vulns = new ArrayList<>();
 			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
 				public X509Certificate[] getAcceptedIssuers() {
 					return new X509Certificate[0];
@@ -124,20 +120,16 @@ public class SslCertificateScanner implements SecurityScanner {
 			SSLSocketFactory factory = sc.getSocketFactory();
 
 			try (SSLSocket socket = (SSLSocket) factory.createSocket(hostname, port)) {
-				// Ensure we attempt to use the latest protocols if available,
-				// but if we want to detect old protocols, we should enable them for the
-				// handshake.
 				socket.setEnabledProtocols(new String[] { "TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3" });
 				socket.setSoTimeout(5000);
 				socket.startHandshake();
 
 				SSLSession session = socket.getSession();
 
-				// 1. Check Protocol Version
 				String protocol = session.getProtocol();
 				if ("TLSv1".equals(protocol) || "TLSv1.1".equals(protocol) || "SSLv3".equals(protocol)
 						|| "SSLv2".equals(protocol)) {
-					vulnerabilities.add(createVulnerabilityWithTrace("Weak SSL/TLS Protocol Enabled",
+					vulns.add(createVulnerabilityWithTrace("Weak SSL/TLS Protocol Enabled",
 							"The server is using an outdated and insecure protocol: " + protocol, RiskLevel.HIGH,
 							Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_319, List.of("CAPEC-97"), 7.4,
 							"The negotiated protocol during handshake was " + protocol + ".",
@@ -145,19 +137,33 @@ public class SslCertificateScanner implements SecurityScanner {
 							operation, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
 				}
 
-				// 2. Check Certificate
 				Certificate[] peerCerts = session.getPeerCertificates();
 				if (peerCerts.length > 0 && peerCerts[0] instanceof X509Certificate cert) {
+					long currentTime = System.currentTimeMillis();
+					long notAfter = cert.getNotAfter().getTime();
+					long notBefore = cert.getNotBefore().getTime();
 
-					// 2a. Expiration
-					try {
-						cert.checkValidity();
-
-						// Check if expiring soon (e.g. next 30 days)
-						long timeDiff = cert.getNotAfter().getTime() - System.currentTimeMillis();
+					if (currentTime > notAfter) {
+						vulns.add(createVulnerabilityWithTrace("Expired SSL Certificate",
+								"The SSL certificate for " + hostname + " has expired.", RiskLevel.HIGH,
+								Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298, List.of(), 7.5,
+								"Certificate expired on " + cert.getNotAfter() + ".",
+								"Renew and deploy a valid SSL certificate.", operation, null, "API Endpoint (Network)",
+								"Unauthorized Access / Data Exposure"));
+					}
+					else if (currentTime < notBefore) {
+						vulns.add(createVulnerabilityWithTrace("SSL Certificate Not Yet Valid",
+								"The SSL certificate for " + hostname + " is not yet valid.", RiskLevel.MEDIUM,
+								Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298, List.of(), 5.3,
+								"Certificate is only valid from " + cert.getNotBefore() + ".",
+								"Check the system clock or deploy a valid certificate.", operation, null,
+								"API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
+					}
+					else {
+						long timeDiff = notAfter - currentTime;
 						long daysLeft = TimeUnit.MILLISECONDS.toDays(timeDiff);
 						if (daysLeft < 30) {
-							vulnerabilities.add(createVulnerabilityWithTrace("SSL Certificate Expiring Soon",
+							vulns.add(createVulnerabilityWithTrace("SSL Certificate Expiring Soon",
 									"The SSL certificate for " + hostname + " will expire in " + daysLeft + " days.",
 									RiskLevel.LOW, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298,
 									List.of(), 3.1, "Certificate expires on " + cert.getNotAfter() + ".",
@@ -165,26 +171,9 @@ public class SslCertificateScanner implements SecurityScanner {
 									"API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
 						}
 					}
-					catch (CertificateExpiredException ex) {
-						vulnerabilities.add(createVulnerabilityWithTrace("Expired SSL Certificate",
-								"The SSL certificate for " + hostname + " has expired.", RiskLevel.HIGH,
-								Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298, List.of(), 7.5,
-								"Certificate expired on " + cert.getNotAfter() + ".",
-								"Renew and deploy a valid SSL certificate.", operation, null, "API Endpoint (Network)",
-								"Unauthorized Access / Data Exposure"));
-					}
-					catch (CertificateNotYetValidException ex) {
-						vulnerabilities.add(createVulnerabilityWithTrace("SSL Certificate Not Yet Valid",
-								"The SSL certificate for " + hostname + " is not yet valid.", RiskLevel.MEDIUM,
-								Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_298, List.of(), 5.3,
-								"Certificate is only valid from " + cert.getNotBefore() + ".",
-								"Check the system clock or deploy a valid certificate.", operation, null,
-								"API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
-					}
 
-					// 2b. Self-Signed
 					if (cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) {
-						vulnerabilities.add(createVulnerabilityWithTrace("Self-Signed SSL Certificate",
+						vulns.add(createVulnerabilityWithTrace("Self-Signed SSL Certificate",
 								"The SSL certificate is self-signed, which cannot be inherently trusted by clients.",
 								RiskLevel.MEDIUM, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_295,
 								List.of("CAPEC-475"), 4.8, "The issuer and subject of the certificate are identical.",
@@ -192,10 +181,9 @@ public class SslCertificateScanner implements SecurityScanner {
 								operation, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
 					}
 
-					// 2c. Weak Signature Algorithm
 					String sigAlg = cert.getSigAlgName().toUpperCase();
 					if (sigAlg.contains("MD5") || sigAlg.contains("SHA1")) {
-						vulnerabilities.add(createVulnerabilityWithTrace("Weak Certificate Signature Algorithm",
+						vulns.add(createVulnerabilityWithTrace("Weak Certificate Signature Algorithm",
 								"The SSL certificate uses a weak signature algorithm: " + sigAlg + ".",
 								RiskLevel.MEDIUM, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_327,
 								List.of(), 5.9, "The certificate was signed using " + sigAlg + ".",
@@ -203,12 +191,11 @@ public class SslCertificateScanner implements SecurityScanner {
 								null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure"));
 					}
 
-					// 2d. Weak Key Size
 					PublicKey pubKey = cert.getPublicKey();
 					if (pubKey instanceof RSAPublicKey rsaPubKey) {
 						int keySize = rsaPubKey.getModulus().bitLength();
 						if (keySize < 2048) {
-							vulnerabilities.add(createVulnerabilityWithTrace("Weak RSA Key Length",
+							vulns.add(createVulnerabilityWithTrace("Weak RSA Key Length",
 									"The SSL certificate uses an RSA key size of " + keySize
 											+ " bits, which is considered cryptographically weak.",
 									RiskLevel.MEDIUM, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_200,
@@ -218,9 +205,8 @@ public class SslCertificateScanner implements SecurityScanner {
 						}
 					}
 
-					// 2e. Hostname Mismatch
 					if (!hostnameMatches(hostname, cert)) {
-						vulnerabilities.add(createVulnerabilityWithTrace("Certificate Hostname Mismatch",
+						vulns.add(createVulnerabilityWithTrace("Certificate Hostname Mismatch",
 								"The SSL certificate presented by the server is not valid for the requested hostname ("
 										+ hostname + ").",
 								RiskLevel.HIGH, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_200,
@@ -232,17 +218,15 @@ public class SslCertificateScanner implements SecurityScanner {
 					}
 				}
 			}
-		}
-		catch (Exception ex) {
+			return vulns;
+		}).onErrorResume((ex) -> {
 			log.warn("Failed to perform SSL scan on {}: {}", hostname, ex.getMessage());
-		}
-
-		return Flux.fromIterable(vulnerabilities);
+			return Mono.just(new ArrayList<>());
+		}).flatMapMany(Flux::fromIterable);
 	}
 
 	private boolean hostnameMatches(String hostname, X509Certificate cert) {
-		// Simple check against CN
-		String cn = null;
+		String cn = "";
 		try {
 			javax.naming.ldap.LdapName ldapDN = new javax.naming.ldap.LdapName(
 					cert.getSubjectX500Principal().getName());
@@ -254,14 +238,13 @@ public class SslCertificateScanner implements SecurityScanner {
 			}
 		}
 		catch (Exception ex) {
-			// Ignore
+			// Intentionally ignored
 		}
 
-		if (cn != null && matchDomain(hostname, cn)) {
+		if (cn != null && !cn.isEmpty() && matchDomain(hostname, cn)) {
 			return true;
 		}
 
-		// Check SANs
 		try {
 			Collection<List<?>> sans = cert.getSubjectAlternativeNames();
 			if (sans != null) {
@@ -275,9 +258,10 @@ public class SslCertificateScanner implements SecurityScanner {
 				}
 			}
 		}
-		catch (CertificateParsingException ex) {
-			// Ignore
+		catch (Exception ex) {
+			// Intentionally ignored
 		}
+
 		return false;
 	}
 

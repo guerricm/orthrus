@@ -16,10 +16,13 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -27,11 +30,6 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import org.springframework.http.HttpMethod;
 
 /**
  * Scans for Broken Function Level Authorization (BFLA) (API5:2023).
@@ -88,12 +86,12 @@ public class BflaScanner implements SecurityScanner {
 			}
 
 			Flux<Vulnerability> directTests = Flux.fromIterable(methodsToTestDirectly)
-				.flatMap(testMethod -> executeBflaCheck(operation, testMethod, operation.headers(),
+				.flatMap((testMethod) -> executeBflaCheck(operation, testMethod, operation.headers(),
 						"Using " + testMethod.name() + " method directly"));
 
-			Flux<Vulnerability> headerTests = Flux.fromIterable(methodsToTestViaHeader).flatMap(testMethod -> {
+			Flux<Vulnerability> headerTests = Flux.fromIterable(methodsToTestViaHeader).flatMap((testMethod) -> {
 				Map<String, String> overrideHeaders = new HashMap<>(
-						operation.headers() != null ? operation.headers() : new HashMap<>());
+						(operation.headers() != null) ? operation.headers() : new HashMap<>());
 				overrideHeaders.put("X-HTTP-Method-Override", testMethod.name());
 				overrideHeaders.put("X-HTTP-Method", testMethod.name());
 

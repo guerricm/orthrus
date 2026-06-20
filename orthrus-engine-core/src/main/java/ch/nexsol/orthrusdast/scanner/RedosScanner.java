@@ -24,13 +24,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
-
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
@@ -83,7 +81,7 @@ public class RedosScanner implements SecurityScanner {
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			// Get a baseline response time
-			return httpClient.send(operation, false).flatMapMany(baselineResponse -> {
+			return httpClient.send(operation, false).flatMapMany((baselineResponse) -> {
 				long baselineTime = baselineResponse.responseTimeMs();
 
 				List<Mono<Vulnerability>> checks = new ArrayList<>();
@@ -106,9 +104,10 @@ public class RedosScanner implements SecurityScanner {
 					}
 				}
 
-				// 2. JSON Body ReDoS
+				Mono<List<Mono<Vulnerability>>> jsonChecksMono = Mono.just(new ArrayList<>());
 				if (operation.body() != null && operation.body().trim().startsWith("{")) {
-					try {
+					jsonChecksMono = Mono.fromCallable(() -> {
+						List<Mono<Vulnerability>> jsonChecks = new ArrayList<>();
 						JsonNode rootNode = mapper.readTree(operation.body());
 						if (rootNode.isObject()) {
 							for (String field : rootNode.propertyNames()) {
@@ -122,25 +121,26 @@ public class RedosScanner implements SecurityScanner {
 											operation.expectedContentTypes(), operation.authScheme(),
 											operation.templateUrl(), operation.sourceNode());
 
-									checks.add(executeAndCheck(testOp, operation, "JSON Body Field '" + field + "'",
+									jsonChecks.add(executeAndCheck(testOp, operation, "JSON Body Field '" + field + "'",
 											baselineTime));
 								}
 							}
 						}
-					}
-					catch (Exception ex) {
-						log.debug("Failed to parse JSON body for ReDoS in {}", operation.url());
-					}
+						return jsonChecks;
+					}).onErrorReturn(new ArrayList<>());
 				}
 
-				return Flux.fromIterable(checks).flatMap(mono -> mono).filter(vuln -> vuln != null);
+				return jsonChecksMono.flatMapMany((jsonChecks) -> {
+					checks.addAll(jsonChecks);
+					return Flux.fromIterable(checks).flatMap((mono) -> mono).filter((vuln) -> vuln != null);
+				});
 			});
 		});
 	}
 
 	private Mono<Vulnerability> executeAndCheck(Operation testOp, Operation originalOp, String injectionPoint,
 			long baselineTime) {
-		return httpClient.send(testOp, false).flatMap(response -> {
+		return httpClient.send(testOp, false).flatMap((response) -> {
 			long testTime = response.responseTimeMs();
 
 			// Detect if the request took significantly longer than the baseline (Baseline

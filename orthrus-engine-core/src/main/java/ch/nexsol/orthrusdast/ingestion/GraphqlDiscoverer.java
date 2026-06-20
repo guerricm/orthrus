@@ -18,26 +18,23 @@ package ch.nexsol.orthrusdast.ingestion;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
+import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-
-import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import java.util.HashMap;
-import org.springframework.http.HttpMethod;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 @Component
 public class GraphqlDiscoverer implements EndpointDiscoverer {
@@ -61,7 +58,7 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 
 	@Override
 	public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
-		SecurityScheme authScheme = config != null ? config.authScheme() : null;
+		SecurityScheme authScheme = (config != null) ? config.authScheme() : null;
 		log.info("Starting GraphQL discovery on {}", target);
 
 		Operation introspectionOp = new Operation(target, HttpMethod.POST,
@@ -69,21 +66,22 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 				INTROSPECTION_QUERY, Collections.emptyList(), List.of("application/json"), authScheme);
 
 		return httpClient.send(introspectionOp)
-			.map((response) -> parseIntrospection(target, response, authScheme))
+			.flatMap((response) -> parseIntrospection(target, response, authScheme))
 			.onErrorResume((e) -> {
 				log.error("Failed to fetch GraphQL introspection from {}: {}", target, e.getMessage());
 				return Mono.just(Collections.emptyList());
 			});
 	}
 
-	private List<Operation> parseIntrospection(String targetUrl, ScanHttpResponse response, SecurityScheme authScheme) {
-		List<Operation> operations = new ArrayList<>();
+	private Mono<List<Operation>> parseIntrospection(String targetUrl, ScanHttpResponse response,
+			SecurityScheme authScheme) {
 		if (response.statusCode().isError()) {
 			log.warn("Introspection query failed with status {}", response.statusCode());
-			return operations;
+			return Mono.just(new ArrayList<>());
 		}
 
-		try {
+		return Mono.fromCallable(() -> {
+			List<Operation> operations = new ArrayList<>();
 			JsonNode root = objectMapper.readTree(response.body());
 			JsonNode data = root.path("data").path("__schema");
 			if (data.isMissingNode()) {
@@ -116,11 +114,11 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 				}
 			}
 			log.info("Discovered {} GraphQL operations.", operations.size());
-		}
-		catch (Exception ex) {
+			return operations;
+		}).onErrorResume((ex) -> {
 			log.error("Error parsing GraphQL introspection response", ex);
-		}
-		return operations;
+			return Mono.just(new ArrayList<>());
+		});
 	}
 
 	private String buildDummyQuery(boolean isMutation, String fieldName, JsonNode argsNode) {
@@ -159,17 +157,14 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 			.append(varsCallBuilder.toString())
 			.append(" { __typename } }");
 
-		try {
+		return Mono.fromCallable(() -> {
 			Map<String, Object> payload = new HashMap<>();
 			payload.put("query", queryBuilder.toString());
 			if (!variablesMap.isEmpty()) {
 				payload.put("variables", variablesMap);
 			}
 			return objectMapper.writeValueAsString(payload);
-		}
-		catch (Exception ex) {
-			return "{\"query\": \"{ " + fieldName + " }\"}";
-		}
+		}).onErrorReturn("{\"query\": \"{ " + fieldName + " }\"}").block();
 	}
 
 	private String getGraphQLTypeString(JsonNode typeNode) {

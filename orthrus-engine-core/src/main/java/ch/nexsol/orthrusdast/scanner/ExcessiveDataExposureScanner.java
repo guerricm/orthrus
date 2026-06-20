@@ -16,24 +16,25 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Scanner for detecting Excessive Data Exposure (CWE-201 / CWE-213).
@@ -106,43 +107,46 @@ public class ExcessiveDataExposureScanner implements SecurityScanner {
 					return Flux.empty();
 				}
 
-				List<String> findings = new ArrayList<>();
+				Mono<List<String>> findingsMono = Mono.just(new ArrayList<>());
 
 				if (contentType.toLowerCase().contains("application/json")) {
-					try {
+					findingsMono = Mono.fromCallable(() -> {
+						List<String> parsedFindings = new ArrayList<>();
 						JsonNode root = objectMapper.readTree(body);
-						checkNode(root, sensitiveKeys, findings, "");
-					}
-					catch (JacksonException e) {
+						checkNode(root, sensitiveKeys, parsedFindings, "");
+						return parsedFindings;
+					}).onErrorResume((e) -> {
 						log.debug("Failed to parse JSON response for {}", operation.url());
-					}
+						return Mono.just(new ArrayList<>());
+					});
 				}
 
-				if (!findings.isEmpty()) {
-					StringBuilder evidence = new StringBuilder(
-							"Found the following sensitive data attributes in the response:\n");
-					for (String finding : findings) {
-						evidence.append("- ").append(finding).append("\n");
+				return findingsMono.flatMapMany((findingsList) -> {
+					if (!findingsList.isEmpty()) {
+						StringBuilder evidence = new StringBuilder(
+								"Found the following sensitive data attributes in the response:\n");
+						for (String finding : findingsList) {
+							evidence.append("- ").append(finding).append("\n");
+						}
+
+						String description = "The endpoint returns sensitive data that might be excessive. "
+								+ "If this API is consumed by a client that doesn't need all these details, it violates the principle of least privilege. "
+								+ "\n\n⚠️ **FALSE POSITIVES LIKELY: Manual validation required.** "
+								+ "If this is an internal API designed to return full records (e.g., admin panel), this may be legitimate. "
+								+ "However, if this is an external-facing API, ensure you implement Data Masking or use strict DTOs.";
+
+						String remediation = "Review the exposed fields. If the client application does not need this data to function, "
+								+ "remove the fields from the response using dedicated Data Transfer Objects (DTOs) or apply Data Masking.";
+
+						Vulnerability vuln = createVulnerabilityWithTrace("Excessive Data Exposure", description,
+								RiskLevel.MEDIUM, Vulnerability.Confidence.MEDIUM, operation, CWEReference.CWE_200,
+								List.of("CAPEC-118"), 4.3, evidence.toString(), remediation, operation, response,
+								"Response Body", "Data Leakage");
+						return Flux.just(vuln);
 					}
 
-					String description = "The endpoint returns sensitive data that might be excessive. "
-							+ "If this API is consumed by a client that doesn't need all these details, it violates the principle of least privilege. "
-							+ "\n\n⚠️ **FALSE POSITIVES LIKELY: Manual validation required.** "
-							+ "If this is an internal API designed to return full records (e.g., admin panel), this may be legitimate. "
-							+ "However, if this is an external-facing API, ensure you implement Data Masking or use strict DTOs.";
-
-					String remediation = "Review the exposed fields. If the client application does not need this data to function, "
-							+ "remove the fields from the response using dedicated Data Transfer Objects (DTOs) or apply Data Masking.";
-
-					Vulnerability vuln = createVulnerabilityWithTrace("Excessive Data Exposure", description,
-							RiskLevel.HIGH, Vulnerability.Confidence.MEDIUM, operation, CWEReference.CWE_201,
-							List.of("CAPEC-118"), 6.5, evidence.toString(), remediation, operation, response,
-							"API Endpoint (Network)", "Unauthorized Access / Data Exposure");
-
-					return Flux.just(vuln);
-				}
-
-				return Flux.empty();
+					return Flux.empty();
+				});
 			});
 		});
 	}

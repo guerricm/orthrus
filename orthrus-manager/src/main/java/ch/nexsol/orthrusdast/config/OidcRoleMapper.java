@@ -1,7 +1,28 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.config;
 
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.GrantedAuthority;
@@ -16,14 +37,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import reactor.core.publisher.Mono;
-
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
-import java.util.HashMap;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Mapper for OAuth2/OIDC roles from Keycloak to Spring Security roles.
@@ -41,7 +56,7 @@ public class OidcRoleMapper {
 	public ReactiveOAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
 		final OidcReactiveOAuth2UserService delegate = new OidcReactiveOAuth2UserService();
 
-		return userRequest -> delegate.loadUser(userRequest).map(oidcUser -> {
+		return (userRequest) -> delegate.loadUser(userRequest).map((oidcUser) -> {
 			Collection<GrantedAuthority> mappedAuthorities = new ArrayList<>(oidcUser.getAuthorities());
 
 			// 1. Try to extract from ID Token / UserInfo
@@ -92,7 +107,7 @@ public class OidcRoleMapper {
 	public ReactiveOAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2UserService() {
 		final DefaultReactiveOAuth2UserService delegate = new DefaultReactiveOAuth2UserService();
 
-		return userRequest -> delegate.loadUser(userRequest).map(oauth2User -> {
+		return (userRequest) -> delegate.loadUser(userRequest).map((oauth2User) -> {
 			Collection<GrantedAuthority> mappedAuthorities = new ArrayList<>(oauth2User.getAuthorities());
 
 			boolean mapped = extractKeycloakRoles(oauth2User.getAttributes(), mappedAuthorities);
@@ -156,7 +171,7 @@ public class OidcRoleMapper {
 				}
 			}
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			// Ignore parsing errors, it might not be a JWT
 		}
 		return null;

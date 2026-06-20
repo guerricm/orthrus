@@ -28,8 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Service
 public class PayloadLoaderService {
@@ -51,37 +51,31 @@ public class PayloadLoaderService {
 			return Flux.fromIterable(payloadCache.get(category));
 		}
 
-		return Flux.defer(() -> {
+		return Mono.fromCallable(() -> {
 			List<String> payloads = new ArrayList<>();
-			try {
-				ClassPathResource resource = new ClassPathResource("payloads/" + category + ".txt");
-				if (resource.exists()) {
-					try (BufferedReader reader = new BufferedReader(
-							new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
-						String line;
-						while ((line = reader.readLine()) != null) {
-							String trimmed = line.trim();
-							// Ignore comments and empty lines
-							if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
-								payloads.add(trimmed);
-							}
+			ClassPathResource resource = new ClassPathResource("payloads/" + category + ".txt");
+			if (resource.exists()) {
+				try (BufferedReader reader = new BufferedReader(
+						new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+					String line;
+					while ((line = reader.readLine()) != null) {
+						String trimmed = line.trim();
+						if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+							payloads.add(trimmed);
 						}
 					}
-					log.info("Loaded {} payloads for category '{}'", payloads.size(), category);
 				}
-				else {
-					log.warn("Payload file not found for category '{}'. Using fallback payloads.", category);
-					payloads = getFallbackPayloads(category);
-				}
+				log.info("Loaded {} payloads for category '{}'", payloads.size(), category);
 			}
-			catch (Exception ex) {
-				log.error("Failed to load payloads for category '{}': {}", category, ex.getMessage());
+			else {
+				log.warn("Payload file not found for category '{}'. Using fallback payloads.", category);
 				payloads = getFallbackPayloads(category);
 			}
-
-			payloadCache.put(category, payloads);
-			return Flux.fromIterable(payloads);
-		});
+			return payloads;
+		}).onErrorResume((ex) -> {
+			log.error("Failed to load payloads for category '{}': {}", category, ex.getMessage());
+			return Mono.just(getFallbackPayloads(category));
+		}).doOnNext((payloads) -> payloadCache.put(category, payloads)).flatMapMany(Flux::fromIterable);
 	}
 
 	private List<String> getFallbackPayloads(String category) {

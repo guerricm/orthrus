@@ -22,19 +22,17 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
+import ch.nexsol.orthrusdast.model.AttemptStatus;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
-
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.AttemptStatus;
 
 /**
  * Core engine that orchestrates the scanning process reactively.
@@ -113,8 +111,8 @@ public class ScanEngine {
 		log.info("Starting scan engine for family: {} with concurrency: {}", family, config.concurrency());
 
 		List<SecurityScanner> activeScanners = allScanners.stream()
-			.filter(s -> s.getFamily() == family)
-			.filter(s -> config.shouldRunScanner(s.getId()))
+			.filter((s) -> s.getFamily() == family)
+			.filter((s) -> config.shouldRunScanner(s.getId()))
 			.toList();
 
 		log.info("Active scanners for family {}: {}", family,
@@ -155,10 +153,10 @@ public class ScanEngine {
 									operation.method().name(), operation.url(), AttemptStatus.ERROR, List.of()));
 						}));
 			})
-			.onErrorResume(e -> {
+			.onErrorResume((e) -> {
 				log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
 				return Flux.fromIterable(scanners)
-					.map(scanner -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
 							operation.url(), AttemptStatus.ERROR, List.of()));
 			});
 	}

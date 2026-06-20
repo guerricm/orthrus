@@ -21,7 +21,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -62,10 +61,7 @@ public class CrossUserBolaScanner implements SecurityScanner {
 
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
-		return Flux.defer(() -> {
-			// Fallback if not called with config, do nothing
-			return Flux.empty();
-		});
+		return Flux.defer(() -> Flux.empty());
 	}
 
 	@Override
@@ -81,7 +77,7 @@ public class CrossUserBolaScanner implements SecurityScanner {
 		// User A's response means User B was served User A's private object: a confirmed
 		// BOLA. A successful-but-different response is only a weaker signal.
 		Operation userAOp = operation
-			.withAuth(config.authScheme() != null ? config.authScheme() : operation.authScheme());
+			.withAuth((config.authScheme() != null) ? config.authScheme() : operation.authScheme());
 		Operation crossUserOp = operation.withAuth(config.secondaryAuthScheme());
 
 		return httpClient.send(userAOp)
