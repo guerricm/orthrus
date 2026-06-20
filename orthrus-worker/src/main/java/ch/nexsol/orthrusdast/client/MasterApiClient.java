@@ -19,6 +19,7 @@ package ch.nexsol.orthrusdast.client;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
+import ch.nexsol.orthrusdast.engine.ScanService;
 import ch.nexsol.orthrusdast.model.NodeStatus;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 
@@ -55,7 +57,10 @@ public class MasterApiClient {
 
 	private boolean masterDownLogged = false;
 
-	public MasterApiClient(OrthrusProperties properties) {
+	private final ScanService scanService;
+
+	public MasterApiClient(OrthrusProperties properties, ScanService scanService) {
+		this.scanService = scanService;
 		this.webClient = WebClient.builder()
 			.defaultHeader("X-Orthrus-Internal-Token", properties.getMaster().getInternalToken())
 			.build();
@@ -68,7 +73,14 @@ public class MasterApiClient {
 
 	@EventListener(ApplicationReadyEvent.class)
 	public void registerToMaster() {
-		String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\"}", slaveId, slaveUrl);
+		String families = scanService.getAvailableScannerObjects().stream()
+				.map((s) -> s.getFamily().name())
+				.distinct()
+				.collect(Collectors.joining(","));
+		String caps = String.join(",", scanService.getAvailableDiscoverers()) + ","
+				+ scanService.getAvailableScannerObjects().stream().map((s) -> s.getId()).collect(Collectors.joining(","))
+				+ "," + families;
+		String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\", \"capabilities\": \"%s\"}", slaveId, slaveUrl, caps);
 		if (!masterDownLogged) {
 			log.info("Registering slave to master at {}", masterUrl);
 		}

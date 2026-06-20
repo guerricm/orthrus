@@ -38,7 +38,9 @@ public class SlaveNodeEntity implements Persistable<String> {
 
 	private NodeStatus status;
 
-	private Integer maxConcurrentScans = 0;
+	private Integer maxConcurrentScans = 10;
+
+	private String capabilities;
 
 	private Boolean isActive = true;
 
@@ -47,11 +49,12 @@ public class SlaveNodeEntity implements Persistable<String> {
 	public SlaveNodeEntity() {
 	}
 
-	public SlaveNodeEntity(String id, String url, NodeStatus status) {
+	public SlaveNodeEntity(String id, String url, NodeStatus status, String capabilities) {
 		this.id = id;
 		this.url = url;
 		this.status = status;
-		this.maxConcurrentScans = 0;
+		this.capabilities = capabilities;
+		this.maxConcurrentScans = 10;
 		this.isActive = true;
 		this.lastSeenAt = Instant.now();
 	}
@@ -78,6 +81,14 @@ public class SlaveNodeEntity implements Persistable<String> {
 
 	public void setStatus(NodeStatus status) {
 		this.status = status;
+	}
+
+	public String getCapabilities() {
+		return capabilities;
+	}
+
+	public void setCapabilities(String capabilities) {
+		this.capabilities = capabilities;
 	}
 
 	public Integer getMaxConcurrentScans() {

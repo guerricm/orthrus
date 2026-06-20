@@ -55,6 +55,8 @@ import reactor.core.publisher.Mono;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
+
 	@Value("${orthrus.security.admin.username:superadmin}")
 	private String adminUsername;
 
@@ -102,8 +104,7 @@ public class SecurityConfig {
 			http.oauth2Login((oauth2) -> {
 				oauth2.loginPage("/login");
 				oauth2.authenticationFailureHandler((webFilterExchange, exception) -> {
-					System.err.println("OIDC Login Failed: " + exception.getMessage());
-					exception.printStackTrace();
+					log.error("OIDC Login Failed: ", exception);
 					return new org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler(
 							"/login?error_oauth2")
 						.onAuthenticationFailure(webFilterExchange, exception);

@@ -49,6 +49,8 @@ public class ScanTaskEntity {
 
 	private Instant completedAt;
 
+	private Integer retryCount = 0;
+
 	public Long getId() {
 		return id;
 	}
@@ -119,6 +121,14 @@ public class ScanTaskEntity {
 
 	public void setCompletedAt(Instant completedAt) {
 		this.completedAt = completedAt;
+	}
+
+	public Integer getRetryCount() {
+		return retryCount;
+	}
+
+	public void setRetryCount(Integer retryCount) {
+		this.retryCount = retryCount;
 	}
 
 }

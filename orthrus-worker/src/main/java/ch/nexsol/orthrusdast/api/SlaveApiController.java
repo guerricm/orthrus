@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.context.event.ContextClosedEvent;
+import org.springframework.context.event.EventListener;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -61,6 +63,22 @@ public class SlaveApiController {
 		this.scanService = scanService;
 		this.masterApiClient = masterApiClient;
 		this.objectMapper = objectMapper;
+	}
+
+	@EventListener(ContextClosedEvent.class)
+	public void onShutdown() {
+		LoggerFactory.getLogger(SlaveApiController.class).info("Graceful shutdown initiated. Cancelling active jobs...");
+		masterApiClient.setStatus(NodeStatus.OFFLINE);
+		for (Map.Entry<Long, Disposable> entry : activeJobs.entrySet()) {
+			Long jobId = entry.getKey();
+			Disposable disposable = entry.getValue();
+			if (!disposable.isDisposed()) {
+				disposable.dispose();
+				masterApiClient.failJob(jobId, "Worker is shutting down gracefully").subscribe();
+				masterApiClient.failTask(jobId, "Worker is shutting down gracefully").subscribe();
+			}
+		}
+		activeJobs.clear();
 	}
 
 	@PostMapping("/scans")

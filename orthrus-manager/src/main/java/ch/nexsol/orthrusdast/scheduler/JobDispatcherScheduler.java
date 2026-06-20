@@ -24,6 +24,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
@@ -39,6 +40,8 @@ import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 @Component
 @EnableScheduling
 public class JobDispatcherScheduler {
+
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JobDispatcherScheduler.class);
 
 	private final ScanJobRepository scanJobRepository;
 
@@ -75,16 +78,40 @@ public class JobDispatcherScheduler {
 		jobOrchestratorService.processPendingJobs().subscribe();
 
 		// 1. Find all PENDING tasks and process them sequentially
-		scanTaskRepository.findByStatus(JobStatus.PENDING).concatMap((task) ->
-		// 2. Find an eligible slave for each task
-		slaveNodeRepository.findAll()
-			.filter((slave) -> Boolean.TRUE.equals(slave.getIsActive()))
-			.filter((slave) -> slave.getStatus() != NodeStatus.OFFLINE)
-			.filter((slave) -> slave.getLastSeenAt().isAfter(Instant.now().minusSeconds(30)))
-			.filterWhen((slave) -> scanTaskRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
-				.map((count) -> count < slave.getMaxConcurrentScans()))
-			.next()
-			.flatMap((slave) -> dispatchTaskToSlave(task, slave))).subscribe();
+		scanTaskRepository.findByStatus(JobStatus.PENDING).concatMap((task) -> {
+			return slaveNodeRepository.findAll()
+				.filter((slave) -> Boolean.TRUE.equals(slave.getIsActive()))
+				.filter((slave) -> slave.getStatus() != NodeStatus.OFFLINE)
+				.filter((slave) -> slave.getLastSeenAt().isAfter(Instant.now().minusSeconds(30)))
+				.collectList()
+				.flatMap((slaves) -> {
+					if (slaves.isEmpty()) {
+						return Mono.empty();
+					}
+
+					boolean anyCapable = slaves.stream()
+						.anyMatch((s) -> s.getCapabilities() != null && s.getCapabilities().contains(task.getPhase()));
+
+					if (!anyCapable) {
+						log.info("No capable slave found for task {} phase {} among {} active slaves. Auto-completing.",
+								task.getId(), task.getPhase(), slaves.size());
+						return jobOrchestratorService.onScanTaskComplete(task.getId(), 0, 0);
+					}
+
+					return Flux.fromIterable(slaves)
+						.filter((slave) -> slave.getCapabilities() != null
+								&& slave.getCapabilities().contains(task.getPhase()))
+						.filterWhen((slave) -> scanTaskRepository
+							.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
+							.map((count) -> {
+								int maxScans = (slave.getMaxConcurrentScans() != null
+										&& slave.getMaxConcurrentScans() > 0) ? slave.getMaxConcurrentScans() : 10;
+								return count < maxScans;
+							}))
+						.next()
+						.flatMap((slave) -> dispatchTaskToSlave(task, slave));
+				});
+		}).subscribe();
 	}
 
 	@Scheduled(fixedDelay = 10000)
@@ -97,24 +124,24 @@ public class JobDispatcherScheduler {
 				.timeout(Duration.ofSeconds(3))
 				.thenReturn(true)
 				.onErrorResume((e) -> {
-					System.err.println("Ping failed to " + slave.getUrl() + ": " + e.getMessage());
+					log.warn("Ping failed to {}: {}", slave.getUrl(), e.getMessage());
 					return Mono.just(false);
 				})
 				.flatMap((isUp) -> {
 					if (!isUp && slave.getStatus() != NodeStatus.OFFLINE) {
-						System.out.println("Slave " + slave.getId() + " is unreachable. Marking as OFFLINE.");
+						log.warn("Slave {} is unreachable. Marking as OFFLINE.", slave.getId());
 						return slaveNodeRepository
 							.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.OFFLINE.name(),
 									slave.getLastSeenAt())
 							.flatMap((r) -> failZombieScansForSlave(slave.getId()))
-							.doOnSuccess((r) -> System.out
-								.println("Slave " + slave.getId() + " marked OFFLINE and zombie scans failed."));
+							.doOnSuccess(
+									(r) -> log.info("Slave {} marked OFFLINE and zombie scans failed.", slave.getId()));
 					}
 					else if (isUp && slave.getStatus() == NodeStatus.OFFLINE) {
-						System.out.println("Slave " + slave.getId() + " is back online. Marking as IDLE.");
+						log.info("Slave {} is back online. Marking as IDLE.", slave.getId());
 						return slaveNodeRepository
 							.updateSlaveNodeStatusAndLastSeenAt(slave.getId(), NodeStatus.IDLE.name(), Instant.now())
-							.doOnSuccess((r) -> System.out.println("Rows updated to IDLE: " + r));
+							.doOnSuccess((r) -> log.debug("Rows updated to IDLE: {}", r));
 					}
 					return Mono.empty();
 				});
@@ -126,7 +153,7 @@ public class JobDispatcherScheduler {
 		// Find jobs that have been RUNNING for more than 4 hours
 		Instant fourHoursAgo = Instant.now().minus(Duration.ofHours(4));
 		scanJobRepository.findByStatusAndStartedAtBefore(JobStatus.RUNNING, fourHoursAgo).flatMap((job) -> {
-			System.out.println("Job " + job.getId() + " has exceeded the global 4-hour timeout. Marking as FAILED.");
+			log.warn("Job {} has exceeded the global 4-hour timeout. Marking as FAILED.", job.getId());
 			job.setStatus(JobStatus.FAILED);
 			return scanJobRepository.save(job)
 				.doOnSuccess((j) -> jobEventPublisher.emit(j.getId(),
@@ -136,11 +163,23 @@ public class JobDispatcherScheduler {
 
 	private Mono<Void> failZombieScansForSlave(String slaveId) {
 		return scanTaskRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap((task) -> {
-			System.out.println(
-					"Failing zombie task " + task.getId() + " because assigned slave " + slaveId + " went OFFLINE.");
-			task.setStatus(JobStatus.FAILED);
-			return scanTaskRepository.save(task)
-				.flatMap((t) -> jobOrchestratorService.onTaskFailed(t.getId(), "Slave node crashed or disconnected"));
+			int retryCount = task.getRetryCount() != null ? task.getRetryCount() : 0;
+			if (retryCount < 3) {
+				log.info("Retrying zombie task {} (Attempt {}) because assigned slave {} went OFFLINE.", task.getId(),
+						(retryCount + 1), slaveId);
+				task.setRetryCount(retryCount + 1);
+				task.setStatus(JobStatus.PENDING);
+				task.setAssignedSlaveId(null);
+				task.setStartedAt(null);
+				return scanTaskRepository.save(task).then();
+			}
+			else {
+				log.warn("Failing zombie task {} because assigned slave {} went OFFLINE.", task.getId(), slaveId);
+				task.setStatus(JobStatus.FAILED);
+				return scanTaskRepository.save(task)
+					.flatMap((t) -> jobOrchestratorService.onTaskFailed(t.getId(),
+							"Slave node crashed or disconnected"));
+			}
 		}).then();
 	}
 
@@ -150,7 +189,7 @@ public class JobDispatcherScheduler {
 			.minus(Duration.ofMinutes(orthrusProperties.getMaster().getOfflineSlaveDeletionMinutes()));
 		slaveNodeRepository.deleteOfflineSlaves(cutoff)
 			.filter((count) -> count > 0)
-			.doOnNext((count) -> System.out.println("Deleted " + count + " offline slave nodes."))
+			.doOnNext((count) -> log.info("Deleted {} offline slave nodes.", count))
 			.subscribe();
 	}
 
@@ -162,7 +201,9 @@ public class JobDispatcherScheduler {
 		return scanTaskRepository.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 			.flatMap((runningCount) -> {
 				long newCount = runningCount + 1;
-				if (newCount >= slave.getMaxConcurrentScans()) {
+				int maxScans = (slave.getMaxConcurrentScans() != null && slave.getMaxConcurrentScans() > 0)
+						? slave.getMaxConcurrentScans() : 10;
+				if (newCount >= maxScans) {
 					slave.setStatus(NodeStatus.BUSY);
 				}
 				else {
@@ -188,7 +229,7 @@ public class JobDispatcherScheduler {
 					.retrieve()
 					.bodyToMono(Void.class)
 					.onErrorResume((e) -> {
-						System.err.println("Dispatch failed to " + slave.getUrl() + ": " + e.getMessage());
+						log.error("Dispatch failed to {}: {}", slave.getUrl(), e.getMessage());
 						t.setStatus(JobStatus.FAILED);
 						return scanTaskRepository.save(t)
 							.flatMap((saved) -> jobOrchestratorService.onTaskFailed(t.getId(), "Dispatch failed"))

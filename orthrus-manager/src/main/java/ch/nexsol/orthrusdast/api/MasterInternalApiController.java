@@ -52,6 +52,8 @@ import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 @RequestMapping("/api/internal")
 public class MasterInternalApiController {
 
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MasterInternalApiController.class);
+
 	private final SlaveNodeRepository slaveNodeRepository;
 
 	private final ScanJobRepository scanJobRepository;
@@ -81,25 +83,41 @@ public class MasterInternalApiController {
 	 */
 	@PostMapping("/slaves/register")
 	public Mono<ResponseEntity<SlaveNodeEntity>> registerSlave(@RequestBody SlaveRegistrationRequest request) {
-		SlaveNodeEntity node = new SlaveNodeEntity(request.id(), request.url(), NodeStatus.IDLE);
+		SlaveNodeEntity node = new SlaveNodeEntity(request.id(), request.url(), NodeStatus.IDLE,
+				request.capabilities());
 		return slaveNodeRepository.findById(node.getId())
 			.flatMap((existing) -> slaveNodeRepository
-				.updateSlaveNodeUrlStatusAndLastSeenAt(node.getId(), node.getUrl(), node.getStatus().name(),
-						node.getLastSeenAt())
+				.updateSlaveNodeUrlStatusCapabilitiesAndLastSeenAt(node.getId(), node.getUrl(), node.getStatus().name(),
+						node.getCapabilities(), node.getLastSeenAt())
 				.then(failZombieScansForSlave(node.getId()))
 				.thenReturn(ResponseEntity.ok(node)))
-			.switchIfEmpty(Mono.defer(() -> slaveNodeRepository
-				.insertSlaveNode(node.getId(), node.getUrl(), node.getStatus(), node.getLastSeenAt())
-				.thenReturn(ResponseEntity.ok(node))));
+			.switchIfEmpty(
+					Mono.defer(() -> slaveNodeRepository
+						.insertSlaveNode(node.getId(), node.getUrl(), node.getStatus(), node.getCapabilities(),
+								node.getLastSeenAt())
+						.thenReturn(ResponseEntity.ok(node))));
 	}
 
 	private Mono<Void> failZombieScansForSlave(String slaveId) {
 		return scanJobRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap((job) -> {
-			System.out.println("Failing zombie job " + job.getId() + " because slave " + slaveId + " re-registered.");
-			job.setStatus(JobStatus.FAILED);
-			return scanJobRepository.save(job)
-				.doOnSuccess((j) -> jobEventPublisher.emit(j.getId(),
-						JobEvent.failed(j.getId(), j.getTarget(), "Slave node restarted")));
+			int retryCount = job.getRetryCount() != null ? job.getRetryCount() : 0;
+			if (retryCount < 3) {
+				log.info("Retrying zombie job {} (Attempt {}) because slave {} re-registered.", job.getId(),
+						(retryCount + 1), slaveId);
+				job.setRetryCount(retryCount + 1);
+				job.setStatus(JobStatus.PENDING);
+				job.setAssignedSlaveId(null);
+				job.setStartedAt(null);
+				return scanJobRepository.save(job).then();
+			}
+			else {
+				log.warn("Failing zombie job {} because slave {} re-registered.", job.getId(), slaveId);
+				job.setStatus(JobStatus.FAILED);
+				return scanJobRepository.save(job)
+					.doOnSuccess((j) -> jobEventPublisher.emit(j.getId(),
+							JobEvent.failed(j.getId(), j.getTarget(), "Slave node restarted")))
+					.then();
+			}
 		}).then();
 	}
 
@@ -208,7 +226,9 @@ public class MasterInternalApiController {
 							.flatMap((slave) -> scanJobRepository
 								.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 								.flatMap((runningCount) -> {
-									if (runningCount < slave.getMaxConcurrentScans()) {
+									int maxScans = (slave.getMaxConcurrentScans() != null
+											&& slave.getMaxConcurrentScans() > 0) ? slave.getMaxConcurrentScans() : 10;
+									if (runningCount < maxScans) {
 										return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
 												NodeStatus.IDLE.name(), slave.getLastSeenAt());
 									}
@@ -235,7 +255,9 @@ public class MasterInternalApiController {
 						.flatMap((slave) -> scanJobRepository
 							.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 							.flatMap((runningCount) -> {
-								if (runningCount < slave.getMaxConcurrentScans()) {
+								int maxScans = (slave.getMaxConcurrentScans() != null
+										&& slave.getMaxConcurrentScans() > 0) ? slave.getMaxConcurrentScans() : 10;
+								if (runningCount < maxScans) {
 									return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
 											NodeStatus.IDLE.name(), slave.getLastSeenAt());
 								}
@@ -281,7 +303,7 @@ public class MasterInternalApiController {
 		return jobOrchestratorService.onTaskFailed(id, request.reason()).thenReturn(ResponseEntity.ok().<Void>build());
 	}
 
-	public record SlaveRegistrationRequest(String id, String url) {
+	public record SlaveRegistrationRequest(String id, String url, String capabilities) {
 	}
 
 }

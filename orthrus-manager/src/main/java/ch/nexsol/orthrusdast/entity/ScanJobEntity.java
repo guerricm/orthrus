@@ -57,6 +57,8 @@ public class ScanJobEntity {
 
 	private Integer testsCount;
 
+	private Integer retryCount = 0;
+
 	@Transient
 	private String planName;
 
@@ -183,6 +185,14 @@ public class ScanJobEntity {
 
 	public void setTestsCount(Integer testsCount) {
 		this.testsCount = testsCount;
+	}
+
+	public Integer getRetryCount() {
+		return retryCount;
+	}
+
+	public void setRetryCount(Integer retryCount) {
+		this.retryCount = retryCount;
 	}
 
 	public String getFormattedDuration() {

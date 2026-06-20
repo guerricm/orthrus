@@ -27,9 +27,18 @@ orthrus:
 
 server:
   port: 8081
+  shutdown: graceful
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   main:
     web-application-type: reactive
   codec:
     max-in-memory-size: 50MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

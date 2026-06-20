@@ -94,12 +94,23 @@ public class JobOrchestratorService {
 
 	public Mono<Void> onTaskFailed(Long taskId, String reason) {
 		return scanTaskRepository.findById(taskId).flatMap((task) -> {
-			task.setStatus(JobStatus.FAILED);
-			task.setCompletedAt(Instant.now());
-			log.error("Task {} failed: {}", taskId, reason);
-			return scanTaskRepository.save(task).flatMap((savedTask) -> {
-				return checkJobCompletion(task.getScanJobId());
-			});
+			int retryCount = task.getRetryCount() != null ? task.getRetryCount() : 0;
+			if (retryCount < 3) {
+				log.warn("Task {} failed (Attempt {}). Reason: {}. Retrying...", taskId, retryCount + 1, reason);
+				task.setRetryCount(retryCount + 1);
+				task.setStatus(JobStatus.PENDING);
+				task.setAssignedSlaveId(null);
+				task.setStartedAt(null);
+				return scanTaskRepository.save(task).then();
+			}
+			else {
+				log.error("Task {} permanently failed after {} attempts: {}", taskId, retryCount, reason);
+				task.setStatus(JobStatus.FAILED);
+				task.setCompletedAt(Instant.now());
+				return scanTaskRepository.save(task).flatMap((savedTask) -> {
+					return checkJobCompletion(task.getScanJobId());
+				});
+			}
 		});
 	}
 
@@ -117,44 +128,58 @@ public class JobOrchestratorService {
 	private Mono<Void> checkJobCompletion(Long jobId) {
 		return scanTaskRepository.countActiveTasksForJob(jobId).flatMap((activeCount) -> {
 			if (activeCount == 0) {
-				log.info("All tasks completed for job {}", jobId);
+				log.info("All tasks completed or failed for job {}", jobId);
 				return scanJobRepository.findById(jobId).flatMap((job) -> {
-					job.setStatus(JobStatus.COMPLETED);
-					job.setCompletedAt(Instant.now());
+					return scanTaskRepository.countFailedTasksForJob(jobId).flatMap((failedCount) -> {
+						if (failedCount > 0) {
+							job.setStatus(JobStatus.FAILED);
+						}
+						else {
+							job.setStatus(JobStatus.COMPLETED);
+						}
+						job.setCompletedAt(Instant.now());
 
-					int testsCount = job.getTestsCount() != null ? job.getTestsCount() : 0;
+						int testsCount = job.getTestsCount() != null ? job.getTestsCount() : 0;
 
-					return scanResultService
-						.finalizeJobResult(job.getResultId(), job.getTarget(), job.getStartedAt(), job.getCompletedAt(),
-								testsCount)
-						.flatMap((result) -> scanJobRepository.save(job).doOnSuccess((j) -> {
-							long critical = result.riskSummary()
-								.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.CRITICAL, 0L);
-							long high = result.riskSummary()
-								.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.HIGH, 0L);
-							long medium = result.riskSummary()
-								.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.MEDIUM, 0L);
-							long low = result.riskSummary().getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.LOW, 0L);
-							String grade = "A";
-							if (critical > 0)
-								grade = "F";
-							else if (high > 0)
-								grade = "D";
-							else if (medium > 0)
-								grade = "C";
-							else if (low > 0)
-								grade = "B";
+						return scanResultService
+							.finalizeJobResult(job.getResultId(), job.getTarget(), job.getStartedAt(),
+									job.getCompletedAt(), testsCount)
+							.flatMap((result) -> scanJobRepository.save(job).doOnSuccess((j) -> {
+								if (j.getStatus() == JobStatus.FAILED) {
+									jobEventPublisher.emit(jobId, ch.nexsol.orthrusdast.sse.JobEvent.failed(jobId,
+											job.getTarget(), "Some tasks failed"));
+								}
+								else {
+									long critical = result.riskSummary()
+										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.CRITICAL, 0L);
+									long high = result.riskSummary()
+										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.HIGH, 0L);
+									long medium = result.riskSummary()
+										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.MEDIUM, 0L);
+									long low = result.riskSummary()
+										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.LOW, 0L);
+									String grade = "A";
+									if (critical > 0)
+										grade = "F";
+									else if (high > 0)
+										grade = "D";
+									else if (medium > 0)
+										grade = "C";
+									else if (low > 0)
+										grade = "B";
 
-							long info = result.riskSummary()
-								.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);
+									long info = result.riskSummary()
+										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);
 
-							jobEventPublisher.emit(jobId,
-									ch.nexsol.orthrusdast.sse.JobEvent.completed(jobId, job.getTarget(), result.id(),
-											grade, result.vulnerabilities().size(), critical, high, medium, low, info,
-											result.operationsScanned()));
-							jobEventPublisher.complete(jobId);
-						}))
-						.then();
+									jobEventPublisher.emit(jobId,
+											ch.nexsol.orthrusdast.sse.JobEvent.completed(jobId, job.getTarget(),
+													result.id(), grade, result.vulnerabilities().size(), critical, high,
+													medium, low, info, result.operationsScanned()));
+								}
+								jobEventPublisher.complete(jobId);
+							}))
+							.then();
+					});
 				});
 			}
 			return Mono.empty();

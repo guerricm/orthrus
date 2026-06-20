@@ -17,7 +17,7 @@
 package ch.nexsol.orthrusdast.repository;
 
 import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -26,7 +26,9 @@ import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 
 @Repository
-public interface ScanTaskRepository extends ReactiveCrudRepository<ScanTaskEntity, Long> {
+public interface ScanTaskRepository extends R2dbcRepository<ScanTaskEntity, Long> {
+
+	Mono<Long> countByStatus(JobStatus status);
 
 	Flux<ScanTaskEntity> findByStatus(JobStatus status);
 
@@ -36,6 +38,9 @@ public interface ScanTaskRepository extends ReactiveCrudRepository<ScanTaskEntit
 
 	@Query("SELECT COUNT(id) FROM scan_tasks WHERE scan_job_id = :scanJobId AND status != 'COMPLETED' AND status != 'FAILED'")
 	Mono<Long> countActiveTasksForJob(Long scanJobId);
+
+	@Query("SELECT COUNT(id) FROM scan_tasks WHERE scan_job_id = :scanJobId AND status = 'FAILED'")
+	Mono<Long> countFailedTasksForJob(Long scanJobId);
 
 	Flux<ScanTaskEntity> findByAssignedSlaveIdAndStatus(String assignedSlaveId, JobStatus status);
 

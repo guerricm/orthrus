@@ -22,9 +22,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class OrthrusDastApplication {
 
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrthrusDastApplication.class);
+
 	public static void main(String[] args) {
 		SpringApplication.run(OrthrusDastApplication.class, args);
-		System.out.println("Orthrus DAST Master started.");
+		log.info("Orthrus DAST Master started.");
 	}
 
 }

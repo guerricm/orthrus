@@ -31,6 +31,8 @@ import ch.nexsol.orthrusdast.model.JobStatus;
 @Repository
 public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> {
 
+	Mono<Long> countByStatus(JobStatus status);
+
 	Flux<ScanJobEntity> findByStatus(JobStatus status);
 
 	Flux<ScanJobEntity> findByStatusIn(List<JobStatus> statuses);

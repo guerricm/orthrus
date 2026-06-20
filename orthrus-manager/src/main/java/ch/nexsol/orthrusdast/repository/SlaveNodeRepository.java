@@ -34,12 +34,17 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 	Flux<SlaveNodeEntity> findByStatus(NodeStatus status);
 
 	@Modifying
-	@Query("INSERT INTO \"slave_nodes\" (id, url, status, last_seen_at) VALUES (:id, :url, :status, :lastSeenAt)")
-	Mono<Void> insertSlaveNode(String id, String url, NodeStatus status, Instant lastSeenAt);
+	@Query("INSERT INTO \"slave_nodes\" (id, url, status, capabilities, last_seen_at) VALUES (:id, :url, :status, :capabilities, :lastSeenAt)")
+	Mono<Void> insertSlaveNode(String id, String url, NodeStatus status, String capabilities, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
 	Mono<Integer> updateSlaveNodeStatusAndLastSeenAt(String id, String status, Instant lastSeenAt);
+
+	@Modifying
+	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, capabilities = :capabilities, last_seen_at = :lastSeenAt WHERE id = :id")
+	Mono<Integer> updateSlaveNodeUrlStatusCapabilitiesAndLastSeenAt(String id, String url, String status,
+			String capabilities, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
