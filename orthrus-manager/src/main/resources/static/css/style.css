@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('/vendor/fonts/outfit.css');
 
 :root {
     --primary-color: #6366f1;
     --primary-hover: #4f46e5;
     --bg-dark: #0f172a;
+    --bg-darker: #020617;
     --card-bg: rgba(30, 41, 59, 0.7);
     --border-color: rgba(255, 255, 255, 0.1);
     --text-main: #f8fafc;

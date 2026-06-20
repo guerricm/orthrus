@@ -39,11 +39,12 @@ public class JobDispatcherScheduler {
 	private final ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService;
 
 	public JobDispatcherScheduler(ScanJobRepository scanJobRepository, ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository, SlaveNodeRepository slaveNodeRepository,
-			OrthrusProperties orthrusProperties, JobEventPublisher jobEventPublisher, ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService) {
+			OrthrusProperties orthrusProperties, JobEventPublisher jobEventPublisher, ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService,
+			WebClient.Builder webClientBuilder) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
-		this.webClient = WebClient.builder().build();
+		this.webClient = webClientBuilder.build();
 		this.orthrusProperties = orthrusProperties;
 		this.jobEventPublisher = jobEventPublisher;
 		this.jobOrchestratorService = jobOrchestratorService;

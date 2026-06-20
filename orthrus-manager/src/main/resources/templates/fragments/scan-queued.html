@@ -53,7 +53,7 @@
 
                     <span th:if="${status == 'FAILED' or status == 'COMPLETED' or status == 'CANCELLED'}"
                         th:data-restart-url="@{'/system/jobs/' + ${jobId} + '/restart'}"
-                        onclick="event.preventDefault(); event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); document.body.appendChild(f); f.submit();"
+                        onclick="event.preventDefault(); event.stopPropagation(); const f = document.createElement('form'); f.method='POST'; f.action=this.getAttribute('data-restart-url'); const csrf = document.querySelector('meta[name=\'_csrf\']'); if(csrf){const i = document.createElement('input'); i.type='hidden'; i.name='_csrf'; i.value=csrf.content; f.appendChild(i);} document.body.appendChild(f); f.submit();"
                         class="btn btn-sm btn-outline-warning ms-2" title="Restart Scan Job" style="z-index: 10;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                             viewBox="0 0 16 16">
@@ -97,6 +97,7 @@
                         </div>
                         <form th:if="${status == 'PENDING' or status == 'RUNNING'}"
                             th:action="@{/scans/{id}/cancel(id=${jobId})}" method="post" class="ms-3">
+                                <input th:replace="~{fragments/layout :: csrf}"/>
                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Stop Scan">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                     class="bi bi-stop-circle" viewBox="0 0 16 16">

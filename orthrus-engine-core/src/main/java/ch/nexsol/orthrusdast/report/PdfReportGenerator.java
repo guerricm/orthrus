@@ -22,6 +22,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Entities;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
@@ -159,6 +162,11 @@ public class PdfReportGenerator implements ReportGenerator {
 
 				// 5. Render HTML
 				String html = templateEngine.process("report", context);
+
+				Document document = Jsoup.parse(html, "UTF-8");
+				document.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
+				document.outputSettings().escapeMode(Entities.EscapeMode.xhtml);
+				html = document.html();
 
 				// 6. Generate PDF
 				PdfRendererBuilder builder = new PdfRendererBuilder();

@@ -23,6 +23,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.csrf.CsrfWebFilter;
+import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import reactor.core.publisher.Mono;
 
@@ -49,7 +52,8 @@ public class SecurityConfig {
 
 		http.authorizeExchange(exchanges -> exchanges
 			// Public paths
-			.pathMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/favicon.ico", "/login**", "/error/**")
+			.pathMatchers("/css/**", "/js/**", "/images/**", "/vendor/**", "/webjars/**", "/favicon.ico", "/login**",
+					"/error/**")
 			.permitAll()
 			// Internal API for slaves (Secured manually by InternalApiSecurityWebFilter)
 			.pathMatchers("/api/internal/**")
@@ -62,7 +66,18 @@ public class SecurityConfig {
 			.hasAnyRole("ADMIN", "USER"))
 			.formLogin(form -> form.loginPage("/login"))
 			.logout(logout -> logout.requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout")))
-			.csrf(ServerHttpSecurity.CsrfSpec::disable)
+			// CSRF protects the session-cookie UI. Internal API uses a shared-secret
+			// filter and /api/v1 uses bearer tokens; neither has a session to ride.
+			.csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AndServerWebExchangeMatcher(
+					CsrfWebFilter.DEFAULT_CSRF_MATCHER,
+					new NegatedServerWebExchangeMatcher(
+							ServerWebExchangeMatchers.pathMatchers("/api/internal/**", "/api/v1/**")))))
+			// All assets are served from this origin (vendored libs); 'unsafe-inline'
+			// is still required by the inline scripts/styles in the templates.
+			.headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+							+ "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
+							+ "base-uri 'self'; form-action 'self'; frame-ancestors 'none'")))
 			.exceptionHandling(exceptionHandling -> exceptionHandling.accessDeniedHandler(
 					(exchange, denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
 						.sendRedirect(exchange, java.net.URI.create("/error/403"))));

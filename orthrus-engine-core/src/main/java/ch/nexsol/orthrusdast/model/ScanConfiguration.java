@@ -33,6 +33,15 @@ public record ScanConfiguration(List<String> includeScanners, List<String> exclu
 	}
 
 	/**
+	 * Returns a copy of this configuration with the given auth schemes.
+	 */
+	public ScanConfiguration withAuthSchemes(SecurityScheme authScheme, SecurityScheme secondaryAuthScheme) {
+		return new ScanConfiguration(includeScanners, excludeScanners, concurrency, httpConnectTimeoutMs,
+				httpReadTimeoutMs, ignoreSslErrors, reportFormat, authScheme, secondaryAuthScheme, language,
+				includePassed, gatewayType, appUrl, k8sToken, oauth2Config, openapiOverrideHost);
+	}
+
+	/**
 	 * Check if a scanner ID should be executed given include/exclude rules.
 	 */
 	public boolean shouldRunScanner(String scannerId) {

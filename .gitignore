@@ -29,3 +29,6 @@ orthrus_db/data.trace.db
 .vscode/
 .agents/
 .DS_Store
+AGENTS.md
+.agent/rules/checkstyle.md
+tasks/lessons.md
