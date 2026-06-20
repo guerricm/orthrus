@@ -144,6 +144,16 @@ public class JobDispatcherScheduler {
 		}).then();
 	}
 
+	@Scheduled(fixedDelay = 60000)
+	public void cleanupOfflineSlaves() {
+		Instant cutoff = Instant.now()
+			.minus(Duration.ofMinutes(orthrusProperties.getMaster().getOfflineSlaveDeletionMinutes()));
+		slaveNodeRepository.deleteOfflineSlaves(cutoff)
+			.filter((count) -> count > 0)
+			.doOnNext((count) -> System.out.println("Deleted " + count + " offline slave nodes."))
+			.subscribe();
+	}
+
 	record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
 			String scanConfigurationJson) {
 	}

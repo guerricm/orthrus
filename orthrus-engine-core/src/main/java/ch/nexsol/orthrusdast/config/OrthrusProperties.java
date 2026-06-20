@@ -127,6 +127,8 @@ public class OrthrusProperties {
 
 		private int slaveTimeoutSeconds = 30;
 
+		private int offlineSlaveDeletionMinutes = 15;
+
 		public String getUrl() {
 			return url;
 		}
@@ -157,6 +159,14 @@ public class OrthrusProperties {
 
 		public void setSlaveTimeoutSeconds(int slaveTimeoutSeconds) {
 			this.slaveTimeoutSeconds = slaveTimeoutSeconds;
+		}
+
+		public int getOfflineSlaveDeletionMinutes() {
+			return offlineSlaveDeletionMinutes;
+		}
+
+		public void setOfflineSlaveDeletionMinutes(int offlineSlaveDeletionMinutes) {
+			this.offlineSlaveDeletionMinutes = offlineSlaveDeletionMinutes;
 		}
 
 	}

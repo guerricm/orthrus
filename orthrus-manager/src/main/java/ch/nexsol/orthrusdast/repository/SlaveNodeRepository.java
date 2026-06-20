@@ -57,4 +57,8 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 	@Query("UPDATE \"slave_nodes\" SET status = 'OFFLINE' WHERE status != 'OFFLINE' AND last_seen_at < :cutoff")
 	Mono<Integer> markOfflineSlaves(Instant cutoff);
 
+	@Modifying
+	@Query("DELETE FROM \"slave_nodes\" WHERE status = 'OFFLINE' AND last_seen_at < :cutoff")
+	Mono<Integer> deleteOfflineSlaves(Instant cutoff);
+
 }
