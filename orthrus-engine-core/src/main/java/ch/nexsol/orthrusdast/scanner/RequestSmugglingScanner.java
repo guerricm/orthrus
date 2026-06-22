@@ -16,21 +16,19 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import java.util.HashMap;
-import java.util.Map;
-import reactor.core.publisher.Mono;
 
 /**
  * Scans for HTTP Request Smuggling (CWE-444).
@@ -52,6 +50,11 @@ public class RequestSmugglingScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "HTTP Request Smuggling Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
 	}
 
 	@Override

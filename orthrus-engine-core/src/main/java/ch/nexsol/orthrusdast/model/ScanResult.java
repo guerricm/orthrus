@@ -16,11 +16,10 @@
 
 package ch.nexsol.orthrusdast.model;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-
-import java.time.Duration;
 
 /**
  * Result of a complete scan session.

@@ -21,8 +21,8 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -30,8 +30,6 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
-import org.springframework.http.HttpMethod;
 
 /**
  * Scans for CORS misconfigurations (CWE-346, CWE-942).
@@ -55,6 +53,11 @@ public class CorsScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "CORS Misconfiguration Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.CONFIGURATION;
 	}
 
 	@Override

@@ -1,11 +1,19 @@
 server:
   port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
 
 orthrus:
   master:
     url: http://localhost:8080
     internal-token: "change-me-in-production"
     slave-timeout-seconds: 30
+    offline-slave-deletion-minutes: 15
   slave:
     advertised-url: http://not-used
   security:
@@ -14,6 +22,8 @@ orthrus:
       password: ${ADMIN_PASSWORD:superadmin}
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   r2dbc:
     url: r2dbc:h2:file:///./orthrus_db/data;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
     username: sa

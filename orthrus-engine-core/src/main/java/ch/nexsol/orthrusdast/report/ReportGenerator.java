@@ -33,9 +33,9 @@ public interface ReportGenerator {
 	String getFormat();
 
 	/**
-	 * Generates the report and writes it to the output stream.
-	 * @param result The scan result
-	 * @param output The output stream to write to
+	 * generates the report and writes it to the output stream.
+	 * @param result the scan result
+	 * @param output the output stream to write to
 	 * @param includePassed the includePassed
 	 * @return a Mono that completes when the report is fully written
 	 */

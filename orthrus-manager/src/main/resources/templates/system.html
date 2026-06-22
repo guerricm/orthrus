@@ -4,7 +4,7 @@
 
 <body>
 
-    <div class="container-fluid py-4 animate-fade-in">
+    <div class="container-fluid py-4 animate-fade-in" id="system-container" hx-get="/system" hx-trigger="every 5s" hx-swap="outerHTML" hx-select="#system-container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>System Overview</h2>
             <span class="badge bg-primary" th:text="${slaves.size()} + ' Slaves Registered'"></span>
@@ -43,10 +43,12 @@
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="badge bg-secondary" th:text="${activeJobsCount.get(slave.id) + ' / ' + slave.maxConcurrentScans}"></span>
                                         <form th:action="@{'/system/slaves/' + ${slave.id} + '/concurrency'}" method="post" class="d-inline m-0 p-0">
+                                            <input th:replace="~{fragments/layout :: csrf}"/>
                                             <input type="hidden" name="maxConcurrentScans" th:value="${slave.maxConcurrentScans - 1}">
                                             <button type="submit" class="btn btn-sm btn-outline-light py-0 px-2" th:disabled="${slave.maxConcurrentScans <= 0}">-</button>
                                         </form>
                                         <form th:action="@{'/system/slaves/' + ${slave.id} + '/concurrency'}" method="post" class="d-inline m-0 p-0">
+                                            <input th:replace="~{fragments/layout :: csrf}"/>
                                             <input type="hidden" name="maxConcurrentScans" th:value="${slave.maxConcurrentScans + 1}">
                                             <button type="submit" class="btn btn-sm btn-outline-light py-0 px-2">+</button>
                                         </form>
@@ -54,6 +56,7 @@
                                 </td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;">
                                     <form th:action="@{'/system/slaves/' + ${slave.id} + '/toggle-active'}" method="post" class="m-0 p-0">
+                                        <input th:replace="~{fragments/layout :: csrf}"/>
                                         <button type="submit" th:class="'btn btn-sm ' + (${slave.isActive} ? 'btn-success' : 'btn-outline-danger')">
                                             <i th:class="'bi ' + (${slave.isActive} ? 'bi-toggle-on' : 'bi-toggle-off')"></i>
                                             <span th:text="${slave.isActive} ? 'Active' : 'Inactive'"></span>
@@ -120,10 +123,12 @@
                                         
                                     <form th:if="${job.status != null and (job.status.name() == 'FAILED' or job.status.name() == 'COMPLETED' or job.status.name() == 'RUNNING' or job.status.name() == 'CANCELLED')}"
                                           th:action="@{'/system/jobs/' + ${job.id} + '/restart'}" method="post" class="d-inline">
+                                              <input th:replace="~{fragments/layout :: csrf}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-warning" title="Restart Scan Job"><i class="bi bi-arrow-clockwise"></i> Restart</button>
                                     </form>
                                     <form th:if="${job.status != null and (job.status.name() == 'PENDING' or job.status.name() == 'RUNNING')}"
                                           th:action="@{'/scans/' + ${job.id} + '/cancel'}" method="post" class="d-inline ms-1">
+                                              <input th:replace="~{fragments/layout :: csrf}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Stop Scan Job"><i class="bi bi-stop-circle"></i> Stop</button>
                                     </form>
                                 </td>

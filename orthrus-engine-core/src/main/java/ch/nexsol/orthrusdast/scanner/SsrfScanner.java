@@ -19,7 +19,6 @@ package ch.nexsol.orthrusdast.scanner;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -52,6 +51,11 @@ public class SsrfScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "SSRF Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
 	}
 
 	@Override

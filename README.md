@@ -27,7 +27,7 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 - HAProxy (`/v2/services/haproxy/configuration/acls`)
 - Kubernetes Ingress (`/apis/networking.k8s.io/v1/ingresses`)
 
-### 36 Specialized Scanners
+### 41 Specialized Scanners
 
 | Scanner ID | Description | Associated CWE |
 | --- | --- | --- |
@@ -43,10 +43,13 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 | `cors` | Overly permissive CORS origins | CWE-942 (Permissive Cross-domain Policy with Untrusted Domains) |
 | `cross-user-bola` | Advanced BOLA testing using a secondary user's token | CWE-639 (Authorization Bypass Through User-Controlled Key) |
 | `csrf-protection` | Checks state-changing endpoints for missing Anti-CSRF tokens | CWE-352 (Cross-Site Request Forgery (CSRF)) |
+| `excessive-data-exposure` | Analyzes JSON/XML responses to detect exposed PII or sensitive fields lacking data masking | CWE-201 (Insertion of Sensitive Information Into Sent Data) |
 | `file-upload` | Attempts to bypass validation by uploading EICAR signatures and malicious extensions | CWE-434 (Unrestricted Upload of File with Dangerous Type) |
 | `graphql-dos` | Tests GraphQL endpoints for deeply nested queries triggering Resource Consumption DoS | CWE-770 (Allocation of Resources Without Limits or Throttling) |
 | `graphql-injection` | Injects SQLi, XSS, and CmdInj payloads dynamically into GraphQL JSON variables | CWE-74 (Improper Neutralization of Special Elements in Output Used by a Downstream Component) |
 | `graphql-introspection` | Detects if GraphQL introspection is enabled in production | CWE-200 (Exposure of Sensitive Information to an Unauthorized Actor) |
+| `host-header-injection` | Manipulates the Host or X-Forwarded-Host header to provoke cache poisoning or blind SSRF | CWE-114 (Process Control) / CWE-644 |
+| `hpp` | HTTP Parameter Pollution via duplicate parameters to test backend conflict handling | CWE-235 (Improper Handling of Extra Parameters) |
 | `insecure-deserialization` | Sends magic byte payloads for Java, Python, and JSON gadgets | CWE-502 (Deserialization of Untrusted Data) |
 | `jwt-blank-secret` | JWT blank secret bypass | CWE-310 (Cryptographic Issues) |
 | `jwt-none-alg` | JWT 'none' algorithm bypass | CWE-347 (Improper Verification of Cryptographic Signature) |
@@ -54,8 +57,10 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 | `method-tampering` | Exposure of unsafe HTTP methods like TRACE | CWE-650 (Trusting HTTP Permission Methods on the Server Side) |
 | `nosql-injection` | MongoDB operator injection | CWE-943 (Improper Neutralization of Special Elements in Data Query Logic) |
 | `open-redirect` | Unvalidated redirects | CWE-601 (URL Redirection to Untrusted Site ('Open Redirect')) |
+| `pagination-dos` | Tests for excessive pagination size parameters causing database resource exhaustion | CWE-770 (Allocation of Resources Without Limits or Throttling) |
 | `path-traversal` | Directory Traversal for arbitrary file reads | CWE-22 (Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')) |
 | `rate-limiting` | Lack of rate limiting on sensitive endpoints | CWE-770 (Allocation of Resources Without Limits or Throttling) |
+| `redos` | Regular Expression Denial of Service via malicious backtracking payloads | CWE-400 (Uncontrolled Resource Consumption) |
 | `request-smuggling` | Detects HTTP Request Smuggling vulnerabilities using malformed Transfer-Encoding headers | CWE-444 (Inconsistent Interpretation of HTTP Requests) |
 | `schema-validation` | Enforces OpenAPI schema constraints (maxLength, required properties, data types) | CWE-20 (Improper Input Validation) |
 | `security-headers` | Missing critical security headers (HSTS, CSP, etc.) | CWE-693 (Protection Mechanism Failure) |

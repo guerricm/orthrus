@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS "slave_nodes" (
     id VARCHAR(255) PRIMARY KEY,
     url VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL,
-    max_concurrent_scans INT DEFAULT 0,
+    max_concurrent_scans INT DEFAULT 10,
+    capabilities VARCHAR(1024),
     is_active BOOLEAN DEFAULT TRUE,
     last_seen_at TIMESTAMP
 );
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
     created_at TIMESTAMP,
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
+    retry_count INT DEFAULT 0,
     test_plan_id BIGINT,
     result_id VARCHAR(255),
     vulns_count INT,
@@ -97,3 +99,20 @@ ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
 ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS last_modified_at TIMESTAMP;
 ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);
 ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS last_modified_by VARCHAR(255);
+
+CREATE TABLE IF NOT EXISTS "scan_tasks" (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    scan_job_id BIGINT NOT NULL,
+    phase VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    assigned_slave_id VARCHAR(255),
+    endpoints_payload TEXT,
+    created_at TIMESTAMP,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    retry_count INT DEFAULT 0,
+    FOREIGN KEY (scan_job_id) REFERENCES "scan_jobs"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_scantasks_job ON "scan_tasks"(scan_job_id);
+CREATE INDEX IF NOT EXISTS idx_scantasks_status ON "scan_tasks"(status);

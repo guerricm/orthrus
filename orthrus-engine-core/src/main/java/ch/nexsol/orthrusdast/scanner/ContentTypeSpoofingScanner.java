@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -53,6 +52,11 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "Content-Type Spoofing Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.CONFIGURATION;
 	}
 
 	@Override
@@ -135,13 +139,6 @@ public class ContentTypeSpoofingScanner implements SecurityScanner {
 
 			return Flux.concat(xxeVulns, bypassVulns);
 		});
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

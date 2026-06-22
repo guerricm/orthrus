@@ -1,17 +1,32 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.repository;
 
-import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
+import java.time.Instant;
+
+import org.springframework.data.r2dbc.repository.Modifying;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
-
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.r2dbc.repository.Modifying;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.NodeStatus;
-
-import java.time.Instant;
 
 @Repository
 public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, String> {
@@ -19,12 +34,17 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 	Flux<SlaveNodeEntity> findByStatus(NodeStatus status);
 
 	@Modifying
-	@Query("INSERT INTO \"slave_nodes\" (id, url, status, last_seen_at) VALUES (:id, :url, :status, :lastSeenAt)")
-	Mono<Void> insertSlaveNode(String id, String url, NodeStatus status, Instant lastSeenAt);
+	@Query("INSERT INTO \"slave_nodes\" (id, url, status, capabilities, last_seen_at) VALUES (:id, :url, :status, :capabilities, :lastSeenAt)")
+	Mono<Void> insertSlaveNode(String id, String url, NodeStatus status, String capabilities, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
 	Mono<Integer> updateSlaveNodeStatusAndLastSeenAt(String id, String status, Instant lastSeenAt);
+
+	@Modifying
+	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, capabilities = :capabilities, last_seen_at = :lastSeenAt WHERE id = :id")
+	Mono<Integer> updateSlaveNodeUrlStatusCapabilitiesAndLastSeenAt(String id, String url, String status,
+			String capabilities, Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
@@ -41,5 +61,9 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET status = 'OFFLINE' WHERE status != 'OFFLINE' AND last_seen_at < :cutoff")
 	Mono<Integer> markOfflineSlaves(Instant cutoff);
+
+	@Modifying
+	@Query("DELETE FROM \"slave_nodes\" WHERE status = 'OFFLINE' AND last_seen_at < :cutoff")
+	Mono<Integer> deleteOfflineSlaves(Instant cutoff);
 
 }

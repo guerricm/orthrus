@@ -23,13 +23,6 @@ import reactor.core.publisher.Mono;
 
 public interface OastService {
 
-	record OastSession(String correlationId, String domain, String secretKey) {
-	}
-
-	record OastInteraction(String protocol, String queryType, String rawRequest, String remoteAddress,
-			Instant timestamp) {
-	}
-
 	/**
 	 * Registers a new unique domain for receiving Out-Of-Band interactions.
 	 * @return the result
@@ -42,5 +35,12 @@ public interface OastService {
 	 * @return the result
 	 */
 	Flux<OastInteraction> pollInteractions(OastSession session);
+
+	record OastSession(String correlationId, String domain, String secretKey) {
+	}
+
+	record OastInteraction(String protocol, String queryType, String rawRequest, String remoteAddress,
+			Instant timestamp) {
+	}
 
 }

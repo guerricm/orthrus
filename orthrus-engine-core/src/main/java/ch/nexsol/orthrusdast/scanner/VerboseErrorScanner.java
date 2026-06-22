@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -52,6 +51,11 @@ public class VerboseErrorScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "Verbose Error Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
 	}
 
 	@Override
@@ -114,13 +118,6 @@ public class VerboseErrorScanner implements SecurityScanner {
 			}
 			return Flux.empty();
 		});
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

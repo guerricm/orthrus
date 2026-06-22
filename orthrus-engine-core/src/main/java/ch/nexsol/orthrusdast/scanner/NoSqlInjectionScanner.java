@@ -19,7 +19,6 @@ package ch.nexsol.orthrusdast.scanner;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -57,13 +56,16 @@ public class NoSqlInjectionScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.INJECTION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
-		return Flux.defer(() -> {
-			return Flux.just(PAYLOAD_1, PAYLOAD_2)
-				.concatMap((payload) -> InjectionHelper.generateInjectedOperations(operation, payload)
-					.concatMap((test) -> executeNoSqlInjectionTest(operation, test.mutatedOperation(),
-							test.injectionPoint(), payload)));
-		});
+		return Flux.defer(() -> Flux.just(PAYLOAD_1, PAYLOAD_2)
+			.concatMap((payload) -> InjectionHelper.generateInjectedOperations(operation, payload)
+				.concatMap((test) -> executeNoSqlInjectionTest(operation, test.mutatedOperation(),
+						test.injectionPoint(), payload))));
 	}
 
 	private Flux<Vulnerability> executeNoSqlInjectionTest(Operation originalOp, Operation testOp, String injectionPoint,
@@ -85,13 +87,6 @@ public class NoSqlInjectionScanner implements SecurityScanner {
 			}
 			return Flux.empty();
 		});
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

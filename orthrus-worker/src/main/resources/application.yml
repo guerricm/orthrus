@@ -22,14 +22,23 @@ orthrus:
     internal-token: "change-me-in-production"
 
   slave:
-    id: "slave-node-01"
-    advertised-url: http://localhost:8081
+    id: ${SLAVE_ID:${HOSTNAME:localhost}:${server.port}}
+    advertised-url: ${SLAVE_ADVERTISED_URL:http://${HOSTNAME:localhost}:${server.port}}
 
 server:
   port: 8081
+  shutdown: graceful
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   main:
     web-application-type: reactive
   codec:
     max-in-memory-size: 50MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

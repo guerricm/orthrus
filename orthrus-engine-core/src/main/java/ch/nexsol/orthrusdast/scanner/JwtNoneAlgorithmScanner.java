@@ -22,7 +22,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -54,6 +53,11 @@ public class JwtNoneAlgorithmScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "JWT 'none' Algorithm Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.AUTHENTICATION;
 	}
 
 	@Override

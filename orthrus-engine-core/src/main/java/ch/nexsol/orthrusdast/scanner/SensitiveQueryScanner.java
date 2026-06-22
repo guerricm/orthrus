@@ -21,11 +21,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
@@ -58,6 +57,11 @@ public class SensitiveQueryScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "Sensitive Query Parameters Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
 	}
 
 	@Override
@@ -102,12 +106,11 @@ public class SensitiveQueryScanner implements SecurityScanner {
 				// Active check: Try moving JSON body fields to Query String (Parameter
 				// Binding abuse)
 				if (operation.body() != null && operation.body().trim().startsWith("{")) {
-					try {
+					activeVulns = Mono.fromCallable(() -> {
 						Map<String, Object> bodyMap = mapper.readValue(operation.body(),
 								new TypeReference<Map<String, Object>>() {
 								});
 
-						// Only test if body has sensitive keywords
 						boolean hasSensitiveField = bodyMap.keySet()
 							.stream()
 							.anyMatch((k) -> SENSITIVE_KEYWORDS.stream().anyMatch(k.toLowerCase()::contains));
@@ -122,7 +125,7 @@ public class SensitiveQueryScanner implements SecurityScanner {
 									newQueryParams, "{}", operation.securityRequirements(),
 									operation.expectedContentTypes(), operation.authScheme());
 
-							activeVulns = httpClient.send(testOp).flatMapMany((response) -> {
+							return httpClient.send(testOp).flatMapMany((response) -> {
 								if (response.isSuccessful()) {
 									Vulnerability vuln = createVulnerabilityWithTrace(
 											"Sensitive Parameter Binding in Query String (Active)",
@@ -139,10 +142,8 @@ public class SensitiveQueryScanner implements SecurityScanner {
 								return Flux.empty();
 							});
 						}
-					}
-					catch (Exception ex) {
-						// Ignore parse errors
-					}
+						return Flux.<Vulnerability>empty();
+					}).onErrorResume((ex) -> Mono.just(Flux.<Vulnerability>empty())).flatMapMany((flux) -> flux);
 				}
 			}
 

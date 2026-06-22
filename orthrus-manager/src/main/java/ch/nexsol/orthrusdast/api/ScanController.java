@@ -1,24 +1,48 @@
-package ch.nexsol.orthrusdast.api;
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-// ch.nexsol.orthrusdast.engine.ScanService removed
-import ch.nexsol.orthrusdast.model.OAuth2Config;
-import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.GatewayType;
-import ch.nexsol.orthrusdast.model.ScanResult;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
+package ch.nexsol.orthrusdast.api;
 
 import java.util.List;
 
-import ch.nexsol.orthrusdast.entity.ScanJobEntity;
-import ch.nexsol.orthrusdast.model.JobStatus;
-import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
+
+import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
+import ch.nexsol.orthrusdast.entity.ScanJobEntity;
+import ch.nexsol.orthrusdast.model.GatewayType;
+import ch.nexsol.orthrusdast.model.JobStatus;
+import ch.nexsol.orthrusdast.model.OAuth2Config;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.ScanResult;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
+import ch.nexsol.orthrusdast.repository.ScanJobRepository;
+
+// ch.nexsol.orthrusdast.engine.ScanService removed
 
 /**
  * Reactive REST Controller for triggering scans via HTTP.
@@ -57,9 +81,9 @@ public class ScanController {
 	public Mono<ResponseEntity<ScanResult>> triggerScan(@RequestBody ScanRequest request) {
 
 		return Mono.justOrEmpty(request.oauth2())
-			.flatMap(oauth2Config -> tokenFetcher.fetchTokens(oauth2Config))
+			.flatMap((oauth2Config) -> tokenFetcher.fetchTokens(oauth2Config))
 			.defaultIfEmpty(List.of())
-			.flatMap(fetchedTokens -> {
+			.flatMap((fetchedTokens) -> {
 				SecurityScheme authScheme = request.authScheme();
 				SecurityScheme secondaryAuthScheme = request.secondaryAuthScheme();
 
@@ -78,25 +102,25 @@ public class ScanController {
 						request.includePassed() != null ? request.includePassed() : false, GatewayType.AUTO, null, null,
 						request.oauth2(), request.overrideHost());
 
-				return Mono.fromCallable(() -> objectMapper.writeValueAsString(config)).flatMap(configJson -> {
+				return Mono.fromCallable(() -> objectMapper.writeValueAsString(config)).flatMap((configJson) -> {
 					ScanJobEntity job = new ScanJobEntity(request.discovererId(), request.target(), configJson,
 							JobStatus.PENDING, null);
 					return scanJobRepository.save(job);
 				})
-					.map(savedJob -> ResponseEntity.accepted().body((ScanResult) null)) // Need
-																						// a
-																						// DTO
-																						// or
-																						// just
-																						// return
-																						// job
-																						// ID
-					.doOnError(e -> LoggerFactory.getLogger(ScanController.class)
+					.map((savedJob) -> ResponseEntity.accepted().body((ScanResult) null)) // Need
+																							// a
+																							// DTO
+																							// or
+																							// just
+																							// return
+																							// job
+																							// ID
+					.doOnError((e) -> LoggerFactory.getLogger(ScanController.class)
 						.error("Failed to create or save scan job for target: {}", request.target(), e));
 			})
-			.onErrorResume(IllegalArgumentException.class, e -> Mono.just(ResponseEntity.badRequest().build()))
+			.onErrorResume(IllegalArgumentException.class, (e) -> Mono.just(ResponseEntity.badRequest().build()))
 			.onErrorResume(Exception.class,
-					e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
+					(e) -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));
 	}
 
 	// DTO for incoming requests

@@ -16,6 +16,7 @@
 
 package ch.nexsol.orthrusdast.engine;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -24,15 +25,13 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
-import java.util.Comparator;
 
 /**
  * High-level orchestration service. Finds the right discoverer and triggers the
@@ -53,13 +52,6 @@ public class ScanService {
 			.collect(Collectors.toMap(EndpointDiscoverer::getId, Function.identity()));
 	}
 
-	/**
-	 * Execute a scan based on a target and a specific discoverer ID.
-	 * @param discovererId the discovererId
-	 * @param target the target
-	 * @param config the config
-	 * @return the result
-	 */
 	public Flux<ScanAttempt> executeScan(String discovererId, String target, ScanConfiguration config) {
 		EndpointDiscoverer discoverer = discoverers.get(discovererId);
 		if (discoverer == null) {
@@ -69,6 +61,36 @@ public class ScanService {
 		log.info("Executing scan with discoverer '{}' on target '{}'", discovererId, target);
 
 		return scanEngine.runScan(discoverer, target, config);
+	}
+
+	/**
+	 * Execute only discovery phase.
+	 * @param discovererId the discovererId
+	 * @param target the target
+	 * @param config the config
+	 * @return a Mono of discovered operations
+	 */
+	public Mono<List<ch.nexsol.orthrusdast.model.Operation>> executeDiscovery(String discovererId, String target,
+			ScanConfiguration config) {
+		EndpointDiscoverer discoverer = discoverers.get(discovererId);
+		if (discoverer == null) {
+			return Mono.error(new IllegalArgumentException("Unknown discoverer ID: " + discovererId));
+		}
+		log.info("Executing discovery with discoverer '{}' on target '{}'", discovererId, target);
+		return scanEngine.runDiscovery(discoverer, target, config);
+	}
+
+	/**
+	 * Execute a scan for a specific family on pre-discovered operations.
+	 * @param operations the operations to scan
+	 * @param family the scanner family
+	 * @param config the scan configuration
+	 * @return the flux of scan attempts
+	 */
+	public Flux<ScanAttempt> executeScanFamily(List<ch.nexsol.orthrusdast.model.Operation> operations,
+			ch.nexsol.orthrusdast.scanner.ScannerFamily family, ScanConfiguration config) {
+		log.info("Executing scan for family '{}' on {} operations", family, operations.size());
+		return scanEngine.runScannersOnOperations(operations, family, config);
 	}
 
 	/**

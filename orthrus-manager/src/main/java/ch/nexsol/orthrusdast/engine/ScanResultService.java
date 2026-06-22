@@ -1,36 +1,52 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.engine;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.entity.ScanAttemptEntity;
 import ch.nexsol.orthrusdast.entity.ScanResultEntity;
 import ch.nexsol.orthrusdast.entity.VulnerabilityEntity;
+import ch.nexsol.orthrusdast.model.AttemptStatus;
+import ch.nexsol.orthrusdast.model.CWEReference;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.OwaspReference;
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.model.OwaspReference;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.repository.ScanAttemptRepository;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
-import tools.jackson.databind.ObjectMapper;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.repository.ScanResultRepository;
 import ch.nexsol.orthrusdast.repository.VulnerabilityRepository;
-import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Collections;
-import java.util.stream.Collectors;
-
-import ch.nexsol.orthrusdast.model.AttemptStatus;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.UUID;
-import org.springframework.data.domain.PageRequest;
 
 @Service
 public class ScanResultService {
@@ -59,13 +75,13 @@ public class ScanResultService {
 		ScanResultEntity entity = new ScanResultEntity(result.id(), result.targetUrl(), result.scanStartTime(),
 				result.scanEndTime(), result.operationsDiscovered(), result.operationsScanned());
 
-		return scanResultRepository.save(entity).flatMap(savedEntity -> {
+		return scanResultRepository.save(entity).flatMap((savedEntity) -> {
 			if (result.vulnerabilities() == null || result.vulnerabilities().isEmpty()) {
 				return Mono.just(result);
 			}
 			List<VulnerabilityEntity> vulnEntities = result.vulnerabilities()
 				.stream()
-				.map(v -> mapToEntity(v, savedEntity.id()))
+				.map((v) -> mapToEntity(v, savedEntity.id()))
 				.toList();
 			return vulnerabilityRepository.saveAll(vulnEntities).then(Mono.just(result));
 		});
@@ -103,12 +119,12 @@ public class ScanResultService {
 			int testsCount) {
 		return scanResultRepository.finalizeScanResult(resultId, endTime, testsCount)
 			.defaultIfEmpty(0)
-			.flatMap(rows -> {
+			.flatMap((rows) -> {
 				if (rows == 0) {
 					ScanResultEntity entity = new ScanResultEntity(resultId, targetUrl, startTime, endTime, 0,
 							testsCount);
 					return scanResultRepository.save(entity)
-						.onErrorResume(e -> Mono.empty()) // in case of race condition
+						.onErrorResume((e) -> Mono.empty()) // in case of race condition
 															// duplicate key
 						.then(findById(resultId));
 				}
@@ -118,47 +134,48 @@ public class ScanResultService {
 
 	public Mono<ScanResult> findById(String id) {
 		return scanResultRepository.findById(id)
-			.flatMap(entity -> Mono.zip(vulnerabilityRepository.findByScanResultId(id).collectList(),
-					scanAttemptRepository.findByScanResultId(id).collectList(),
-					scanJobRepository.findByResultId(id).map(job -> {
-						try {
-							return objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
-						}
-						catch (Exception e) {
-							return ScanConfiguration.defaults();
-						}
-					}).defaultIfEmpty(ScanConfiguration.defaults()))
-				.map(tuple -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
+			.flatMap((entity) -> Mono
+				.zip(vulnerabilityRepository.findByScanResultId(id).collectList(),
+						scanAttemptRepository.findByScanResultId(id).collectList(),
+						scanJobRepository.findByResultId(id)
+							.flatMap((job) -> Mono
+								.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(),
+										ScanConfiguration.class))
+								.onErrorReturn(ScanConfiguration.defaults()))
+							.defaultIfEmpty(ScanConfiguration.defaults()))
+				.map((tuple) -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
 	}
 
 	public Flux<ScanResult> findAll() {
 		return scanResultRepository.findAll()
-			.flatMap(entity -> Mono.zip(vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
-					scanAttemptRepository.findByScanResultId(entity.id()).collectList(),
-					scanJobRepository.findByResultId(entity.id()).map(job -> {
-						try {
-							return objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
-						}
-						catch (Exception e) {
-							return ScanConfiguration.defaults();
-						}
-					}).defaultIfEmpty(ScanConfiguration.defaults()))
-				.map(tuple -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
+			.flatMap((entity) -> Mono
+				.zip(vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
+						scanAttemptRepository
+							.findByScanResultId(entity.id())
+							.collectList(),
+						scanJobRepository.findByResultId(entity.id())
+							.flatMap((job) -> Mono
+								.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(),
+										ScanConfiguration.class))
+								.onErrorReturn(ScanConfiguration.defaults()))
+							.defaultIfEmpty(ScanConfiguration.defaults()))
+				.map((tuple) -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
 	}
 
 	public Flux<ScanResult> getHistory(int page, int size) {
 		return scanResultRepository.findAllByOrderByScanStartTimeDesc(PageRequest.of(page, size))
-			.flatMap(entity -> Mono.zip(vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
-					scanAttemptRepository.findByScanResultId(entity.id()).collectList(),
-					scanJobRepository.findByResultId(entity.id()).map(job -> {
-						try {
-							return objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
-						}
-						catch (Exception e) {
-							return ScanConfiguration.defaults();
-						}
-					}).defaultIfEmpty(ScanConfiguration.defaults()))
-				.map(tuple -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
+			.flatMap((entity) -> Mono
+				.zip(vulnerabilityRepository.findByScanResultId(entity.id()).collectList(),
+						scanAttemptRepository
+							.findByScanResultId(entity.id())
+							.collectList(),
+						scanJobRepository.findByResultId(entity.id())
+							.flatMap((job) -> Mono
+								.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(),
+										ScanConfiguration.class))
+								.onErrorReturn(ScanConfiguration.defaults()))
+							.defaultIfEmpty(ScanConfiguration.defaults()))
+				.map((tuple) -> mapToDomain(entity, tuple.getT1(), tuple.getT2(), tuple.getT3())));
 	}
 
 	private VulnerabilityEntity mapToEntity(Vulnerability v, String scanResultId) {
@@ -173,7 +190,7 @@ public class ScanResultService {
 
 	private ScanResult mapToDomain(ScanResultEntity entity, List<VulnerabilityEntity> vulnEntities,
 			List<ScanAttemptEntity> attemptEntities, ScanConfiguration configuration) {
-		List<Vulnerability> vulnerabilities = vulnEntities.stream().map(ve -> {
+		List<Vulnerability> vulnerabilities = vulnEntities.stream().map((ve) -> {
 			CWEReference cwe = null;
 			if (ve.cweId() != null) {
 				try {
@@ -207,9 +224,9 @@ public class ScanResultService {
 			.collect(Collectors.groupingBy(Vulnerability::scannerId,
 					Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
-		List<ScanAttempt> attempts = attemptEntities.stream().map(ae -> {
+		List<ScanAttempt> attempts = attemptEntities.stream().map((ae) -> {
 			List<Vulnerability> relatedVulns = vulnerabilities.stream()
-				.filter(v -> v.scannerId().equals(ae.scannerId()) && v.operationMethod().equals(ae.operationMethod())
+				.filter((v) -> v.scannerId().equals(ae.scannerId()) && v.operationMethod().equals(ae.operationMethod())
 						&& v.operationUrl().equals(ae.operationUrl()))
 				.toList();
 			return new ScanAttempt(ae.scannerId(), ae.scannerName(), ae.operationMethod(), ae.operationUrl(),

@@ -24,6 +24,9 @@ public enum CWEReference {
 
 	// Input Validation
 	CWE_20("Improper Input Validation", 20, OwaspReference.A05_INJECTION),
+	CWE_114("Process Control", 114, OwaspReference.A05_INJECTION),
+	CWE_235("Improper Handling of Extra Parameters", 235, OwaspReference.A05_INJECTION),
+	CWE_644("Improper Neutralization of HTTP Headers for Scripting Syntax", 644, OwaspReference.A05_INJECTION),
 
 	// XSS
 	CWE_79("Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')", 79,
@@ -98,6 +101,7 @@ public enum CWEReference {
 
 	// Information Exposure & Verbose Errors
 	CWE_200("Exposure of Sensitive Information to an Unauthorized Actor", 200, OwaspReference.OTHER),
+	CWE_201("Insertion of Sensitive Information Into Sent Data", 201, OwaspReference.OTHER),
 	CWE_209("Generation of Error Message Containing Sensitive Information", 209,
 			OwaspReference.A02_SECURITY_MISCONFIGURATION),
 	CWE_598("Information Exposure Through Query Strings in GET Request", 598,

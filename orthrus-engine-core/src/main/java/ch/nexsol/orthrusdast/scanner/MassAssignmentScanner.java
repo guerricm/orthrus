@@ -21,11 +21,10 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
@@ -60,6 +59,11 @@ public class MassAssignmentScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			String method = operation.method().name();
@@ -71,32 +75,34 @@ public class MassAssignmentScanner implements SecurityScanner {
 				return Flux.empty();
 			}
 
-			try {
+			return Mono.fromCallable(() -> {
 				ObjectNode jsonBody = (ObjectNode) mapper.readTree(operation.body());
 
-				// Define sensitive fields to inject
 				String[] sensitiveBooleanFields = { "is_admin", "isAdmin", "deleted", "is_deleted", "isOwner", "system",
 						"superuser" };
 				String[] sensitiveStringFields = { "role", "permissions", "group", "status", "privilege",
 						"account_type", "user_type" };
 				String[] sensitiveIntFields = { "user_id", "tenant_id", "account_id", "org_id", "balance", "credit" };
 
-				// Test 1: Standard Injection (Booleans, Strings, Ints)
 				ObjectNode standardInject = jsonBody.deepCopy();
-				for (String field : sensitiveBooleanFields)
+				for (String field : sensitiveBooleanFields) {
 					standardInject.put(field, true);
-				for (String field : sensitiveStringFields)
+				}
+				for (String field : sensitiveStringFields) {
 					standardInject.put(field, "admin");
-				for (String field : sensitiveIntFields)
+				}
+				for (String field : sensitiveIntFields) {
 					standardInject.put(field, 1);
+				}
 				String standardBody = mapper.writeValueAsString(standardInject);
 
-				// Test 2: Type Confusion (Arrays and Objects)
 				ObjectNode typeConfusionInject = jsonBody.deepCopy();
-				for (String field : sensitiveBooleanFields)
+				for (String field : sensitiveBooleanFields) {
 					typeConfusionInject.putArray(field).add(true);
-				for (String field : sensitiveStringFields)
+				}
+				for (String field : sensitiveStringFields) {
 					typeConfusionInject.putObject(field).put("id", 1);
+				}
 				String typeConfusionBody = mapper.writeValueAsString(typeConfusionInject);
 
 				Operation standardOp = new Operation(operation.url(), operation.method(), operation.headers(),
@@ -112,12 +118,7 @@ public class MassAssignmentScanner implements SecurityScanner {
 								"injected sensitive fields (booleans, strings, ints)"),
 						executeMassAssignmentCheck(typeConfusionOp, operation, "Type Confusion Injection",
 								"injected sensitive fields using unexpected types (Arrays, Objects)"));
-
-			}
-			catch (Exception ex) {
-				log.debug("Failed to parse or modify JSON body for {}: {}", operation.url(), ex.getMessage());
-				return Flux.empty();
-			}
+			}).flatMapMany((flux) -> flux).onErrorResume((ex) -> Flux.empty());
 		});
 	}
 

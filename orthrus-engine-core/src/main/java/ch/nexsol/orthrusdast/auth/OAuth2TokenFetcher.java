@@ -17,6 +17,7 @@
 package ch.nexsol.orthrusdast.auth;
 
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,14 +28,11 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.model.OAuth2Config;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-
-import java.util.Map;
 
 @Service
 public class OAuth2TokenFetcher {
@@ -82,7 +80,7 @@ public class OAuth2TokenFetcher {
 
 	private Mono<SecurityScheme> fetchSingleToken(OAuth2Config config, String username, String password) {
 		log.info("Fetching OAuth2 token from {} for user: {}", config.tokenUrl(),
-				username != null ? username : "<client_credentials>");
+				(username != (null)) ? username : "<client_credentials>");
 
 		MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
 		formData.add("grant_type", config.grantType());

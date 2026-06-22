@@ -20,25 +20,23 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Locale;
-
-import org.springframework.stereotype.Component;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
-
-import reactor.core.publisher.Mono;
-
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.ScanResult;
-
-import ch.nexsol.orthrusdast.model.AttemptStatus;
-import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+import reactor.core.publisher.Mono;
+
+import ch.nexsol.orthrusdast.model.AttemptStatus;
+import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
  * Generates an HTML report using Thymeleaf.
@@ -72,7 +70,7 @@ public class HtmlReportGenerator implements ReportGenerator {
 		return Mono.fromRunnable(() -> {
 			try {
 				// 1. Determine Language
-				String langStr = result.configuration() != null && result.configuration().language() != null
+				String langStr = (result.configuration() != null && result.configuration().language() != null)
 						? result.configuration().language() : "en";
 				Locale locale = StringUtils.parseLocaleString(langStr);
 

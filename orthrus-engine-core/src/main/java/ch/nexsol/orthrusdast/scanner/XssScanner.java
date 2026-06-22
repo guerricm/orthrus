@@ -17,21 +17,20 @@
 package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
@@ -73,8 +72,18 @@ public class XssScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.XSS;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
+			// Tracks injection points already proven vulnerable so we report each point
+			// at most once instead of emitting one finding per payload (avoids noise
+			// while still probing every payload against not-yet-proven points).
+			Set<String> reportedPoints = ConcurrentHashMap.newKeySet();
+
 			return oastService.createSession().flatMapMany((oastSession) -> {
 
 				Flux<Vulnerability> scanVulns = payloadLoader.getPayloads("xss").concatMap((rawPayload) -> {
@@ -82,9 +91,11 @@ public class XssScanner implements SecurityScanner {
 					String payload = payloadMutator.mutate(oastPayload, PayloadMutator.Context.URL_PARAM);
 
 					return InjectionHelper.generateInjectedOperations(operation, payload)
+						.filter((test) -> !reportedPoints.contains(test.injectionPoint()))
 						.concatMap((test) -> executeAndCheck(test.mutatedOperation(), operation, test.injectionPoint(),
-								payload));
-				}).take(1);
+								payload)
+							.doOnNext((vuln) -> reportedPoints.add(test.injectionPoint())));
+				});
 
 				return scanVulns.concatWith(oastService.pollInteractions(oastSession)
 					.map((interaction) -> createVulnerabilityWithTrace("Out-Of-Band (Blind) XSS",
@@ -93,7 +104,7 @@ public class XssScanner implements SecurityScanner {
 							List.of("CAPEC-63"), 9.8,
 							"An interaction was received from " + interaction.remoteAddress() + " via "
 									+ interaction.protocol() + " for query: " + interaction.queryType(),
-							"Contextually encode user input before reflecting it in nulls, even in internal administrative dashboards.",
+							"Contextually encode user input before reflecting it in responses, even in internal administrative dashboards.",
 							operation, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
 			});
 		});
@@ -135,13 +146,6 @@ public class XssScanner implements SecurityScanner {
 			}
 			return Flux.empty();
 		});
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
 	}
 
 }

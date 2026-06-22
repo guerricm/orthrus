@@ -1,11 +1,32 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.cli;
 
-import ch.nexsol.orthrusdast.engine.ScanService;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.ScanResult;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-import ch.nexsol.orthrusdast.model.GatewayType;
-import ch.nexsol.orthrusdast.report.ReportGenerator;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,23 +34,17 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
+import ch.nexsol.orthrusdast.engine.ScanService;
+import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.OAuth2Config;
-
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.ScanResult;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-import java.time.Instant;
-import java.util.Comparator;
-import java.util.UUID;
+import ch.nexsol.orthrusdast.report.ReportGenerator;
 
 @Component
 @Command(name = "scan", description = "Run a VulnAPI security scan", mixinStandardHelpOptions = true,
@@ -169,8 +184,8 @@ public class ScanCommand implements Callable<Integer> {
 
 			int testsCount = attempts.size();
 			List<Vulnerability> vulnerabilities = attempts.stream()
-				.filter(a -> a.vulnerabilities() != null)
-				.flatMap(a -> a.vulnerabilities().stream())
+				.filter((a) -> a.vulnerabilities() != null)
+				.flatMap((a) -> a.vulnerabilities().stream())
 				.sorted(Comparator.comparing(Vulnerability::riskLevel).reversed())
 				.toList();
 
@@ -204,8 +219,8 @@ public class ScanCommand implements Callable<Integer> {
 			return result.vulnerabilities().isEmpty() ? 0 : 1;
 
 		}
-		catch (Exception e) {
-			log.error("Scan failed", e);
+		catch (Exception ex) {
+			log.error("Scan failed", ex);
 			return 2;
 		}
 	}

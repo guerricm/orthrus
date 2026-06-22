@@ -34,14 +34,14 @@ public record Operation(String url, HttpMethod method, Map<String, String> heade
 			String body, List<String> securityRequirements, List<String> expectedContentTypes,
 			SecurityScheme authScheme, String templateUrl, Object sourceNode) {
 		this(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, authScheme,
-				templateUrl, sourceNode, method != null ? List.of(method) : Collections.emptyList());
+				templateUrl, sourceNode, (method != null) ? List.of(method) : Collections.emptyList());
 	}
 
 	public Operation(String url, HttpMethod method, Map<String, String> headers, Map<String, String> queryParams,
 			String body, List<String> securityRequirements, List<String> expectedContentTypes,
 			SecurityScheme authScheme) {
 		this(url, method, headers, queryParams, body, securityRequirements, expectedContentTypes, authScheme, url, null,
-				method != null ? List.of(method) : Collections.emptyList());
+				(method != null) ? List.of(method) : Collections.emptyList());
 	}
 
 	/**
@@ -49,16 +49,16 @@ public record Operation(String url, HttpMethod method, Map<String, String> heade
 	 */
 	public static Operation simple(String url, HttpMethod method) {
 		return new Operation(url, method, Collections.emptyMap(), Collections.emptyMap(), null, Collections.emptyList(),
-				Collections.emptyList(), null, url, null, method != null ? List.of(method) : Collections.emptyList());
+				Collections.emptyList(), null, url, null, (method != null) ? List.of(method) : Collections.emptyList());
 	}
 
 	/**
 	 * Create an operation with headers (for curl-like discovery).
 	 */
 	public static Operation withHeaders(String url, HttpMethod method, Map<String, String> headers, String body) {
-		return new Operation(url, method, headers != null ? headers : Collections.emptyMap(), Collections.emptyMap(),
+		return new Operation(url, method, (headers != null) ? headers : Collections.emptyMap(), Collections.emptyMap(),
 				body, Collections.emptyList(), Collections.emptyList(), null, url, null,
-				method != null ? List.of(method) : Collections.emptyList());
+				(method != null) ? List.of(method) : Collections.emptyList());
 	}
 
 	/**

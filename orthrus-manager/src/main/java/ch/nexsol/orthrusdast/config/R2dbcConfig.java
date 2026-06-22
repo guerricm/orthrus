@@ -1,4 +1,3 @@
-// src/main/java/ch/nexsol/orthrusdast/config/R2dbcConfig.java
 /*
  * Copyright 2014-2024 the original author or authors.
  *

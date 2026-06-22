@@ -22,23 +22,21 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
-import org.springframework.http.HttpMethod;
 
 /**
  * Scans GraphQL Operations for Injection Vulnerabilities (SQLi, XSS, CmdInj) by injecting
@@ -78,6 +76,11 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.INJECTION;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (!HttpMethod.POST.equals(operation.method()) || operation.body() == null
@@ -86,10 +89,15 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 			}
 
 			return oastService.createSession().flatMapMany((oastSession) -> {
-				try {
+				return Mono.fromCallable(() -> {
 					Map<String, Object> bodyMap = objectMapper.readValue(operation.body(),
 							new TypeReference<Map<String, Object>>() {
 							});
+					return bodyMap;
+				}).onErrorResume((ex) -> {
+					log.warn("Failed to parse GraphQL body for injection scanning: {}", ex.getMessage());
+					return Mono.empty();
+				}).flatMapMany((bodyMap) -> {
 					if (!bodyMap.containsKey("variables") || !(bodyMap.get("variables") instanceof Map)) {
 						return Flux.empty();
 					}
@@ -97,7 +105,6 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 					@SuppressWarnings("unchecked")
 					Map<String, Object> variables = (Map<String, Object>) bodyMap.get("variables");
 
-					// Merge payloads from multiple categories
 					Flux<String> allPayloads = Flux.concat(payloadLoader.getPayloads("sqli"),
 							payloadLoader.getPayloads("cmd-injection"), payloadLoader.getPayloads("nosql"),
 							payloadLoader.getPayloads("ssti"));
@@ -112,26 +119,13 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 					return scanVulns.concatWith(oastService.pollInteractions(oastSession)
 						.map((interaction) -> createVulnerabilityWithTrace("Out-Of-Band (Blind) Injection in GraphQL",
 								"The endpoint evaluated a payload and made an out-of-band request to the OAST server. This indicates a blind injection vulnerability (e.g. Blind SQLi, Blind CmdInj, SSRF).",
-								RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_89, // Defaulting
-																													// to
-																													// 89,
-																													// though
-																													// could
-																													// be
-																													// 78
-																													// or
-																													// SSRF
+								RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_89,
 								List.of("CAPEC-66"), 9.8,
 								"An interaction was received from " + interaction.remoteAddress() + " via "
 										+ interaction.protocol(),
 								"Validate and sanitize all GraphQL variable inputs.", operation, null,
 								"API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
-
-				}
-				catch (Exception ex) {
-					log.warn("Failed to parse GraphQL body for injection scanning: {}", ex.getMessage());
-					return Flux.empty();
-				}
+				});
 			});
 		});
 	}
@@ -139,15 +133,15 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 	private Flux<Vulnerability> testVariable(Operation operation, Map<String, Object> originalBodyMap,
 			Map<String, Object> originalVariables, String varName, String payload) {
 
-		try {
+		return Mono.fromCallable(() -> {
 			Map<String, Object> modifiedVariables = new HashMap<>(originalVariables);
 			modifiedVariables.put(varName, payload);
 
 			Map<String, Object> modifiedBodyMap = new HashMap<>(originalBodyMap);
 			modifiedBodyMap.put("variables", modifiedVariables);
 
-			String newBody = objectMapper.writeValueAsString(modifiedBodyMap);
-
+			return objectMapper.writeValueAsString(modifiedBodyMap);
+		}).onErrorResume((ex) -> Mono.empty()).flatMapMany((newBody) -> {
 			Operation testOp = new Operation(operation.url(), operation.method(), operation.headers(),
 					operation.queryParams(), newBody, operation.securityRequirements(),
 					operation.expectedContentTypes(), operation.authScheme());
@@ -169,7 +163,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 					return Flux.just(vuln);
 				}
 
-				String body = response.body() != null ? response.body().toLowerCase() : "";
+				String body = (response.body() != null) ? response.body().toLowerCase() : "";
 				boolean hasError = body.contains("syntax error") || body.contains("mysql_fetch")
 						|| body.contains("ora-") || body.contains("command not found");
 
@@ -186,17 +180,7 @@ public class GraphqlInjectionScanner implements SecurityScanner {
 				}
 				return Flux.empty();
 			});
-		}
-		catch (Exception ex) {
-			return Flux.empty();
-		}
-	}
-
-	private String truncate(String text) {
-		if (text == null) {
-			return "null";
-		}
-		return (text.length() > 200) ? text.substring(0, 200) + "..." : text;
+		});
 	}
 
 }

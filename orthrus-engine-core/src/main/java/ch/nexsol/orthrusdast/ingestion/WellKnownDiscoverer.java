@@ -20,17 +20,15 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import org.springframework.http.HttpMethod;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
  * Discovers endpoints by checking standard well-known paths.
@@ -57,7 +55,7 @@ public class WellKnownDiscoverer implements EndpointDiscoverer {
 
 	@Override
 	public Mono<List<Operation>> discover(String targetUrl, ScanConfiguration config) {
-		SecurityScheme authScheme = config != null ? config.authScheme() : null;
+		SecurityScheme authScheme = (config != null) ? config.authScheme() : null;
 		log.info("Starting well-known path discovery for base URL: {}", targetUrl);
 
 		String baseUrl = targetUrl.endsWith("/") ? targetUrl.substring(0, targetUrl.length() - 1) : targetUrl;

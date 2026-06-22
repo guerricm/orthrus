@@ -18,7 +18,6 @@ package ch.nexsol.orthrusdast.config;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
@@ -128,6 +127,8 @@ public class OrthrusProperties {
 
 		private int slaveTimeoutSeconds = 30;
 
+		private int offlineSlaveDeletionMinutes = 15;
+
 		public String getUrl() {
 			return url;
 		}
@@ -158,6 +159,14 @@ public class OrthrusProperties {
 
 		public void setSlaveTimeoutSeconds(int slaveTimeoutSeconds) {
 			this.slaveTimeoutSeconds = slaveTimeoutSeconds;
+		}
+
+		public int getOfflineSlaveDeletionMinutes() {
+			return offlineSlaveDeletionMinutes;
+		}
+
+		public void setOfflineSlaveDeletionMinutes(int offlineSlaveDeletionMinutes) {
+			this.offlineSlaveDeletionMinutes = offlineSlaveDeletionMinutes;
 		}
 
 	}

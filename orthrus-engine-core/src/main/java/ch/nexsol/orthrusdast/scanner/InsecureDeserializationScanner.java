@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
-
 import reactor.core.publisher.Flux;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -28,11 +27,7 @@ import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
-
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
-import java.io.ObjectInputStream;
-import java.lang.Class;
-import java.net.URL;
 
 /**
  * Scans for Insecure Deserialization vulnerabilities by sending known magic bytes or
@@ -63,6 +58,11 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 	@Override
 	public String getName() {
 		return "Insecure Deserialization Scanner";
+	}
+
+	@Override
+	public ScannerFamily getFamily() {
+		return ScannerFamily.LOGIC;
 	}
 
 	@Override

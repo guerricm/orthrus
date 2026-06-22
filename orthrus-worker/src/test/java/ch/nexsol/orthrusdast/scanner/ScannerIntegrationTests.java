@@ -1,11 +1,25 @@
+/*
+ * Copyright 2014-2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.nexsol.orthrusdast.scanner;
 
-import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.GatewayType;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
-import ch.nexsol.orthrusdast.model.Vulnerability;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -13,18 +27,20 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
+import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.model.GatewayType;
+import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
+import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.oast.InteractshClient;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;
-import org.springframework.http.HttpMethod;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class ScannerIntegrationTests {
 
@@ -144,7 +160,7 @@ class ScannerIntegrationTests {
 
 		List<Vulnerability> vulns = scanner.scan(op).collectList().block();
 		assertThat(vulns).hasSize(2);
-		assertThat(vulns).anyMatch(v -> v.cwe().getId() == 611);
+		assertThat(vulns).anyMatch((v) -> v.cwe().getId() == 611);
 	}
 
 	@Test
