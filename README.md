@@ -1,7 +1,7 @@
 # Orthrus DAST
 
 <p align="center">
-  <img src="orthrus-manager/src/main/resources/static/images/logo.png" alt="Orthrus DAST Logo" width="300"/>
+  <img src="orthrus-manager/src/main/resources/static/images/logo.jpg" alt="Orthrus DAST Logo" width="300"/>
 </p>
 
 Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) tool designed for APIs. Built with Spring Boot and WebFlux, it scans your API endpoints for common vulnerabilities like SQL Injection, Broken Authentication, BOLA, XSS, SSRF, CORS misconfigurations, and more.
