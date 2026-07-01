@@ -39,6 +39,8 @@ public class JobEventPublisher {
 
 	/**
 	 * Get or create a Flux for a given job ID.
+	 * @param jobId the job ID
+	 * @return a flux of job events
 	 */
 	public Flux<JobEvent> stream(Long jobId) {
 		return getOrCreateSink(jobId).asFlux();
@@ -46,6 +48,7 @@ public class JobEventPublisher {
 
 	/**
 	 * Subscribe to all events globally.
+	 * @return a flux of job events globally
 	 */
 	public Flux<JobEvent> globalStream() {
 		return globalSink.asFlux();
@@ -53,6 +56,8 @@ public class JobEventPublisher {
 
 	/**
 	 * Emit an event to all subscribers of a given job, and globally.
+	 * @param jobId the job ID
+	 * @param event the job event to emit
 	 */
 	public void emit(Long jobId, JobEvent event) {
 		getOrCreateSink(jobId).tryEmitNext(event);
@@ -62,6 +67,7 @@ public class JobEventPublisher {
 	/**
 	 * Complete the sink for a given job (no more events will be sent). This closes the
 	 * EventSource on the client side.
+	 * @param jobId the job id
 	 */
 	public void complete(Long jobId) {
 		Sinks.Many<JobEvent> sink = sinks.remove(jobId);

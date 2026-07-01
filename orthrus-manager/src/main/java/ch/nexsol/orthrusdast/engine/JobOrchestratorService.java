@@ -92,7 +92,7 @@ public class JobOrchestratorService {
 
 	public Mono<Void> onTaskFailed(Long taskId, String reason) {
 		return scanTaskRepository.findById(taskId).flatMap((task) -> {
-			int retryCount = task.getRetryCount() != null ? task.getRetryCount() : 0;
+			int retryCount = (task.getRetryCount() != null) ? task.getRetryCount() : 0;
 			if (retryCount < 3) {
 				log.warn("Task {} failed (Attempt {}). Reason: {}. Retrying...", taskId, retryCount + 1, reason);
 				task.setRetryCount(retryCount + 1);
@@ -105,9 +105,7 @@ public class JobOrchestratorService {
 				log.error("Task {} permanently failed after {} attempts: {}", taskId, retryCount, reason);
 				task.setStatus(JobStatus.FAILED);
 				task.setCompletedAt(Instant.now());
-				return scanTaskRepository.save(task).flatMap((savedTask) -> {
-					return checkJobCompletion(task.getScanJobId());
-				});
+				return scanTaskRepository.save(task).flatMap((savedTask) -> checkJobCompletion(task.getScanJobId()));
 			}
 		});
 	}
@@ -126,7 +124,7 @@ public class JobOrchestratorService {
 						}
 						job.setCompletedAt(Instant.now());
 
-						int testsCount = job.getTestsCount() != null ? job.getTestsCount() : 0;
+						int testsCount = (job.getTestsCount() != null) ? job.getTestsCount() : 0;
 
 						return scanResultService
 							.finalizeJobResult(job.getResultId(), job.getTarget(), job.getStartedAt(),
@@ -146,14 +144,18 @@ public class JobOrchestratorService {
 									long low = result.riskSummary()
 										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.LOW, 0L);
 									String grade = "A";
-									if (critical > 0)
+									if (critical > 0) {
 										grade = "F";
-									else if (high > 0)
+									}
+									else if (high > 0) {
 										grade = "D";
-									else if (medium > 0)
+									}
+									else if (medium > 0) {
 										grade = "C";
-									else if (low > 0)
+									}
+									else if (low > 0) {
 										grade = "B";
+									}
 
 									long info = result.riskSummary()
 										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);

@@ -120,14 +120,14 @@ public class ScanViewController {
 								if (riskCompare != 0) {
 									return riskCompare;
 								}
-								String cwe1 = v1.cwe() != null ? v1.cwe().name() : "";
-								String cwe2 = v2.cwe() != null ? v2.cwe().name() : "";
+								String cwe1 = (v1.cwe() != null) ? v1.cwe().name() : "";
+								String cwe2 = (v2.cwe() != null) ? v2.cwe().name() : "";
 								int cweCompare = cwe1.compareTo(cwe2);
 								if (cweCompare != 0) {
 									return cweCompare;
 								}
-								String name1 = v1.name() != null ? v1.name() : "";
-								String name2 = v2.name() != null ? v2.name() : "";
+								String name1 = (v1.name() != null) ? v1.name() : "";
+								String name2 = (v2.name() != null) ? v2.name() : "";
 								return name1.compareTo(name2);
 							});
 							model.addAttribute("vulnerabilities", sortedVulns);
@@ -266,15 +266,19 @@ public class ScanViewController {
 	}
 
 	private int getStatusWeight(JobStatus status) {
-		if (status == JobStatus.PENDING)
+		if (status == JobStatus.PENDING) {
 			return 1;
-		if (status == JobStatus.RUNNING)
+		}
+		if (status == JobStatus.RUNNING) {
 			return 2;
+		}
 		return 3;
 	}
 
 	/**
 	 * SSE endpoint for browsers to subscribe to live job status updates.
+	 * @param id the job id
+	 * @return a stream of job events
 	 */
 	@GetMapping(value = "/api/sse/jobs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	@ResponseBody
@@ -285,6 +289,7 @@ public class ScanViewController {
 
 	/**
 	 * SSE endpoint for browsers to subscribe to live status updates for ALL jobs.
+	 * @return a stream of global job events
 	 */
 	@GetMapping(value = "/api/sse/jobs/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	@ResponseBody
@@ -327,8 +332,8 @@ public class ScanViewController {
 	@GetMapping("/api/scans/queued-row/{id}")
 	public Mono<String> getScanQueuedRowFragment(@PathVariable Long id, Model model) {
 		return scanJobRepository.findById(id)
-			.flatMap(job -> populatePlanNames(List.of(job)))
-			.map(jobs -> jobs.get(0))
+			.flatMap((job) -> populatePlanNames(List.of(job)))
+			.map((jobs) -> jobs.get(0))
 			.flatMap((job) -> {
 				model.addAttribute("jobId", job.getId());
 				model.addAttribute("planName", job.getPlanName());
@@ -340,11 +345,11 @@ public class ScanViewController {
 
 				return Mono
 					.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))
-					.doOnNext(conf -> model.addAttribute("config", conf))
-					.onErrorResume(e -> Mono.empty())
+					.doOnNext((conf) -> model.addAttribute("config", conf))
+					.onErrorResume((e) -> Mono.empty())
 					.then(Mono.defer(() -> {
 						if (job.getStatus() == JobStatus.COMPLETED && job.getResultId() != null) {
-							return scanResultService.findById(job.getResultId()).doOnNext(result -> {
+							return scanResultService.findById(job.getResultId()).doOnNext((result) -> {
 								model.addAttribute("result", result);
 								model.addAttribute("globalGrade", computeGrade(result.riskSummary()));
 							}).then();
@@ -357,6 +362,8 @@ public class ScanViewController {
 
 	/**
 	 * Resolves the plan names of all given jobs with a single query.
+	 * @param jobs the list of jobs
+	 * @return a mono emitting the updated list of jobs
 	 */
 	private Mono<List<ScanJobEntity>> populatePlanNames(List<ScanJobEntity> jobs) {
 		List<Long> planIds = jobs.stream()
@@ -381,6 +388,8 @@ public class ScanViewController {
 
 	/**
 	 * Computes the A-F grade of a scan from its risk summary.
+	 * @param riskSummary the risk summary
+	 * @return the grade string
 	 */
 	private static String computeGrade(Map<RiskLevel, Long> riskSummary) {
 		if (riskSummary.getOrDefault(RiskLevel.CRITICAL, 0L) > 0) {

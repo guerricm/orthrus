@@ -72,6 +72,8 @@ public class MasterInternalApiController {
 
 	/**
 	 * Called by Slave to register its presence.
+	 * @param request the registration request
+	 * @return a mono containing the registered slave node
 	 */
 	@PostMapping("/slaves/register")
 	public Mono<ResponseEntity<SlaveNodeEntity>> registerSlave(@RequestBody SlaveRegistrationRequest request) {
@@ -92,7 +94,7 @@ public class MasterInternalApiController {
 
 	private Mono<Void> failZombieScansForSlave(String slaveId) {
 		return scanJobRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap((job) -> {
-			int retryCount = job.getRetryCount() != null ? job.getRetryCount() : 0;
+			int retryCount = (job.getRetryCount() != null) ? job.getRetryCount() : 0;
 			if (retryCount < 3) {
 				log.info("Retrying zombie job {} (Attempt {}) because slave {} re-registered.", job.getId(),
 						(retryCount + 1), slaveId);
@@ -115,6 +117,10 @@ public class MasterInternalApiController {
 
 	/**
 	 * Called by Slave to send a heartbeat.
+	 * @param id the slave ID
+	 * @param status the status of the slave
+	 * @param url the url of the slave
+	 * @return a mono of response entity
 	 */
 	@PostMapping("/slaves/{id}/heartbeat")
 	public Mono<ResponseEntity<Void>> slaveHeartbeat(@PathVariable String id,
@@ -139,6 +145,9 @@ public class MasterInternalApiController {
 
 	/**
 	 * Called by Slave to post a batch of attempts.
+	 * @param id the job ID
+	 * @param batch the batch of attempts
+	 * @return a mono of response entity
 	 */
 	@PostMapping("/jobs/{id}/attempts")
 	public Mono<ResponseEntity<Void>> postJobAttemptsBatch(@PathVariable Long id,
@@ -148,7 +157,7 @@ public class MasterInternalApiController {
 			if (job.getResultId() == null) {
 				job.setResultId(UUID.randomUUID().toString());
 				ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(),
-						job.getCreatedAt() != null ? job.getCreatedAt() : Instant.now());
+						(job.getCreatedAt() != null) ? job.getCreatedAt() : Instant.now());
 			}
 
 			int vulnsInBatch = 0;
@@ -158,8 +167,8 @@ public class MasterInternalApiController {
 				}
 			}
 
-			job.setTestsCount((job.getTestsCount() != null ? job.getTestsCount() : 0) + batch.size());
-			job.setVulnsCount((job.getVulnsCount() != null ? job.getVulnsCount() : 0) + vulnsInBatch);
+			job.setTestsCount(((job.getTestsCount() != null) ? job.getTestsCount() : 0) + batch.size());
+			job.setVulnsCount(((job.getVulnsCount() != null) ? job.getVulnsCount() : 0) + vulnsInBatch);
 
 			return ensureResultExists.then(scanResultService.saveBatch(job.getResultId(), batch))
 				.then(scanJobRepository.save(job))
@@ -167,26 +176,26 @@ public class MasterInternalApiController {
 		}).defaultIfEmpty(ResponseEntity.notFound().build());
 	}
 
-	record CompleteJobRequest(Instant startTime, Instant endTime) {
-	}
-
 	/**
 	 * Called by Slave to mark job as complete.
+	 * @param id the job id
+	 * @param request the request body
+	 * @return a mono void response
 	 */
 	@PostMapping("/jobs/{id}/complete")
 	public Mono<ResponseEntity<Void>> postJobComplete(@PathVariable Long id, @RequestBody CompleteJobRequest request) {
 		return scanJobRepository.findById(id).flatMap((job) -> {
 			job.setStatus(JobStatus.COMPLETED);
-			job.setCompletedAt(request.endTime() != null ? request.endTime() : Instant.now());
+			job.setCompletedAt((request.endTime() != null) ? request.endTime() : Instant.now());
 
 			Mono<Void> ensureResultExists = Mono.empty();
 			if (job.getResultId() == null) {
 				job.setResultId(UUID.randomUUID().toString());
 				ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(),
-						request.startTime() != null ? request.startTime() : Instant.now());
+						(request.startTime() != null) ? request.startTime() : Instant.now());
 			}
 
-			int testsCount = job.getTestsCount() != null ? job.getTestsCount() : 0;
+			int testsCount = (job.getTestsCount() != null) ? job.getTestsCount() : 0;
 
 			return ensureResultExists
 				.then(scanResultService.finalizeJobResult(job.getResultId(), job.getTarget(), request.startTime(),
@@ -197,14 +206,18 @@ public class MasterInternalApiController {
 					long medium = result.riskSummary().getOrDefault(RiskLevel.MEDIUM, 0L);
 					long low = result.riskSummary().getOrDefault(RiskLevel.LOW, 0L);
 					String grade = "A";
-					if (critical > 0)
+					if (critical > 0) {
 						grade = "F";
-					else if (high > 0)
+					}
+					else if (high > 0) {
 						grade = "D";
-					else if (medium > 0)
+					}
+					else if (medium > 0) {
 						grade = "C";
-					else if (low > 0)
+					}
+					else if (low > 0) {
 						grade = "B";
+					}
 
 					long info = result.riskSummary().getOrDefault(RiskLevel.INFO, 0L);
 
@@ -218,8 +231,9 @@ public class MasterInternalApiController {
 							.flatMap((slave) -> scanJobRepository
 								.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 								.flatMap((runningCount) -> {
-									int maxScans = (slave.getMaxConcurrentScans() != null
-											&& slave.getMaxConcurrentScans() > 0) ? slave.getMaxConcurrentScans() : 10;
+									int maxScans = ((slave.getMaxConcurrentScans() != null)
+											&& (slave.getMaxConcurrentScans() > 0)) ? slave.getMaxConcurrentScans()
+													: 10;
 									if (runningCount < maxScans) {
 										return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
 												NodeStatus.IDLE.name(), slave.getLastSeenAt());
@@ -230,9 +244,6 @@ public class MasterInternalApiController {
 					}
 				}));
 		}).map((j) -> ResponseEntity.ok().<Void>build()).defaultIfEmpty(ResponseEntity.notFound().build());
-	}
-
-	record FailJobRequest(String reason) {
 	}
 
 	@PostMapping("/jobs/{id}/fail")
@@ -247,8 +258,8 @@ public class MasterInternalApiController {
 						.flatMap((slave) -> scanJobRepository
 							.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 							.flatMap((runningCount) -> {
-								int maxScans = (slave.getMaxConcurrentScans() != null
-										&& slave.getMaxConcurrentScans() > 0) ? slave.getMaxConcurrentScans() : 10;
+								int maxScans = ((slave.getMaxConcurrentScans() != null)
+										&& (slave.getMaxConcurrentScans() > 0)) ? slave.getMaxConcurrentScans() : 10;
 								if (runningCount < maxScans) {
 									return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
 											NodeStatus.IDLE.name(), slave.getLastSeenAt());
@@ -280,9 +291,6 @@ public class MasterInternalApiController {
 		}).defaultIfEmpty(ResponseEntity.notFound().build());
 	}
 
-	public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
-	}
-
 	@PostMapping("/tasks/{id}/complete")
 	public Mono<ResponseEntity<Void>> postTaskComplete(@PathVariable Long id,
 			@RequestBody CompleteTaskRequest request) {
@@ -296,6 +304,15 @@ public class MasterInternalApiController {
 	}
 
 	public record SlaveRegistrationRequest(String id, String url, String capabilities) {
+	}
+
+	record CompleteJobRequest(Instant startTime, Instant endTime) {
+	}
+
+	record FailJobRequest(String reason) {
+	}
+
+	public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
 	}
 
 }

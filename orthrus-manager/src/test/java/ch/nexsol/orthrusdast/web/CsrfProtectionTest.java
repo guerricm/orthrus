@@ -23,6 +23,8 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Verifies that CSRF protection is active on session-based UI endpoints and disabled on
  * the token-secured APIs.
@@ -49,11 +51,10 @@ class CsrfProtectionTest {
 			.expectStatus()
 			.isOk()
 			.expectHeader()
-			.value("Content-Security-Policy",
-					(csp) -> org.junit.jupiter.api.Assertions.assertTrue(csp.contains("default-src 'self'")))
+			.value("Content-Security-Policy", (csp) -> assertThat(csp).contains("default-src 'self'"))
 			.expectBody(String.class)
-			.value((body) -> org.junit.jupiter.api.Assertions.assertTrue(body.contains("name=\"_csrf\""),
-					"login form should contain the hidden _csrf input"));
+			.value((body) -> assertThat(body).as("login form should contain the hidden _csrf input")
+				.contains("name=\"_csrf\""));
 	}
 
 	@Test
@@ -64,7 +65,7 @@ class CsrfProtectionTest {
 			.uri("/api/internal/slaves/register")
 			.exchange()
 			.expectStatus()
-			.value((status) -> org.junit.jupiter.api.Assertions.assertNotEquals(403, status));
+			.value((status) -> assertThat(status).isNotEqualTo(403));
 	}
 
 }
