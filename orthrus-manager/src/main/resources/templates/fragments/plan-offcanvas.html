@@ -66,26 +66,34 @@
 
         <div class="mt-4 border-top border-secondary pt-4">
             <div class="row g-3 align-items-stretch">
-                <div class="col-6">
+                <div class="col-4">
                     <form th:action="@{/plans/{id}/run(id=${plan.id})}" method="post" class="h-100">
                         <input th:replace="~{fragments/layout :: csrf}"/>
-                        <button type="submit" class="btn btn-success btn-lg w-100 h-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-play-fill me-2 mb-1" viewBox="0 0 16 16">
+                        <button type="submit" class="btn btn-success btn-lg w-100 h-100" style="font-size: 0.9rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill me-1 mb-1" viewBox="0 0 16 16">
                               <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
                             </svg>
                             Run Now
                         </button>
                     </form>
                 </div>
-                <div class="col-6">
+                <div class="col-4">
                     <button class="btn btn-primary btn-lg w-100 h-100" 
                             th:attr="hx-get=@{/api/plans/{id}/edit(id=${plan.id})}" 
-                            hx-target="#planOffcanvasContent">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil me-2 mb-1" viewBox="0 0 16 16">
+                            hx-target="#planOffcanvasContent" style="font-size: 0.9rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil me-1 mb-1" viewBox="0 0 16 16">
                           <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
                         </svg>
-                        Edit Test Plan
+                        Edit Plan
                     </button>
+                </div>
+                <div class="col-4">
+                    <a th:href="@{/plans/new(duplicateId=${plan.id})}" class="btn btn-outline-info btn-lg w-100 h-100" style="font-size: 0.9rem; padding-top: 0.6rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy me-1 mb-1" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/>
+                        </svg>
+                        Duplicate
+                    </a>
                 </div>
             </div>
         </div>

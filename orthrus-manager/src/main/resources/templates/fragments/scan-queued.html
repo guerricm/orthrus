@@ -19,6 +19,8 @@
                         th:text="${status}">STATUS</span>
                     <strong>#<span th:text="${jobId}"></span></strong>
                     <span class="text-muted mx-2">&bull;</span>
+                    <strong th:if="${planName != null}" th:text="${planName}"></strong>
+                    <span class="text-muted mx-2" th:if="${planName != null}">&bull;</span>
                     <span class="badge bg-secondary text-light text-uppercase"
                         th:text="${discovererId != null ? discovererId : 'openapi'}">openapi</span>
                     <span class="mx-2">&mdash;</span>

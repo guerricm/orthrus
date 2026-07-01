@@ -29,6 +29,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -93,10 +94,25 @@ public class PlanController {
 	}
 
 	@GetMapping("/plans/new")
-	public Mono<String> newTestPlan(Model model) {
-		return Mono
-			.zip(slaveNodeRepository.findAll().collectList(),
-					scanTaskRepository.findByStatus(JobStatus.RUNNING).collectList())
+	public Mono<String> newTestPlan(@RequestParam(required = false) Long duplicateId, Model model) {
+		Mono<Void> setupModelMono = Mono.empty();
+		if (duplicateId != null) {
+			setupModelMono = testPlanRepository.findById(duplicateId).flatMap((plan) -> {
+				plan.setName(plan.getName() + " - copy");
+				model.addAttribute("plan", plan);
+				return Mono
+					.fromCallable(
+							() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class))
+					.doOnNext((conf) -> model.addAttribute("config", conf))
+					.then();
+			}).onErrorResume((ex) -> {
+				log.warn("Failed to load duplicate plan {}", duplicateId, ex);
+				return Mono.empty();
+			});
+		}
+
+		return setupModelMono.then(Mono.zip(slaveNodeRepository.findAll().collectList(),
+				scanTaskRepository.findByStatus(JobStatus.RUNNING).collectList())
 			.flatMap((tuple) -> {
 				List<SlaveNodeEntity> slaves = tuple.getT1();
 				List<ch.nexsol.orthrusdast.entity.ScanTaskEntity> runningTasks = tuple.getT2();
@@ -141,7 +157,7 @@ public class PlanController {
 					model.addAttribute("scanners", List.of());
 					return Mono.just("plans/edit");
 				}
-			});
+			}));
 	}
 
 	@GetMapping("/plans")
