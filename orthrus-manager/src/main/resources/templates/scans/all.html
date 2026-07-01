@@ -11,7 +11,7 @@
                     <a href="/plans" class="btn btn-primary">Test Plans</a>
                 </div>
 
-                <div id="scans-container" hx-get="/scans/all" hx-trigger="every 5s" hx-swap="outerHTML" hx-select="#scans-container">
+                <div id="scans-container" hx-ext="sse" sse-connect="/api/sse/jobs/events">
                     <div th:if="${activeJobs == null or activeJobs.isEmpty()}"
                         class="alert alert-info bg-transparent border-info text-light d-flex align-items-center"
                         role="alert">

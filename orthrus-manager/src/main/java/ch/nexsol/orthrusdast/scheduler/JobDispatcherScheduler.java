@@ -28,7 +28,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
-import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;

@@ -5,7 +5,8 @@
 
     <!-- SCAN QUEUED PANEL — injected by HTMX after form submit -->
     <div th:fragment="scanQueued" class="accordion-item bg-transparent border-secondary"
-        th:id="'scan-tracker-' + ${jobId}">
+        th:id="'scan-tracker-' + ${jobId}"
+        th:attr="hx-get=${status == 'PENDING' or status == 'RUNNING' ? '/api/scans/queued-row/' + jobId : null},hx-trigger=${status == 'PENDING' or status == 'RUNNING' ? 'sse:message' : null},hx-swap=${status == 'PENDING' or status == 'RUNNING' ? 'outerHTML' : null}">
         <h2 class="accordion-header" th:id="'heading-' + ${jobId}">
             <button class="accordion-button bg-dark text-light border-secondary"
                 th:classappend="${status == 'PENDING' or status == 'RUNNING'} ? '' : 'collapsed'" type="button"

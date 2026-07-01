@@ -279,7 +279,7 @@ public class ScanViewController {
 	@ResponseBody
 	public Flux<ServerSentEvent<JobEvent>> jobEvents(@PathVariable Long id) {
 		return jobEventPublisher.stream(id)
-			.map((event) -> ServerSentEvent.<JobEvent>builder().event(event.status()).data(event).build());
+			.map((event) -> ServerSentEvent.<JobEvent>builder().event("message").data(event).build());
 	}
 
 	/**
@@ -289,7 +289,7 @@ public class ScanViewController {
 	@ResponseBody
 	public Flux<ServerSentEvent<JobEvent>> allJobEvents() {
 		return jobEventPublisher.globalStream()
-			.map((event) -> ServerSentEvent.<JobEvent>builder().event(event.status()).data(event).build());
+			.map((event) -> ServerSentEvent.<JobEvent>builder().event("message").data(event).build());
 	}
 
 	@GetMapping("/scans")
@@ -321,6 +321,33 @@ public class ScanViewController {
 			model.addAttribute("history", jobs);
 			return "fragments/scan-items :: items";
 		}).defaultIfEmpty("fragments/scan-items :: items");
+	}
+
+	@GetMapping("/api/scans/queued-row/{id}")
+	public Mono<String> getScanQueuedRowFragment(@PathVariable Long id, Model model) {
+		return scanJobRepository.findById(id).flatMap((job) -> {
+			model.addAttribute("jobId", job.getId());
+			model.addAttribute("target", job.getTarget());
+			model.addAttribute("discovererId", job.getDiscovererId());
+			model.addAttribute("createdAt", job.getCreatedAt());
+			model.addAttribute("status", job.getStatus().name());
+			model.addAttribute("resultId", job.getResultId());
+
+			return Mono
+				.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))
+				.doOnNext(conf -> model.addAttribute("config", conf))
+				.onErrorResume(e -> Mono.empty())
+				.then(Mono.defer(() -> {
+					if (job.getStatus() == JobStatus.COMPLETED && job.getResultId() != null) {
+						return scanResultService.findById(job.getResultId()).doOnNext(result -> {
+							model.addAttribute("result", result);
+							model.addAttribute("globalGrade", computeGrade(result.riskSummary()));
+						}).then();
+					}
+					return Mono.empty();
+				}))
+				.thenReturn("fragments/scan-queued :: scanQueued");
+		});
 	}
 
 	/**

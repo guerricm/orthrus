@@ -17,22 +17,20 @@
 package ch.nexsol.orthrusdast.engine;
 
 import java.time.Instant;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
-import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
+import ch.nexsol.orthrusdast.sse.JobEvent;
 
 @Service
 public class JobOrchestratorService {
@@ -43,18 +41,15 @@ public class JobOrchestratorService {
 
 	private final ScanTaskRepository scanTaskRepository;
 
-	private final ObjectMapper objectMapper;
-
 	private final ch.nexsol.orthrusdast.engine.ScanResultService scanResultService;
 
 	private final ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher;
 
 	public JobOrchestratorService(ScanJobRepository scanJobRepository, ScanTaskRepository scanTaskRepository,
-			ObjectMapper objectMapper, ch.nexsol.orthrusdast.engine.ScanResultService scanResultService,
+			ch.nexsol.orthrusdast.engine.ScanResultService scanResultService,
 			ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
-		this.objectMapper = objectMapper;
 		this.scanResultService = scanResultService;
 		this.jobEventPublisher = jobEventPublisher;
 	}
@@ -67,7 +62,10 @@ public class JobOrchestratorService {
 			job.setResultId(java.util.UUID.randomUUID().toString());
 			return scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(), job.getStartedAt())
 				.then(scanJobRepository.save(job))
-				.flatMap((savedJob) -> createFamilyTasks(savedJob));
+				.flatMap((savedJob) -> {
+					jobEventPublisher.emit(savedJob.getId(), JobEvent.running(savedJob.getId(), savedJob.getTarget()));
+					return createFamilyTasks(savedJob);
+				});
 		}).then();
 	}
 
@@ -114,17 +112,6 @@ public class JobOrchestratorService {
 		});
 	}
 
-	private Mono<Void> failJob(Long jobId, String reason) {
-		return scanJobRepository.findById(jobId).flatMap((job) -> {
-			job.setStatus(JobStatus.FAILED);
-			return scanJobRepository.save(job).doOnSuccess((j) -> {
-				jobEventPublisher.emit(jobId,
-						ch.nexsol.orthrusdast.sse.JobEvent.failed(jobId, job.getTarget(), reason));
-				jobEventPublisher.complete(jobId);
-			}).then();
-		});
-	}
-
 	private Mono<Void> checkJobCompletion(Long jobId) {
 		return scanTaskRepository.countActiveTasksForJob(jobId).flatMap((activeCount) -> {
 			if (activeCount == 0) {
@@ -146,8 +133,8 @@ public class JobOrchestratorService {
 									job.getCompletedAt(), testsCount)
 							.flatMap((result) -> scanJobRepository.save(job).doOnSuccess((j) -> {
 								if (j.getStatus() == JobStatus.FAILED) {
-									jobEventPublisher.emit(jobId, ch.nexsol.orthrusdast.sse.JobEvent.failed(jobId,
-											job.getTarget(), "Some tasks failed"));
+									jobEventPublisher.emit(jobId,
+											JobEvent.failed(jobId, job.getTarget(), "Some tasks failed"));
 								}
 								else {
 									long critical = result.riskSummary()
@@ -172,9 +159,9 @@ public class JobOrchestratorService {
 										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);
 
 									jobEventPublisher.emit(jobId,
-											ch.nexsol.orthrusdast.sse.JobEvent.completed(jobId, job.getTarget(),
-													result.id(), grade, result.vulnerabilities().size(), critical, high,
-													medium, low, info, result.operationsScanned()));
+											JobEvent.completed(jobId, job.getTarget(), result.id(), grade,
+													result.vulnerabilities().size(), critical, high, medium, low, info,
+													result.operationsScanned()));
 								}
 								jobEventPublisher.complete(jobId);
 							}))
