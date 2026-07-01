@@ -33,7 +33,7 @@
                             <th class="bg-transparent border-secondary text-end" style="padding: 1rem;">Action</th>
                         </tr>
                     </thead>
-                    <tbody id="scan-table-body">
+                    <tbody id="scan-table-body" hx-ext="sse" sse-connect="/api/sse/jobs/events">
                         <th:block th:replace="~{fragments/scan-items :: items}"></th:block>
                     </tbody>
                 </table>

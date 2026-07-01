@@ -36,8 +36,6 @@ import ch.nexsol.orthrusdast.entity.ScanResultEntity;
 import ch.nexsol.orthrusdast.entity.VulnerabilityEntity;
 import ch.nexsol.orthrusdast.model.AttemptStatus;
 import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.OwaspReference;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;

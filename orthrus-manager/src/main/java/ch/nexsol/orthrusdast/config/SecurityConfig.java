@@ -20,15 +20,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
@@ -44,7 +44,7 @@ import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.csrf.CsrfWebFilter;
 import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
@@ -96,9 +96,16 @@ public class SecurityConfig {
 					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
 							+ "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
 							+ "base-uri 'self'; form-action 'self'; frame-ancestors 'none'")))
-			.exceptionHandling((exceptionHandling) -> exceptionHandling.accessDeniedHandler(
-					(exchange, denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
-						.sendRedirect(exchange, java.net.URI.create("/error/403"))));
+			.exceptionHandling((exceptionHandling) -> exceptionHandling.authenticationEntryPoint((exchange, ex) -> {
+				if (exchange.getRequest().getHeaders().getAccept().contains(MediaType.TEXT_EVENT_STREAM)) {
+					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+					return exchange.getResponse().setComplete();
+				}
+				return new RedirectServerAuthenticationEntryPoint("/login").commence(exchange, ex);
+			})
+				.accessDeniedHandler((exchange,
+						denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
+							.sendRedirect(exchange, java.net.URI.create("/error/403"))));
 
 		if (clientRegistrations.getIfAvailable() != null) {
 			http.oauth2Login((oauth2) -> {

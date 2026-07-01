@@ -2,7 +2,7 @@
     <tr th:each="scan : ${history}" th:id="'job-row-' + ${scan.id}"
         th:style="${scan.resultId != null ? 'cursor: pointer;' : ''}"
         th:onclick="${scan.resultId != null} ? |window.location.href='/scans/${scan.id}/details'| : ''"
-        th:attr="hx-get=${scan.status.name() == 'PENDING' or scan.status.name() == 'RUNNING' ? '/api/scans/row/' + scan.id : null},hx-trigger=${scan.status.name() == 'PENDING' or scan.status.name() == 'RUNNING' ? 'every 5s' : null},hx-swap=${scan.status.name() == 'PENDING' or scan.status.name() == 'RUNNING' ? 'outerHTML' : null}">
+        th:attr="hx-get=${scan.status.name() == 'PENDING' or scan.status.name() == 'RUNNING' ? '/api/scans/row/' + scan.id : null},hx-trigger=${scan.status.name() == 'PENDING' or scan.status.name() == 'RUNNING' ? 'sse:message' : null},hx-swap=${scan.status.name() == 'PENDING' or scan.status.name() == 'RUNNING' ? 'outerHTML' : null}">
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
             <strong class="text-light" th:text="'#' + ${scan.id}">#1</strong>
         </td>

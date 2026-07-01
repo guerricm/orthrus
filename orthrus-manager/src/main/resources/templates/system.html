@@ -4,7 +4,7 @@
 
 <body>
 
-    <div class="container-fluid py-4 animate-fade-in" id="system-container" hx-get="/system" hx-trigger="every 5s" hx-swap="outerHTML" hx-select="#system-container">
+    <div class="container-fluid py-4 animate-fade-in" id="system-container" hx-ext="sse" sse-connect="/api/sse/system" hx-trigger="sse:pulse" hx-get="/system" hx-swap="outerHTML" hx-select="#system-container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>System Overview</h2>
             <span class="badge bg-primary" th:text="${slaves.size()} + ' Slaves Registered'"></span>
