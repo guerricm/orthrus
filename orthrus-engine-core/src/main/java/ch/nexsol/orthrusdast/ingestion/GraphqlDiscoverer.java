@@ -157,14 +157,17 @@ public class GraphqlDiscoverer implements EndpointDiscoverer {
 			.append(varsCallBuilder.toString())
 			.append(" { __typename } }");
 
-		return Mono.fromCallable(() -> {
+		try {
 			Map<String, Object> payload = new HashMap<>();
 			payload.put("query", queryBuilder.toString());
 			if (!variablesMap.isEmpty()) {
 				payload.put("variables", variablesMap);
 			}
 			return objectMapper.writeValueAsString(payload);
-		}).onErrorReturn("{\"query\": \"{ " + fieldName + " }\"}").block();
+		}
+		catch (Exception ex) {
+			return "{\"query\": \"{ " + fieldName + " }\"}";
+		}
 	}
 
 	private String getGraphQLTypeString(JsonNode typeNode) {

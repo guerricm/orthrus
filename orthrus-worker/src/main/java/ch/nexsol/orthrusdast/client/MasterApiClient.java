@@ -73,14 +73,19 @@ public class MasterApiClient {
 
 	@EventListener(ApplicationReadyEvent.class)
 	public void registerToMaster() {
-		String families = scanService.getAvailableScannerObjects().stream()
-				.map((s) -> s.getFamily().name())
-				.distinct()
-				.collect(Collectors.joining(","));
+		String families = scanService.getAvailableScannerObjects()
+			.stream()
+			.map((s) -> s.getFamily().name())
+			.distinct()
+			.collect(Collectors.joining(","));
 		String caps = String.join(",", scanService.getAvailableDiscoverers()) + ","
-				+ scanService.getAvailableScannerObjects().stream().map((s) -> s.getId()).collect(Collectors.joining(","))
+				+ scanService.getAvailableScannerObjects()
+					.stream()
+					.map((s) -> s.getId())
+					.collect(Collectors.joining(","))
 				+ "," + families;
-		String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\", \"capabilities\": \"%s\"}", slaveId, slaveUrl, caps);
+		String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\", \"capabilities\": \"%s\"}", slaveId, slaveUrl,
+				caps);
 		if (!masterDownLogged) {
 			log.info("Registering slave to master at {}", masterUrl);
 		}

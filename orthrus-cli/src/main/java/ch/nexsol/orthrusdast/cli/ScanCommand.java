@@ -208,10 +208,13 @@ public class ScanCommand implements Callable<Integer> {
 				os = new FileOutputStream(outputFile);
 			}
 
-			generator.generateReport(result, os, includePassed).block();
-
-			if (os != System.out) {
-				os.close();
+			try {
+				generator.generateReport(result, os, includePassed).block();
+			}
+			finally {
+				if (os != System.out) {
+					os.close();
+				}
 			}
 
 			// Return non-zero exit code if vulnerabilities found (useful for CI/CD)

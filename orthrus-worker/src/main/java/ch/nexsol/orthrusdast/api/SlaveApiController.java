@@ -67,7 +67,8 @@ public class SlaveApiController {
 
 	@EventListener(ContextClosedEvent.class)
 	public void onShutdown() {
-		LoggerFactory.getLogger(SlaveApiController.class).info("Graceful shutdown initiated. Cancelling active jobs...");
+		LoggerFactory.getLogger(SlaveApiController.class)
+			.info("Graceful shutdown initiated. Cancelling active jobs...");
 		masterApiClient.setStatus(NodeStatus.OFFLINE);
 		for (Map.Entry<Long, Disposable> entry : activeJobs.entrySet()) {
 			Long jobId = entry.getKey();
