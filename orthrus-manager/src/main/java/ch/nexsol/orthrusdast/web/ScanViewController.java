@@ -223,6 +223,7 @@ public class ScanViewController {
 	public Mono<String> activeScans(Model model) {
 		return scanJobRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, 100))
 			.collectList()
+			.flatMap(this::populatePlanNames)
 			.flatMap((history) -> {
 				// Sort: PENDING first, then RUNNING, then everything else (COMPLETED,
 				// FAILED),
@@ -325,29 +326,33 @@ public class ScanViewController {
 
 	@GetMapping("/api/scans/queued-row/{id}")
 	public Mono<String> getScanQueuedRowFragment(@PathVariable Long id, Model model) {
-		return scanJobRepository.findById(id).flatMap((job) -> {
-			model.addAttribute("jobId", job.getId());
-			model.addAttribute("target", job.getTarget());
-			model.addAttribute("discovererId", job.getDiscovererId());
-			model.addAttribute("createdAt", job.getCreatedAt());
-			model.addAttribute("status", job.getStatus().name());
-			model.addAttribute("resultId", job.getResultId());
+		return scanJobRepository.findById(id)
+			.flatMap(job -> populatePlanNames(List.of(job)))
+			.map(jobs -> jobs.get(0))
+			.flatMap((job) -> {
+				model.addAttribute("jobId", job.getId());
+				model.addAttribute("planName", job.getPlanName());
+				model.addAttribute("target", job.getTarget());
+				model.addAttribute("discovererId", job.getDiscovererId());
+				model.addAttribute("createdAt", job.getCreatedAt());
+				model.addAttribute("status", job.getStatus().name());
+				model.addAttribute("resultId", job.getResultId());
 
-			return Mono
-				.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))
-				.doOnNext(conf -> model.addAttribute("config", conf))
-				.onErrorResume(e -> Mono.empty())
-				.then(Mono.defer(() -> {
-					if (job.getStatus() == JobStatus.COMPLETED && job.getResultId() != null) {
-						return scanResultService.findById(job.getResultId()).doOnNext(result -> {
-							model.addAttribute("result", result);
-							model.addAttribute("globalGrade", computeGrade(result.riskSummary()));
-						}).then();
-					}
-					return Mono.empty();
-				}))
-				.thenReturn("fragments/scan-queued :: scanQueued");
-		});
+				return Mono
+					.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))
+					.doOnNext(conf -> model.addAttribute("config", conf))
+					.onErrorResume(e -> Mono.empty())
+					.then(Mono.defer(() -> {
+						if (job.getStatus() == JobStatus.COMPLETED && job.getResultId() != null) {
+							return scanResultService.findById(job.getResultId()).doOnNext(result -> {
+								model.addAttribute("result", result);
+								model.addAttribute("globalGrade", computeGrade(result.riskSummary()));
+							}).then();
+						}
+						return Mono.empty();
+					}))
+					.thenReturn("fragments/scan-queued :: scanQueued");
+			});
 	}
 
 	/**

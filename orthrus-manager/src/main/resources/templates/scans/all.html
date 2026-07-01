@@ -29,7 +29,7 @@
                         <th:block th:each="jobMap : ${activeJobs}">
                             <th:block th:if="${jobMap != null}">
                                 <div
-                                    th:insert="~{fragments/scan-queued :: scanQueued(jobId=${jobMap['job'].id}, target=${jobMap['job'].target}, discovererId=${jobMap['job'].discovererId}, createdAt=${jobMap['job'].createdAt}, status=${jobMap['job'].status.name()}, resultId=${jobMap['job'].resultId}, result=${jobMap['result']}, globalGrade=${jobMap['globalGrade']}, config=${jobMap['config']})}">
+                                    th:insert="~{fragments/scan-queued :: scanQueued(jobId=${jobMap['job'].id}, target=${jobMap['job'].target}, discovererId=${jobMap['job'].discovererId}, createdAt=${jobMap['job'].createdAt}, status=${jobMap['job'].status.name()}, resultId=${jobMap['job'].resultId}, result=${jobMap['result']}, globalGrade=${jobMap['globalGrade']}, config=${jobMap['config']}, planName=${jobMap['job'].planName})}">
                                 </div>
                             </th:block>
                         </th:block>
