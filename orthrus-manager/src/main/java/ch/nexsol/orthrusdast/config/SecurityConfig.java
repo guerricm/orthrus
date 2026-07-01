@@ -43,8 +43,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.web.server.DefaultServerRedirectStrategy;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler;
 import org.springframework.security.web.server.csrf.CsrfWebFilter;
 import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
@@ -101,30 +103,43 @@ public class SecurityConfig {
 					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
 					return exchange.getResponse().setComplete();
 				}
+				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
+					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/login");
+					return exchange.getResponse().setComplete();
+				}
 				return new RedirectServerAuthenticationEntryPoint("/login").commence(exchange, ex);
-			})
-				.accessDeniedHandler((exchange,
-						denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
-							.sendRedirect(exchange, java.net.URI.create("/error/403"))));
+			}).accessDeniedHandler((exchange, denied) -> exchange.getPrincipal().flatMap((principal) -> {
+				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
+					exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/error/403");
+					return exchange.getResponse().setComplete();
+				}
+				return new DefaultServerRedirectStrategy().sendRedirect(exchange, java.net.URI.create("/error/403"));
+			}).switchIfEmpty(Mono.defer(() -> {
+				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
+					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/login");
+					return exchange.getResponse().setComplete();
+				}
+				return new DefaultServerRedirectStrategy().sendRedirect(exchange, java.net.URI.create("/login"));
+			}))));
 
 		if (clientRegistrations.getIfAvailable() != null) {
 			http.oauth2Login((oauth2) -> {
 				oauth2.loginPage("/login");
 				oauth2.authenticationFailureHandler((webFilterExchange, exception) -> {
 					log.error("OIDC Login Failed: ", exception);
-					return new org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler(
-							"/login?error_oauth2")
+					return new RedirectServerAuthenticationFailureHandler("/login?error_oauth2")
 						.onAuthenticationFailure(webFilterExchange, exception);
 				});
 			});
 		}
 
 		if (jwtDecoder.getIfAvailable() != null) {
-			http.oauth2ResourceServer((oauth2) -> oauth2
-				.jwt((jwt) -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
-				.authenticationEntryPoint(
-						new org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint(
-								"/error/401")));
+			http.oauth2ResourceServer(
+					(oauth2) -> oauth2.jwt((jwt) -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
+						.authenticationEntryPoint(new RedirectServerAuthenticationEntryPoint("/error/401")));
 		}
 
 		return http.build();
@@ -169,13 +184,13 @@ public class SecurityConfig {
 			Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
 			if (resourceAccess != null && resourceAccess.containsKey("orthrus")) {
 				Object orthrusResource = resourceAccess.get("orthrus");
-				if (orthrusResource instanceof Map) {
-					Map<String, Object> orthrusMap = (Map<String, Object>) orthrusResource;
+				if (orthrusResource instanceof Map<?, ?> orthrusMap) {
 					Object rolesObj = orthrusMap.get("roles");
-					if (rolesObj instanceof List) {
-						List<String> roles = (List<String>) rolesObj;
-						for (String role : roles) {
-							authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+					if (rolesObj instanceof List<?> roles) {
+						for (Object roleObj : roles) {
+							if (roleObj instanceof String role) {
+								authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+							}
 						}
 					}
 				}

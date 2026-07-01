@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.engine.ScanResultService;
+import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
@@ -153,11 +154,13 @@ public class MasterInternalApiController {
 	public Mono<ResponseEntity<Void>> postJobAttemptsBatch(@PathVariable Long id,
 			@RequestBody List<ScanAttempt> batch) {
 		return scanJobRepository.findById(id).flatMap((job) -> {
-			Mono<Void> ensureResultExists = Mono.empty();
+			Mono<ScanJobEntity> ensureJobResultId = Mono.just(job);
 			if (job.getResultId() == null) {
 				job.setResultId(UUID.randomUUID().toString());
-				ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(),
-						(job.getCreatedAt() != null) ? job.getCreatedAt() : Instant.now());
+				ensureJobResultId = scanResultService
+					.createPlaceholderResult(job.getResultId(), job.getTarget(),
+							(job.getCreatedAt() != null) ? job.getCreatedAt() : Instant.now())
+					.then(scanJobRepository.save(job));
 			}
 
 			int vulnsInBatch = 0;
@@ -167,11 +170,8 @@ public class MasterInternalApiController {
 				}
 			}
 
-			job.setTestsCount(((job.getTestsCount() != null) ? job.getTestsCount() : 0) + batch.size());
-			job.setVulnsCount(((job.getVulnsCount() != null) ? job.getVulnsCount() : 0) + vulnsInBatch);
-
-			return ensureResultExists.then(scanResultService.saveBatch(job.getResultId(), batch))
-				.then(scanJobRepository.save(job))
+			return ensureJobResultId.then(scanResultService.saveBatch(job.getResultId(), batch))
+				.then(scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, batch.size()))
 				.thenReturn(ResponseEntity.ok().<Void>build());
 		}).defaultIfEmpty(ResponseEntity.notFound().build());
 	}
@@ -200,7 +200,7 @@ public class MasterInternalApiController {
 			return ensureResultExists
 				.then(scanResultService.finalizeJobResult(job.getResultId(), job.getTarget(), request.startTime(),
 						job.getCompletedAt(), testsCount))
-				.flatMap((result) -> scanJobRepository.save(job).doOnSuccess((j) -> {
+				.flatMap((result) -> scanJobRepository.save(job).flatMap((j) -> {
 					long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
 					long high = result.riskSummary().getOrDefault(RiskLevel.HIGH, 0L);
 					long medium = result.riskSummary().getOrDefault(RiskLevel.MEDIUM, 0L);
@@ -227,7 +227,7 @@ public class MasterInternalApiController {
 					jobEventPublisher.complete(id);
 
 					if (job.getAssignedSlaveId() != null) {
-						slaveNodeRepository.findById(job.getAssignedSlaveId())
+						return slaveNodeRepository.findById(job.getAssignedSlaveId())
 							.flatMap((slave) -> scanJobRepository
 								.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 								.flatMap((runningCount) -> {
@@ -240,8 +240,9 @@ public class MasterInternalApiController {
 									}
 									return Mono.empty();
 								}))
-							.subscribe();
+							.thenReturn(j);
 					}
+					return Mono.just(j);
 				}));
 		}).map((j) -> ResponseEntity.ok().<Void>build()).defaultIfEmpty(ResponseEntity.notFound().build());
 	}
@@ -250,11 +251,11 @@ public class MasterInternalApiController {
 	public Mono<ResponseEntity<Void>> postJobFail(@PathVariable Long id, @RequestBody FailJobRequest request) {
 		return scanJobRepository.findById(id).flatMap((job) -> {
 			job.setStatus(JobStatus.FAILED);
-			return scanJobRepository.save(job).doOnSuccess((j) -> {
+			return scanJobRepository.save(job).flatMap((j) -> {
 				jobEventPublisher.emit(id, JobEvent.failed(id, job.getTarget(), request.reason()));
 				jobEventPublisher.complete(id);
 				if (job.getAssignedSlaveId() != null) {
-					slaveNodeRepository.findById(job.getAssignedSlaveId())
+					return slaveNodeRepository.findById(job.getAssignedSlaveId())
 						.flatMap((slave) -> scanJobRepository
 							.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
 							.flatMap((runningCount) -> {
@@ -266,8 +267,9 @@ public class MasterInternalApiController {
 								}
 								return Mono.empty();
 							}))
-						.subscribe();
+						.thenReturn(j);
 				}
+				return Mono.just(j);
 			});
 		}).map((j) -> ResponseEntity.ok().<Void>build()).defaultIfEmpty(ResponseEntity.notFound().build());
 	}

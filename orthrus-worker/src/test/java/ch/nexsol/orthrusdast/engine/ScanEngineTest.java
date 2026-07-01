@@ -86,7 +86,7 @@ class ScanEngineTest {
 
 		ScanHttpClient mockHttpClient = Mockito.mock(ScanHttpClient.class);
 		Mockito.when(mockHttpClient.send(ArgumentMatchers.any()))
-				.thenReturn(Mono.just(new ScanHttpResponse(HttpStatus.OK, new HttpHeaders(), "", 0L)));
+			.thenReturn(Mono.just(new ScanHttpResponse(HttpStatus.OK, new HttpHeaders(), "", 0L)));
 
 		ScanEngine engine = new ScanEngine(List.of(mockScanner), mockHttpClient);
 
