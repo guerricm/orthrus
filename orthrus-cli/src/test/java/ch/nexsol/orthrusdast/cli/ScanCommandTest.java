@@ -28,7 +28,7 @@ import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.engine.ScanService;
 import ch.nexsol.orthrusdast.report.ReportGenerator;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -53,7 +53,7 @@ class ScanCommandTest {
 		command.format = "json";
 
 		Integer result = command.call();
-		assertEquals(0, result);
+		assertThat(result).isEqualTo(0);
 	}
 
 }

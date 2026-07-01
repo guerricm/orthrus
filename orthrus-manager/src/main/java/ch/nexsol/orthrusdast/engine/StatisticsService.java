@@ -64,7 +64,7 @@ public class StatisticsService {
 
 					for (Map.Entry<ScanResultEntity, Map<String, Long>> scanEntry : scanEntries) {
 						ScanResultEntity scan = scanEntry.getKey();
-						String targetUrl = scan.targetUrl() != null ? scan.targetUrl() : "Unknown Target";
+						String targetUrl = (scan.targetUrl() != null) ? scan.targetUrl() : "Unknown Target";
 						String scanId = scan.id();
 						Map<String, Long> endpoints = scanEntry.getValue();
 
@@ -83,10 +83,6 @@ public class StatisticsService {
 		});
 	}
 
-	public record GlobalScanSummary(String scanId, String targetUrl, Instant startTime, Map<String, Long> vulnsByRisk,
-			Map<String, Long> vulnsByCwe, long totalVulns) {
-	}
-
 	public Mono<List<GlobalScanSummary>> getGlobalStatistics() {
 		return scanResultRepository.findAll().collectList().flatMap((scans) -> {
 			scans.sort((s1, s2) -> s2.scanStartTime().compareTo(s1.scanStartTime()));
@@ -103,11 +99,15 @@ public class StatisticsService {
 								.collect(Collectors.groupingBy(VulnerabilityEntity::cweId, Collectors.counting()));
 
 							return new GlobalScanSummary(scan.id(),
-									scan.targetUrl() != null ? scan.targetUrl() : "Unknown Target",
+									(scan.targetUrl() != null) ? scan.targetUrl() : "Unknown Target",
 									scan.scanStartTime(), byRisk, byCwe, vulns.size());
 						}))
 				.collectList();
 		});
+	}
+
+	public record GlobalScanSummary(String scanId, String targetUrl, Instant startTime, Map<String, Long> vulnsByRisk,
+			Map<String, Long> vulnsByCwe, long totalVulns) {
 	}
 
 }

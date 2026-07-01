@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.engine.ScanService;
@@ -168,8 +167,8 @@ public class ScanCommand implements Callable<Integer> {
 			}
 		}
 
-		ScanConfiguration config = new ScanConfiguration(includeScanners != null ? includeScanners : List.of(),
-				excludeScanners != null ? excludeScanners : List.of(), concurrency, 5000, 10000, false, format,
+		ScanConfiguration config = new ScanConfiguration((includeScanners != null) ? includeScanners : List.of(),
+				(excludeScanners != null) ? excludeScanners : List.of(), concurrency, 5000, 10000, false, format,
 				authScheme, secondaryAuthScheme, language, includePassed, GatewayType.fromString(gatewayType), appUrl,
 				k8sToken, oauth2Config, null);
 

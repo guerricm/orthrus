@@ -196,12 +196,14 @@ public class ScanJobEntity {
 	}
 
 	public String getFormattedDuration() {
-		if (startedAt == null)
+		if (startedAt == null) {
 			return "-";
+		}
 		Instant end = (completedAt != null) ? completedAt : Instant.now();
 		long seconds = Duration.between(startedAt, end).getSeconds();
-		if (seconds < 60)
+		if (seconds < 60) {
 			return seconds + "s";
+		}
 		return (seconds / 60) + "m " + (seconds % 60) + "s";
 	}
 
