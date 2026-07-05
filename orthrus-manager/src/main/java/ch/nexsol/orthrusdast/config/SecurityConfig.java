@@ -75,6 +75,9 @@ public class SecurityConfig {
 			.pathMatchers("/css/**", "/js/**", "/images/**", "/vendor/**", "/webjars/**", "/favicon.ico", "/login**",
 					"/error/**")
 			.permitAll()
+			// Swagger/OpenAPI
+			.pathMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/swagger-ui/**")
+			.permitAll()
 			// Internal API for slaves (Secured manually by InternalApiSecurityWebFilter)
 			.pathMatchers("/api/internal/**")
 			.permitAll()
