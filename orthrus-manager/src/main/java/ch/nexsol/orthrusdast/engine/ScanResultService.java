@@ -36,8 +36,6 @@ import ch.nexsol.orthrusdast.entity.ScanResultEntity;
 import ch.nexsol.orthrusdast.entity.VulnerabilityEntity;
 import ch.nexsol.orthrusdast.model.AttemptStatus;
 import ch.nexsol.orthrusdast.model.CWEReference;
-import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.OwaspReference;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
@@ -180,12 +178,12 @@ public class ScanResultService {
 
 	private VulnerabilityEntity mapToEntity(Vulnerability v, String scanResultId) {
 		return new VulnerabilityEntity(null, scanResultId, v.name(), v.description(),
-				v.riskLevel() != null ? v.riskLevel().name() : null,
-				v.confidence() != null ? v.confidence().name() : null, v.scannerId(), v.operationUrl(),
-				v.operationMethod(), v.cwe() != null ? String.valueOf(v.cwe().getId()) : null,
-				v.cwe() != null ? v.cwe().getName() : null, v.capecs() != null ? String.join(",", v.capecs()) : null,
-				v.cvssScore(), v.evidence(), v.remediation(), v.requestDetails(), v.responseDetails(), v.attackVector(),
-				v.technicalImpact());
+				(v.riskLevel() != null) ? v.riskLevel().name() : null,
+				(v.confidence() != null) ? v.confidence().name() : null, v.scannerId(), v.operationUrl(),
+				v.operationMethod(), (v.cwe() != null) ? String.valueOf(v.cwe().getId()) : null,
+				(v.cwe() != null) ? v.cwe().getName() : null,
+				(v.capecs() != null) ? String.join(",", v.capecs()) : null, v.cvssScore(), v.evidence(),
+				v.remediation(), v.requestDetails(), v.responseDetails(), v.attackVector(), v.technicalImpact());
 	}
 
 	private ScanResult mapToDomain(ScanResultEntity entity, List<VulnerabilityEntity> vulnEntities,
@@ -207,11 +205,11 @@ public class ScanResultService {
 			}
 			return new Vulnerability(UUID.randomUUID().toString(), ve.vulnerabilityTitle(),
 					ve.vulnerabilityDescription(),
-					ve.riskLevel() != null ? RiskLevel.valueOf(ve.riskLevel()) : RiskLevel.INFO,
-					ve.confidence() != null ? Vulnerability.Confidence.valueOf(ve.confidence())
+					(ve.riskLevel() != null) ? RiskLevel.valueOf(ve.riskLevel()) : RiskLevel.INFO,
+					(ve.confidence() != null) ? Vulnerability.Confidence.valueOf(ve.confidence())
 							: Vulnerability.Confidence.LOW,
 					ve.scannerId(), ve.operationUrl(), ve.operationMethod(), cwe, Collections.emptyList(), // cves
-					ve.capecIds() != null && !ve.capecIds().isEmpty() ? List.of(ve.capecIds().split(","))
+					((ve.capecIds() != null) && !ve.capecIds().isEmpty()) ? List.of(ve.capecIds().split(","))
 							: Collections.emptyList(),
 					ve.cvssBaseScore(), ve.evidence(), ve.recommendation(), ve.requestSummary(), ve.responseSummary(),
 					ve.attackVector(), ve.technicalImpact());

@@ -16,7 +16,6 @@
 
 package ch.nexsol.orthrusdast.web;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +29,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -94,10 +94,25 @@ public class PlanController {
 	}
 
 	@GetMapping("/plans/new")
-	public Mono<String> newTestPlan(Model model) {
-		return Mono
-			.zip(slaveNodeRepository.findAll().collectList(),
-					scanTaskRepository.findByStatus(JobStatus.RUNNING).collectList())
+	public Mono<String> newTestPlan(@RequestParam(required = false) Long duplicateId, Model model) {
+		Mono<Void> setupModelMono = Mono.empty();
+		if (duplicateId != null) {
+			setupModelMono = testPlanRepository.findById(duplicateId).flatMap((plan) -> {
+				plan.setName(plan.getName() + " - copy");
+				model.addAttribute("plan", plan);
+				return Mono
+					.fromCallable(
+							() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class))
+					.doOnNext((conf) -> model.addAttribute("config", conf))
+					.then();
+			}).onErrorResume((ex) -> {
+				log.warn("Failed to load duplicate plan {}", duplicateId, ex);
+				return Mono.empty();
+			});
+		}
+
+		return setupModelMono.then(Mono.zip(slaveNodeRepository.findAll().collectList(),
+				scanTaskRepository.findByStatus(JobStatus.RUNNING).collectList())
 			.flatMap((tuple) -> {
 				List<SlaveNodeEntity> slaves = tuple.getT1();
 				List<ch.nexsol.orthrusdast.entity.ScanTaskEntity> runningTasks = tuple.getT2();
@@ -142,7 +157,7 @@ public class PlanController {
 					model.addAttribute("scanners", List.of());
 					return Mono.just("plans/edit");
 				}
-			});
+			}));
 	}
 
 	@GetMapping("/plans")
@@ -163,7 +178,7 @@ public class PlanController {
 						.orElse(null);
 					if (activeSlave != null) {
 						totalScannersMono = fetchCapabilities(activeSlave)
-							.map((caps) -> caps.scanners() != null ? caps.scanners().size() : 0)
+							.map((caps) -> (caps.scanners() != null) ? caps.scanners().size() : 0)
 							.onErrorReturn(0);
 					}
 				}
@@ -176,12 +191,12 @@ public class PlanController {
 								Map<String, Object> map = new HashMap<>();
 								map.put("plan", plan);
 								if (conf.includeScanners() == null || conf.includeScanners().isEmpty()) {
-									map.put("scannersCount", totalScanners > 0 ? totalScanners : "All");
+									map.put("scannersCount", (totalScanners > 0) ? totalScanners : "All");
 								}
 								else {
 									map.put("scannersCount", conf.includeScanners().size());
 								}
-								map.put("totalScanners", totalScanners > 0 ? totalScanners : "?");
+								map.put("totalScanners", (totalScanners > 0) ? totalScanners : "?");
 								return map;
 							})
 							.onErrorResume((e) -> {
@@ -189,7 +204,7 @@ public class PlanController {
 								Map<String, Object> map = new HashMap<>();
 								map.put("plan", plan);
 								map.put("scannersCount", "All");
-								map.put("totalScanners", totalScanners > 0 ? totalScanners : "?");
+								map.put("totalScanners", (totalScanners > 0) ? totalScanners : "?");
 								return Mono.just(map);
 							}))
 						.collectList()
@@ -206,13 +221,14 @@ public class PlanController {
 		return testPlanRepository.findById(id).flatMap((plan) -> {
 			ScanJobEntity job = new ScanJobEntity(plan.getDiscovererId(), plan.getTarget(),
 					plan.getScanConfigurationJson(), JobStatus.PENDING, plan.getId());
-			return scanJobRepository.save(job).doOnSuccess((savedJob) -> {
-				jobEventPublisher.emit(savedJob.getId(), JobEvent.queued(savedJob.getId(), savedJob.getTarget()));
-			}).thenReturn("redirect:/scans/all");
+			return scanJobRepository.save(job)
+				.doOnSuccess((savedJob) -> jobEventPublisher.emit(savedJob.getId(),
+						JobEvent.queued(savedJob.getId(), savedJob.getTarget())))
+				.thenReturn("redirect:/scans/all");
 		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Test plan not found")));
 	}
 
-	@PostMapping(value = "/web/plans")
+	@PostMapping("/web/plans")
 	public Mono<String> createTestPlan(ServerWebExchange exchange, Model model) {
 		return exchange.getFormData().flatMap((formData) -> {
 			String target = formData.getFirst("target");
@@ -227,7 +243,7 @@ public class PlanController {
 			String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
 
 			List<String> rawIncludeScanners = formData.get("includeScanners");
-			final List<String> includeScanners = (rawIncludeScanners == null) ? List.of() : rawIncludeScanners;
+			final List<String> includeScanners = (rawIncludeScanners != null) ? rawIncludeScanners : List.of();
 			final List<String> excludeScanners = List.of();
 
 			final int concurrency = WebFormUtils.parseIntOrDefault(formData.getFirst("concurrency"), 10);
@@ -369,7 +385,7 @@ public class PlanController {
 				String k8sToken = formData.getFirst("k8sToken");
 				String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
 				List<String> rawIncludeScanners = formData.get("includeScanners");
-				final List<String> includeScanners = (rawIncludeScanners == null) ? List.of() : rawIncludeScanners;
+				final List<String> includeScanners = (rawIncludeScanners != null) ? rawIncludeScanners : List.of();
 				final int concurrency = WebFormUtils.parseIntOrDefault(formData.getFirst("concurrency"), 10);
 
 				String oauth2Url = formData.getFirst("oauth2Url");
@@ -391,8 +407,8 @@ public class PlanController {
 						OAuth2Config oauth2Config = oldConfig.oauth2Config();
 						if (oauth2Url != null && !oauth2Url.isBlank() && oauth2Grant != null
 								&& !oauth2Grant.isBlank()) {
-							String secret = (oauth2ClientSecret == null || oauth2ClientSecret.isBlank())
-									? (oauth2Config != null ? oauth2Config.clientSecret() : "") : oauth2ClientSecret;
+							String secret = (oauth2ClientSecret != null && !oauth2ClientSecret.isBlank())
+									? oauth2ClientSecret : ((oauth2Config != null) ? oauth2Config.clientSecret() : "");
 							oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, secret, oauth2Grant,
 									oauth2Creds);
 						}

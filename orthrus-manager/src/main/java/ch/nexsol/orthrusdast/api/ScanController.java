@@ -22,13 +22,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
@@ -66,6 +63,7 @@ public class ScanController {
 
 	/**
 	 * Get available discoverers.
+	 * @return a list of discoverers
 	 */
 	@GetMapping("/discoverers")
 	public Mono<List<String>> getDiscoverers() {
@@ -76,6 +74,8 @@ public class ScanController {
 	 * Trigger a new scan. Note: In a real production app, this would likely enqueue the
 	 * scan and return an ID, but for this v1 we'll block the connection and return the
 	 * result directly (since we don't have a DB).
+	 * @param request the scan request
+	 * @return a response entity
 	 */
 	@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	public Mono<ResponseEntity<ScanResult>> triggerScan(@RequestBody ScanRequest request) {
@@ -95,12 +95,13 @@ public class ScanController {
 				}
 
 				ScanConfiguration config = new ScanConfiguration(
-						request.includeScanners() != null ? request.includeScanners() : List.of(),
-						request.excludeScanners() != null ? request.excludeScanners() : List.of(),
-						request.concurrency() > 0 ? request.concurrency() : 10, 5000, 10000, request.ignoreSslErrors(),
-						"json", authScheme, secondaryAuthScheme, request.language() != null ? request.language() : "en",
-						request.includePassed() != null ? request.includePassed() : false, GatewayType.AUTO, null, null,
-						request.oauth2(), request.overrideHost());
+						(request.includeScanners() != null) ? request.includeScanners() : List.of(),
+						(request.excludeScanners() != null) ? request.excludeScanners() : List.of(),
+						(request.concurrency() > 0) ? request.concurrency() : 10, 5000, 10000,
+						request.ignoreSslErrors(), "json", authScheme, secondaryAuthScheme,
+						(request.language() != null) ? request.language() : "en",
+						(request.includePassed() != null) ? request.includePassed() : false, GatewayType.AUTO, null,
+						null, request.oauth2(), request.overrideHost());
 
 				return Mono.fromCallable(() -> objectMapper.writeValueAsString(config)).flatMap((configJson) -> {
 					ScanJobEntity job = new ScanJobEntity(request.discovererId(), request.target(), configJson,

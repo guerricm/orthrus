@@ -16,19 +16,22 @@
 
 package ch.nexsol.orthrusdast.config;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
@@ -43,8 +46,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.web.server.DefaultServerRedirectStrategy;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler;
 import org.springframework.security.web.server.csrf.CsrfWebFilter;
 import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
@@ -55,7 +60,7 @@ import reactor.core.publisher.Mono;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
+	private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
 	@Value("${orthrus.security.admin.username:superadmin}")
 	private String adminUsername;
@@ -72,6 +77,9 @@ public class SecurityConfig {
 			// Public paths
 			.pathMatchers("/css/**", "/js/**", "/images/**", "/vendor/**", "/webjars/**", "/favicon.ico", "/login**",
 					"/error/**")
+			.permitAll()
+			// Swagger/OpenAPI
+			.pathMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/swagger-ui/**")
 			.permitAll()
 			// Internal API for slaves (Secured manually by InternalApiSecurityWebFilter)
 			.pathMatchers("/api/internal/**")
@@ -96,28 +104,48 @@ public class SecurityConfig {
 					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
 							+ "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
 							+ "base-uri 'self'; form-action 'self'; frame-ancestors 'none'")))
-			.exceptionHandling((exceptionHandling) -> exceptionHandling.accessDeniedHandler(
-					(exchange, denied) -> new org.springframework.security.web.server.DefaultServerRedirectStrategy()
-						.sendRedirect(exchange, java.net.URI.create("/error/403"))));
+			.exceptionHandling((exceptionHandling) -> exceptionHandling.authenticationEntryPoint((exchange, ex) -> {
+				if (exchange.getRequest().getHeaders().getAccept().contains(MediaType.TEXT_EVENT_STREAM)) {
+					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+					return exchange.getResponse().setComplete();
+				}
+				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
+					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/login");
+					return exchange.getResponse().setComplete();
+				}
+				return new RedirectServerAuthenticationEntryPoint("/login").commence(exchange, ex);
+			}).accessDeniedHandler((exchange, denied) -> exchange.getPrincipal().flatMap((principal) -> {
+				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
+					exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/error/403");
+					return exchange.getResponse().setComplete();
+				}
+				return new DefaultServerRedirectStrategy().sendRedirect(exchange, URI.create("/error/403"));
+			}).switchIfEmpty(Mono.defer(() -> {
+				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
+					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/login");
+					return exchange.getResponse().setComplete();
+				}
+				return new DefaultServerRedirectStrategy().sendRedirect(exchange, URI.create("/login"));
+			}))));
 
 		if (clientRegistrations.getIfAvailable() != null) {
 			http.oauth2Login((oauth2) -> {
 				oauth2.loginPage("/login");
 				oauth2.authenticationFailureHandler((webFilterExchange, exception) -> {
 					log.error("OIDC Login Failed: ", exception);
-					return new org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler(
-							"/login?error_oauth2")
+					return new RedirectServerAuthenticationFailureHandler("/login?error_oauth2")
 						.onAuthenticationFailure(webFilterExchange, exception);
 				});
 			});
 		}
 
 		if (jwtDecoder.getIfAvailable() != null) {
-			http.oauth2ResourceServer((oauth2) -> oauth2
-				.jwt((jwt) -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
-				.authenticationEntryPoint(
-						new org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint(
-								"/error/401")));
+			http.oauth2ResourceServer(
+					(oauth2) -> oauth2.jwt((jwt) -> jwt.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
+						.authenticationEntryPoint(new RedirectServerAuthenticationEntryPoint("/error/401")));
 		}
 
 		return http.build();
@@ -162,13 +190,13 @@ public class SecurityConfig {
 			Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
 			if (resourceAccess != null && resourceAccess.containsKey("orthrus")) {
 				Object orthrusResource = resourceAccess.get("orthrus");
-				if (orthrusResource instanceof Map) {
-					Map<String, Object> orthrusMap = (Map<String, Object>) orthrusResource;
+				if (orthrusResource instanceof Map<?, ?> orthrusMap) {
 					Object rolesObj = orthrusMap.get("roles");
-					if (rolesObj instanceof List) {
-						List<String> roles = (List<String>) rolesObj;
-						for (String role : roles) {
-							authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+					if (rolesObj instanceof List<?> roles) {
+						for (Object roleObj : roles) {
+							if (roleObj instanceof String role) {
+								authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+							}
 						}
 					}
 				}

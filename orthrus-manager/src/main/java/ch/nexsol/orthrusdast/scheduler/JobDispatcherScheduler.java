@@ -28,7 +28,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
-import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
@@ -163,7 +162,7 @@ public class JobDispatcherScheduler {
 
 	private Mono<Void> failZombieScansForSlave(String slaveId) {
 		return scanTaskRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap((task) -> {
-			int retryCount = task.getRetryCount() != null ? task.getRetryCount() : 0;
+			int retryCount = (task.getRetryCount() != null) ? task.getRetryCount() : 0;
 			if (retryCount < 3) {
 				log.info("Retrying zombie task {} (Attempt {}) because assigned slave {} went OFFLINE.", task.getId(),
 						(retryCount + 1), slaveId);
@@ -191,10 +190,6 @@ public class JobDispatcherScheduler {
 			.filter((count) -> count > 0)
 			.doOnNext((count) -> log.info("Deleted {} offline slave nodes.", count))
 			.subscribe();
-	}
-
-	record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
-			String scanConfigurationJson) {
 	}
 
 	private Mono<Void> dispatchTaskToSlave(ch.nexsol.orthrusdast.entity.ScanTaskEntity task, SlaveNodeEntity slave) {
@@ -236,6 +231,10 @@ public class JobDispatcherScheduler {
 							.then(Mono.empty());
 					});
 			}));
+	}
+
+	record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
+			String scanConfigurationJson) {
 	}
 
 }

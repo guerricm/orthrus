@@ -63,18 +63,19 @@
                                 <div class="col-md-12">
                                     <label for="name" class="form-label">Plan Name</label>
                                     <input type="text" class="form-control" id="name" name="name"
+                                        th:value="${plan?.name}"
                                         placeholder="e.g. Daily Prod Scan" required>
                                 </div>
                                 <div class="col-md-12">
                                     <label for="description" class="form-label">Description (Optional)</label>
                                     <textarea class="form-control" id="description" name="description" rows="2"
-                                        placeholder="Detailed description of this test plan..."></textarea>
+                                        placeholder="Detailed description of this test plan..." th:text="${plan?.description}"></textarea>
                                 </div>
 
                                 <div class="col-md-8">
                                     <label for="target" class="form-label">Target URL / Spec Path</label>
                                     <input type="text" class="form-control" id="target" name="target"
-                                        value="https://petstore3.swagger.io/api/v3/openapi.json"
+                                        th:value="${plan?.target ?: 'https://petstore3.swagger.io/api/v3/openapi.json'}"
                                         placeholder="https://api.example.com/openapi.json" required>
                                 </div>
 
@@ -82,7 +83,7 @@
                                     <label for="discovererId" class="form-label">Discovery Mode</label>
                                     <select class="form-select" id="discovererId" name="discovererId" required>
                                         <option th:each="disc : ${discoverers}" th:value="${disc}" th:text="${disc}"
-                                            th:selected="${disc == 'openapi'}">openapi</option>
+                                            th:selected="${disc == (plan?.discovererId ?: 'openapi')}">openapi</option>
                                     </select>
                                 </div>
 
@@ -95,7 +96,7 @@
                                                 <label for="openapiOverrideHost" class="form-label">Override Server URL
                                                     (Optional)</label>
                                                 <input type="url" class="form-control" id="openapiOverrideHost"
-                                                    name="openapiOverrideHost" placeholder="https://override.server.com"
+                                                    name="openapiOverrideHost" th:value="${config?.openapiOverrideHost()}" placeholder="https://override.server.com"
                                                     autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');">
                                                 <div class="form-text text-white-50">Use this to override the server URL
                                                     defined inside the OpenAPI document.</div>
@@ -113,18 +114,18 @@
                                             <div class="col-md-4">
                                                 <label for="gatewayType" class="form-label">Gateway Type</label>
                                                 <select class="form-select" id="gatewayType" name="gatewayType">
-                                                    <option value="auto">Auto-Detect</option>
-                                                    <option value="traefik">Traefik</option>
-                                                    <option value="spring-cloud-gateway">Spring Cloud Gateway</option>
-                                                    <option value="kong">Kong API Gateway</option>
-                                                    <option value="haproxy">HAProxy</option>
-                                                    <option value="k8s">Kubernetes Ingress</option>
+                                                    <option value="auto" th:selected="${config?.gatewayType()?.name() == 'AUTO'}">Auto-Detect</option>
+                                                    <option value="traefik" th:selected="${config?.gatewayType()?.name() == 'TRAEFIK'}">Traefik</option>
+                                                    <option value="spring-cloud-gateway" th:selected="${config?.gatewayType()?.name() == 'SPRING_CLOUD_GATEWAY'}">Spring Cloud Gateway</option>
+                                                    <option value="kong" th:selected="${config?.gatewayType()?.name() == 'KONG'}">Kong API Gateway</option>
+                                                    <option value="haproxy" th:selected="${config?.gatewayType()?.name() == 'HAPROXY'}">HAProxy</option>
+                                                    <option value="k8s" th:selected="${config?.gatewayType()?.name() == 'K8S'}">Kubernetes Ingress</option>
                                                 </select>
                                             </div>
                                             <div class="col-md-8">
                                                 <label for="appUrl" class="form-label">Public App URL (Optional)</label>
                                                 <input type="url" class="form-control" id="appUrl" name="appUrl"
-                                                    placeholder="https://public-api.example.com">
+                                                    th:value="${config?.appUrl()}" placeholder="https://public-api.example.com">
                                                 <div class="form-text text-white-50">Use if the Admin API port differs
                                                     from the public App port.</div>
                                             </div>
@@ -194,7 +195,7 @@
                                                 <div class="col-md-6">
                                                     <label for="oauth2Url" class="form-label">OAuth2 Token URL</label>
                                                     <input type="url" class="form-control" id="oauth2Url"
-                                                        name="oauth2Url"
+                                                        name="oauth2Url" th:value="${config?.oauth2Config()?.tokenUrl()}"
                                                         placeholder="https://keycloak.example.com/token">
                                                 </div>
                                                 <div class="col-md-6">
@@ -202,15 +203,15 @@
                                                         Type</label>
                                                     <select class="form-select" id="oauth2Grant" name="oauth2Grant">
                                                         <option value="">-- Select Grant --</option>
-                                                        <option value="client_credentials">Client Credentials</option>
-                                                        <option value="password">Password</option>
+                                                        <option value="client_credentials" th:selected="${config?.oauth2Config()?.grantType() == 'client_credentials'}">Client Credentials</option>
+                                                        <option value="password" th:selected="${config?.oauth2Config()?.grantType() == 'password'}">Password</option>
                                                     </select>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label for="oauth2ClientId" class="form-label">OAuth2 Client
                                                         ID</label>
                                                     <input type="text" class="form-control" id="oauth2ClientId"
-                                                        name="oauth2ClientId">
+                                                        name="oauth2ClientId" th:value="${config?.oauth2Config()?.clientId()}">
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label for="oauth2ClientSecret" class="form-label">OAuth2 Client
@@ -222,7 +223,7 @@
                                                     <label for="oauth2Creds" class="form-label">OAuth2 Credentials (for
                                                         Password Grant)</label>
                                                     <input type="text" class="form-control" id="oauth2Creds"
-                                                        name="oauth2Creds" placeholder="user1:pass1,user2:pass2">
+                                                        name="oauth2Creds" th:value="${config?.oauth2Config()?.credentials() != null ? #strings.listJoin(config.oauth2Config().credentials(), ',') : ''}" placeholder="user1:pass1,user2:pass2">
                                                     <div class="form-text text-white-50">Comma-separated list of
                                                         username:password</div>
                                                 </div>
@@ -236,7 +237,7 @@
                                                             <div class="form-check">
                                                                 <input class="form-check-input" type="checkbox"
                                                                     name="includeScanners" th:value="${scanner.getId()}"
-                                                                    th:id="'scanner_' + ${scanner.getId()}" checked>
+                                                                    th:id="'scanner_' + ${scanner.getId()}" th:checked="${config == null || config.includeScanners() == null || config.includeScanners().isEmpty() || config.includeScanners().contains(scanner.getId())}">
                                                                 <label class="form-check-label text-light"
                                                                     th:for="'scanner_' + ${scanner.getId()}"
                                                                     th:text="${scanner.getId()}"
@@ -258,9 +259,9 @@
                                             <div class="row g-3">
                                                 <div class="col-md-12">
                                                     <label for="concurrency" class="form-label">Scan Concurrency: <span
-                                                            id="concurrencyValue">10</span></label>
+                                                            id="concurrencyValue" th:text="${config?.concurrency() ?: 10}">10</span></label>
                                                     <input type="range" class="form-range" min="1" max="100" step="1"
-                                                        id="concurrency" name="concurrency" value="10"
+                                                        id="concurrency" name="concurrency" th:value="${config?.concurrency() ?: 10}"
                                                         oninput="document.getElementById('concurrencyValue').innerText = this.value">
                                                     <div class="form-text text-white-50">Higher values scan faster but
                                                         generate more traffic on the target server. Reduce this if the
@@ -274,6 +275,7 @@
                             </div>
 
                             <div class="mt-4 text-end border-top border-secondary pt-4">
+                                <a href="/plans" class="btn btn-outline-secondary btn-lg px-4 me-3">Cancel</a>
                                 <button type="submit" id="saveBtn" class="btn btn-primary btn-lg px-5">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
                                         class="bi bi-save me-2 mb-1" viewBox="0 0 16 16">
