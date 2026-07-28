@@ -16,11 +16,14 @@
 
 package ch.nexsol.orthrusdast.config;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -57,7 +60,7 @@ import reactor.core.publisher.Mono;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
+	private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
 	@Value("${orthrus.security.admin.username:superadmin}")
 	private String adminUsername;
@@ -118,14 +121,14 @@ public class SecurityConfig {
 					exchange.getResponse().getHeaders().add("HX-Redirect", "/error/403");
 					return exchange.getResponse().setComplete();
 				}
-				return new DefaultServerRedirectStrategy().sendRedirect(exchange, java.net.URI.create("/error/403"));
+				return new DefaultServerRedirectStrategy().sendRedirect(exchange, URI.create("/error/403"));
 			}).switchIfEmpty(Mono.defer(() -> {
 				if (exchange.getRequest().getHeaders().getFirst("HX-Request") != null) {
 					exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
 					exchange.getResponse().getHeaders().add("HX-Redirect", "/login");
 					return exchange.getResponse().setComplete();
 				}
-				return new DefaultServerRedirectStrategy().sendRedirect(exchange, java.net.URI.create("/login"));
+				return new DefaultServerRedirectStrategy().sendRedirect(exchange, URI.create("/login"));
 			}))));
 
 		if (clientRegistrations.getIfAvailable() != null) {
