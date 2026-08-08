@@ -16,21 +16,30 @@
 
 package ch.nexsol.orthrusdast.web;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -48,6 +57,8 @@ import ch.nexsol.orthrusdast.model.NodeStatus;
 import ch.nexsol.orthrusdast.model.OAuth2Config;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
+import ch.nexsol.orthrusdast.plan.TestPlanExport;
+import ch.nexsol.orthrusdast.plan.TestPlanPortabilityService;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
@@ -62,6 +73,11 @@ import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 public class PlanController {
 
 	private static final Logger log = LoggerFactory.getLogger(PlanController.class);
+
+	/**
+	 * Upper bound on an uploaded transfer document.
+	 */
+	private static final int MAX_IMPORT_BYTES = 1024 * 1024;
 
 	private final TestPlanRepository testPlanRepository;
 
@@ -85,10 +101,13 @@ public class PlanController {
 	 */
 	private final List<String> defaultDiscoverers;
 
+	private final TestPlanPortabilityService planPortabilityService;
+
 	public PlanController(TestPlanRepository testPlanRepository, ScanJobRepository scanJobRepository,
 			SlaveNodeRepository slaveNodeRepository, ScanTaskRepository scanTaskRepository,
 			OAuth2TokenFetcher tokenFetcher, ObjectMapper objectMapper, JobEventPublisher jobEventPublisher,
-			WebClient.Builder webClientBuilder, List<EndpointDiscoverer> discoverers) {
+			WebClient.Builder webClientBuilder, List<EndpointDiscoverer> discoverers,
+			TestPlanPortabilityService planPortabilityService) {
 		this.testPlanRepository = testPlanRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -98,6 +117,7 @@ public class PlanController {
 		this.jobEventPublisher = jobEventPublisher;
 		this.webClient = webClientBuilder.build();
 		this.defaultDiscoverers = discoverers.stream().map(EndpointDiscoverer::getId).sorted().toList();
+		this.planPortabilityService = planPortabilityService;
 	}
 
 	@GetMapping("/plans/new")
@@ -168,7 +188,11 @@ public class PlanController {
 	}
 
 	@GetMapping("/plans")
-	public Mono<String> listTestPlans(Model model) {
+	public Mono<String> listTestPlans(Model model, @RequestParam(required = false) Integer imported,
+			@RequestParam(required = false) Integer secrets, @RequestParam(required = false) String importError) {
+		model.addAttribute("importedCount", imported);
+		model.addAttribute("importedNeedingSecrets", secrets);
+		model.addAttribute("importFailed", importError != null);
 		return Mono.zip(testPlanRepository.findAll().collectList(), slaveNodeRepository.findAll().collectList())
 			.flatMap((tuple) -> {
 				List<TestPlanEntity> plans = tuple.getT1();
@@ -221,6 +245,72 @@ public class PlanController {
 							return "plans/list";
 						}));
 			});
+	}
+
+	/**
+	 * Downloads one plan as a transfer document. Secrets leave masked, so the file is
+	 * safe to share or commit.
+	 * @param id the plan to export
+	 * @return the document as a download
+	 */
+	@GetMapping("/plans/{id}/export")
+	@ResponseBody
+	public Mono<ResponseEntity<TestPlanExport>> exportTestPlan(@PathVariable Long id) {
+		return this.testPlanRepository.findById(id)
+			.map((plan) -> asDownload(this.planPortabilityService.export(List.of(plan)),
+					"orthrus-plan-" + slugify(plan.getName()) + ".json"))
+			.switchIfEmpty(Mono.error(new IllegalArgumentException("Test plan not found")));
+	}
+
+	/**
+	 * Downloads every plan as a single transfer document.
+	 * @return the document as a download
+	 */
+	@GetMapping("/plans/export")
+	@ResponseBody
+	public Mono<ResponseEntity<TestPlanExport>> exportAllTestPlans() {
+		return this.testPlanRepository.findAll()
+			.collectList()
+			.map((plans) -> asDownload(this.planPortabilityService.export(plans), "orthrus-plans.json"));
+	}
+
+	/**
+	 * Creates plans from an uploaded transfer document. Existing plans are never
+	 * overwritten; a name already in use is suffixed.
+	 * @param file the uploaded document
+	 * @return a redirect back to the plan list, carrying the outcome
+	 */
+	@PostMapping("/plans/import")
+	public Mono<String> importTestPlans(@RequestPart("file") FilePart file) {
+		return DataBufferUtils.join(file.content(), MAX_IMPORT_BYTES).map((buffer) -> {
+			byte[] bytes = new byte[buffer.readableByteCount()];
+			buffer.read(bytes);
+			DataBufferUtils.release(buffer);
+			return new String(bytes, StandardCharsets.UTF_8);
+		})
+			.map((json) -> this.objectMapper.readValue(json, TestPlanExport.class))
+			.flatMap(this.planPortabilityService::importPlans)
+			.map((report) -> "redirect:/plans?imported=" + report.imported().size() + "&secrets="
+					+ report.plansNeedingSecrets().size())
+			.onErrorResume((ex) -> {
+				log.warn("Test plan import failed", ex);
+				return Mono.just("redirect:/plans?importError");
+			});
+	}
+
+	private ResponseEntity<TestPlanExport> asDownload(TestPlanExport export, String filename) {
+		return ResponseEntity.ok()
+			.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+			.contentType(MediaType.APPLICATION_JSON)
+			.body(export);
+	}
+
+	private static String slugify(String name) {
+		if (name == null || name.isBlank()) {
+			return "plan";
+		}
+		String slug = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+		return slug.isBlank() ? "plan" : slug;
 	}
 
 	@PostMapping("/plans/{id}/run")
