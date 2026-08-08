@@ -70,10 +70,31 @@ class PlanPageRenderingTest {
 		// is
 		// silently dropped. Assert on the script's own identifiers: the token header name
 		// also appears in the layout's meta tags, which would mask its absence.
-		assertThat(body).as("import form").contains("id=\"planImportForm\"");
-		assertThat(body).as("upload script survived the layout").contains("planImportFile");
-		assertThat(body).as("script posts to the import endpoint").contains("fetch(form.action");
+		assertThat(body).as("file input").contains("id=\"planImportFile\"");
+		assertThat(body).as("upload script survived the layout").contains("fetch(input.dataset.importUrl");
+		assertThat(body).as("endpoint published to the script").contains("data-import-url=\"/plans/import\"");
 		assertThat(body).as("token read from the layout meta tags").contains("meta[name=\"_csrf_header\"]");
+	}
+
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	void theToolbarButtonsShareOneSizeAndFamily() {
+		String toolbar = toolbarOf(renderPlans("/plans"));
+
+		// Import used to sit inside a form, which took the flex stretch for itself and
+		// left
+		// the label shorter than its neighbours.
+		assertThat(toolbar).as("import is a plain sibling, not wrapped in a form").doesNotContain("<form");
+		assertThat(toolbar).as("import button family").contains("btn btn-outline-primary");
+		assertThat(toolbar).as("no control is a size down").doesNotContain("btn-sm");
+	}
+
+	private String toolbarOf(String body) {
+		int start = body.indexOf("planImportFile");
+		int end = body.indexOf("Create New Plan", start);
+		assertThat(start).as("toolbar present").isGreaterThan(-1);
+		assertThat(end).as("toolbar complete").isGreaterThan(start);
+		return body.substring(start, end);
 	}
 
 	@Test
