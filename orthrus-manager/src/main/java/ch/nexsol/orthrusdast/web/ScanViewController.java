@@ -37,11 +37,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.TestPlanEntity;
@@ -51,9 +51,9 @@ import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.ScanGrade;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
-import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.repository.TestPlanRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
@@ -73,24 +73,21 @@ public class ScanViewController {
 
 	private final TestPlanRepository testPlanRepository;
 
-	private final SlaveNodeRepository slaveNodeRepository;
-
 	private final JobEventPublisher jobEventPublisher;
 
 	private final ObjectMapper objectMapper;
 
-	private final WebClient webClient;
+	private final JobOrchestratorService jobOrchestratorService;
 
 	public ScanViewController(ScanJobRepository scanJobRepository, ScanResultService scanResultService,
-			TestPlanRepository testPlanRepository, SlaveNodeRepository slaveNodeRepository,
-			JobEventPublisher jobEventPublisher, ObjectMapper objectMapper, WebClient.Builder webClientBuilder) {
+			TestPlanRepository testPlanRepository, JobEventPublisher jobEventPublisher, ObjectMapper objectMapper,
+			JobOrchestratorService jobOrchestratorService) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanResultService = scanResultService;
 		this.testPlanRepository = testPlanRepository;
-		this.slaveNodeRepository = slaveNodeRepository;
 		this.jobEventPublisher = jobEventPublisher;
 		this.objectMapper = objectMapper;
-		this.webClient = webClientBuilder.build();
+		this.jobOrchestratorService = jobOrchestratorService;
 	}
 
 	@GetMapping("/scans/{id}/details")
@@ -148,7 +145,7 @@ public class ScanViewController {
 							model.addAttribute("countMedium", medium);
 							model.addAttribute("countLow", low);
 							model.addAttribute("countInfo", info);
-							model.addAttribute("globalGrade", computeGrade(result.riskSummary()));
+							model.addAttribute("globalGrade", ScanGrade.of(result.riskSummary()));
 
 							if (result.attempts() != null && !result.attempts().isEmpty()) {
 								LinkedHashMap<String, List<ScanAttempt>> grouped = new LinkedHashMap<>();
@@ -191,32 +188,7 @@ public class ScanViewController {
 
 	@PostMapping("/scans/{id}/cancel")
 	public Mono<String> cancelScan(@PathVariable Long id) {
-		return scanJobRepository.findById(id).flatMap((job) -> {
-			if (job.getStatus() == JobStatus.PENDING) {
-				job.setStatus(JobStatus.CANCELLED);
-				return scanJobRepository.save(job)
-					.doOnSuccess((j) -> jobEventPublisher.emit(j.getId(),
-							JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")));
-			}
-			else if (job.getStatus() == JobStatus.RUNNING) {
-				job.setStatus(JobStatus.CANCELLED);
-				return scanJobRepository.save(job)
-					.doOnSuccess((j) -> jobEventPublisher.emit(j.getId(),
-							JobEvent.failed(j.getId(), j.getTarget(), "Scan cancelled by user")))
-					.flatMap((j) -> {
-						if (job.getAssignedSlaveId() != null) {
-							return slaveNodeRepository.findById(job.getAssignedSlaveId())
-								.flatMap((slave) -> webClient.delete()
-									.uri(slave.getUrl() + "/api/v1/slave/scans/" + id)
-									.retrieve()
-									.bodyToMono(Void.class)
-									.onErrorResume((e) -> Mono.empty()));
-						}
-						return Mono.empty();
-					});
-			}
-			return Mono.empty();
-		}).thenReturn("redirect:/scans/all");
+		return this.jobOrchestratorService.cancelJob(id).thenReturn("redirect:/scans/all");
 	}
 
 	@GetMapping("/scans/all")
@@ -252,7 +224,7 @@ public class ScanViewController {
 							if (job.getStatus() == JobStatus.COMPLETED && job.getResultId() != null) {
 								return scanResultService.findById(job.getResultId()).map((result) -> {
 									map.put("result", result);
-									map.put("globalGrade", computeGrade(result.riskSummary()));
+									map.put("globalGrade", ScanGrade.of(result.riskSummary()));
 									return map;
 								}).defaultIfEmpty(map);
 							}
@@ -342,6 +314,7 @@ public class ScanViewController {
 				model.addAttribute("createdAt", job.getCreatedAt());
 				model.addAttribute("status", job.getStatus().name());
 				model.addAttribute("resultId", job.getResultId());
+				model.addAttribute("assignedSlaveId", job.getAssignedSlaveId());
 
 				return Mono
 					.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))
@@ -351,7 +324,7 @@ public class ScanViewController {
 						if (job.getStatus() == JobStatus.COMPLETED && job.getResultId() != null) {
 							return scanResultService.findById(job.getResultId()).doOnNext((result) -> {
 								model.addAttribute("result", result);
-								model.addAttribute("globalGrade", computeGrade(result.riskSummary()));
+								model.addAttribute("globalGrade", ScanGrade.of(result.riskSummary()));
 							}).then();
 						}
 						return Mono.empty();
@@ -384,27 +357,6 @@ public class ScanViewController {
 				}
 				return jobs;
 			});
-	}
-
-	/**
-	 * Computes the A-F grade of a scan from its risk summary.
-	 * @param riskSummary the risk summary
-	 * @return the grade string
-	 */
-	private static String computeGrade(Map<RiskLevel, Long> riskSummary) {
-		if (riskSummary.getOrDefault(RiskLevel.CRITICAL, 0L) > 0) {
-			return "F";
-		}
-		if (riskSummary.getOrDefault(RiskLevel.HIGH, 0L) > 0) {
-			return "D";
-		}
-		if (riskSummary.getOrDefault(RiskLevel.MEDIUM, 0L) > 0) {
-			return "C";
-		}
-		if (riskSummary.getOrDefault(RiskLevel.LOW, 0L) > 0) {
-			return "B";
-		}
-		return "A";
 	}
 
 }

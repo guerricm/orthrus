@@ -1,14 +1,14 @@
 CREATE TABLE IF NOT EXISTS "scan_results" (
     id VARCHAR(255) PRIMARY KEY,
     target_url VARCHAR(2048),
-    scan_start_time TIMESTAMP,
-    scan_end_time TIMESTAMP,
+    scan_start_time TIMESTAMP WITH TIME ZONE,
+    scan_end_time TIMESTAMP WITH TIME ZONE,
     operations_discovered INT,
     operations_scanned INT
 );
 
 CREATE TABLE IF NOT EXISTS "scan_attempts" (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     scan_result_id VARCHAR(255),
     scanner_id VARCHAR(100),
     scanner_name VARCHAR(100),
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS "scan_attempts" (
 );
 
 CREATE TABLE IF NOT EXISTS "vulnerabilities" (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     scan_result_id VARCHAR(255),
     vulnerability_title VARCHAR(255),
     vulnerability_description TEXT,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS "vulnerabilities" (
     cwe_id VARCHAR(50),
     cwe_name VARCHAR(255),
     capec_ids VARCHAR(255),
-    cvss_base_score DOUBLE,
+    cvss_base_score DOUBLE PRECISION,
     evidence TEXT,
     recommendation TEXT,
     request_summary TEXT,
@@ -55,32 +55,32 @@ CREATE TABLE IF NOT EXISTS "slave_nodes" (
     max_concurrent_scans INT DEFAULT 10,
     capabilities VARCHAR(1024),
     is_active BOOLEAN DEFAULT TRUE,
-    last_seen_at TIMESTAMP
+    last_seen_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS "test_plans" (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     discoverer_id VARCHAR(100),
     target VARCHAR(2048),
     scan_configuration_json TEXT,
-    created_at TIMESTAMP,
-    last_modified_at TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE,
+    last_modified_at TIMESTAMP WITH TIME ZONE,
     created_by VARCHAR(255),
     last_modified_by VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS "scan_jobs" (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     discoverer_id VARCHAR(100),
     target VARCHAR(2048),
     scan_configuration_json TEXT,
     status VARCHAR(50) NOT NULL,
     assigned_slave_id VARCHAR(255),
-    created_at TIMESTAMP,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
     retry_count INT DEFAULT 0,
     test_plan_id BIGINT,
     result_id VARCHAR(255),
@@ -101,15 +101,15 @@ ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);
 ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS last_modified_by VARCHAR(255);
 
 CREATE TABLE IF NOT EXISTS "scan_tasks" (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     scan_job_id BIGINT NOT NULL,
     phase VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL,
     assigned_slave_id VARCHAR(255),
     endpoints_payload TEXT,
-    created_at TIMESTAMP,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
     retry_count INT DEFAULT 0,
     FOREIGN KEY (scan_job_id) REFERENCES "scan_jobs"(id) ON DELETE CASCADE
 );

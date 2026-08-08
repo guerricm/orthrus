@@ -25,9 +25,9 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
   r2dbc:
-    url: r2dbc:h2:file:///./orthrus_db/data;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
-    username: sa
-    password: ""
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:45432/orthrus}
+    username: ${SPRING_R2DBC_USERNAME:orthrus}
+    password: ${SPRING_R2DBC_PASSWORD:orthrus}
   sql:
     init:
       mode: always

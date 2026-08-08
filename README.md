@@ -106,14 +106,19 @@ docker-compose up -d
 ```
 
 ### Running Manually (Java)
-1. **Start the Master node** (orchestrates scans and provides the Web UI):
+1. **Start postgresql:
+   ```bash
+   docker run --name orthrus_database -p "45432:5432" -e POSTGRES_DB=orthrus -e POSTGRES_USER=orthrus -e POSTGRES_PASSWORD=orthrus -d postgres:17
+   ```
+2. **Start the Master node** (orchestrates scans and provides the Web UI):
    ```bash
    java -jar orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar
    ```
-2. **Start one or more Slave nodes** (executes the actual high-concurrency scans):
+3. **Start one or more Slave nodes** (executes the actual high-concurrency scans):
    ```bash
    java -jar orthrus-worker/target/orthrus-worker-0.0.1-SNAPSHOT.jar --server.port=8081
    ```
+
 
 ### Security & Authentication
 > **Note**: The Web UI and API are secured by default. You must log in using the default credentials:

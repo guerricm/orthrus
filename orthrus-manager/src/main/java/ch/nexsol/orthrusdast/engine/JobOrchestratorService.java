@@ -16,11 +16,14 @@
 
 package ch.nexsol.orthrusdast.engine;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -29,44 +32,84 @@ import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
+import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.sse.JobEvent;
+import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 
+/**
+ * Owns the lifecycle of a scan job: splitting it into per-family tasks, reacting to task
+ * outcomes, and closing the job once no task is left running.
+ */
 @Service
 public class JobOrchestratorService {
 
 	private static final Logger log = LoggerFactory.getLogger(JobOrchestratorService.class);
 
+	/**
+	 * How many times a task is requeued before the job is failed.
+	 */
+	static final int MAX_TASK_ATTEMPTS = 3;
+
 	private final ScanJobRepository scanJobRepository;
 
 	private final ScanTaskRepository scanTaskRepository;
 
-	private final ch.nexsol.orthrusdast.engine.ScanResultService scanResultService;
+	private final ScanResultService scanResultService;
 
-	private final ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher;
+	private final JobEventPublisher jobEventPublisher;
+
+	private final SlaveNodeRepository slaveNodeRepository;
+
+	private final WebClient webClient;
 
 	public JobOrchestratorService(ScanJobRepository scanJobRepository, ScanTaskRepository scanTaskRepository,
-			ch.nexsol.orthrusdast.engine.ScanResultService scanResultService,
-			ch.nexsol.orthrusdast.sse.JobEventPublisher jobEventPublisher) {
+			ScanResultService scanResultService, JobEventPublisher jobEventPublisher,
+			SlaveNodeRepository slaveNodeRepository, WebClient.Builder webClientBuilder) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
 		this.scanResultService = scanResultService;
 		this.jobEventPublisher = jobEventPublisher;
+		this.slaveNodeRepository = slaveNodeRepository;
+		this.webClient = webClientBuilder.build();
 	}
 
 	public Mono<Void> processPendingJobs() {
-		return scanJobRepository.findByStatus(JobStatus.PENDING).flatMap((job) -> {
-			log.info("Orchestrating new job: {}", job.getId());
-			job.setStatus(JobStatus.RUNNING);
-			job.setStartedAt(Instant.now());
-			job.setResultId(java.util.UUID.randomUUID().toString());
-			return scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(), job.getStartedAt())
-				.then(scanJobRepository.save(job))
-				.flatMap((savedJob) -> {
-					jobEventPublisher.emit(savedJob.getId(), JobEvent.running(savedJob.getId(), savedJob.getTarget()));
-					return createFamilyTasks(savedJob);
-				});
-		}).then();
+		return this.scanJobRepository.findByStatus(JobStatus.PENDING).concatMap(this::startJob).then();
+	}
+
+	/**
+	 * Moves one queued job into execution: claim it, give it a result row to write into,
+	 * then split it into per-family tasks.
+	 * @param job the queued job
+	 * @return completion signal
+	 */
+	private Mono<Void> startJob(ScanJobEntity job) {
+		Instant startedAt = Instant.now();
+		String resultId = UUID.randomUUID().toString();
+
+		return this.scanJobRepository.claimForOrchestration(job.getId(), startedAt)
+			.defaultIfEmpty(0)
+			.flatMap((claimed) -> {
+				if (claimed != 1) {
+					log.debug("Job {} was already picked up by another dispatch cycle.", job.getId());
+					return Mono.empty();
+				}
+
+				log.info("Orchestrating new job: {}", job.getId());
+				job.setStatus(JobStatus.RUNNING);
+				job.setStartedAt(startedAt);
+				job.setResultId(resultId);
+
+				// scan_jobs.result_id is a foreign key onto scan_results.
+				return this.scanResultService.createPlaceholderResult(resultId, job.getTarget(), startedAt)
+					.then(this.scanJobRepository.attachResult(job.getId(), resultId))
+					.then(Mono.defer(() -> {
+						this.jobEventPublisher.emit(job.getId(), JobEvent.running(job.getId(), job.getTarget()));
+						return createFamilyTasks(job);
+					}));
+			})
+			.then();
 	}
 
 	private Mono<Void> createFamilyTasks(ScanJobEntity job) {
@@ -76,103 +119,188 @@ public class JobOrchestratorService {
 			subTask.setPhase(family.name());
 			subTask.setStatus(JobStatus.PENDING);
 			subTask.setCreatedAt(Instant.now());
-			return scanTaskRepository.save(subTask);
+			return this.scanTaskRepository.save(subTask);
 		}).then();
 	}
 
 	public Mono<Void> onScanTaskComplete(Long taskId, int testsCount, int vulnsCount) {
-		return scanTaskRepository.findById(taskId).flatMap((task) -> {
+		return this.scanTaskRepository.findById(taskId).flatMap((task) -> {
 			log.info("Scan task {} (Family: {}) completed. {} tests executed, {} vulnerabilities found.", taskId,
 					task.getPhase(), testsCount, vulnsCount);
 			task.setStatus(JobStatus.COMPLETED);
 			task.setCompletedAt(Instant.now());
-			return scanTaskRepository.save(task).flatMap((savedTask) -> checkJobCompletion(task.getScanJobId()));
+			return this.scanTaskRepository.save(task)
+				.flatMap((savedTask) -> checkJobCompletion(savedTask.getScanJobId()));
 		});
 	}
 
 	public Mono<Void> onTaskFailed(Long taskId, String reason) {
-		return scanTaskRepository.findById(taskId).flatMap((task) -> {
-			int retryCount = (task.getRetryCount() != null) ? task.getRetryCount() : 0;
-			if (retryCount < 3) {
-				log.warn("Task {} failed (Attempt {}). Reason: {}. Retrying...", taskId, retryCount + 1, reason);
-				task.setRetryCount(retryCount + 1);
-				task.setStatus(JobStatus.PENDING);
-				task.setAssignedSlaveId(null);
-				task.setStartedAt(null);
-				return scanTaskRepository.save(task).then();
+		return this.scanTaskRepository.findById(taskId).flatMap((task) -> {
+			int attempts = (task.getRetryCount() != null) ? task.getRetryCount() : 0;
+			if (attempts < MAX_TASK_ATTEMPTS) {
+				log.warn("Task {} failed (Attempt {}). Reason: {}. Retrying...", taskId, attempts + 1, reason);
+				return requeue(task).then();
 			}
-			else {
-				log.error("Task {} permanently failed after {} attempts: {}", taskId, retryCount, reason);
-				task.setStatus(JobStatus.FAILED);
-				task.setCompletedAt(Instant.now());
-				return scanTaskRepository.save(task).flatMap((savedTask) -> checkJobCompletion(task.getScanJobId()));
-			}
+			log.error("Task {} permanently failed after {} attempts: {}", taskId, attempts, reason);
+			task.setStatus(JobStatus.FAILED);
+			task.setCompletedAt(Instant.now());
+			return this.scanTaskRepository.save(task)
+				.flatMap((savedTask) -> checkJobCompletion(savedTask.getScanJobId()));
 		});
 	}
 
+	/**
+	 * Requeues every task a worker was still holding, for when it re-registers after a
+	 * restart or is detected offline.
+	 * @param slaveId the worker that dropped its work
+	 * @param reason why the tasks are being recovered
+	 * @return completion signal
+	 */
+	public Mono<Void> recoverTasksOfSlave(String slaveId, String reason) {
+		return this.scanTaskRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap((task) -> {
+			int attempts = (task.getRetryCount() != null) ? task.getRetryCount() : 0;
+			if (attempts < MAX_TASK_ATTEMPTS) {
+				log.info("Requeueing task {} (Attempt {}) because slave {} dropped it: {}", task.getId(), attempts + 1,
+						slaveId, reason);
+				return requeue(task).then();
+			}
+			log.warn("Failing task {} after {} attempts, slave {} dropped it: {}", task.getId(), attempts, slaveId,
+					reason);
+			task.setStatus(JobStatus.FAILED);
+			task.setCompletedAt(Instant.now());
+			return this.scanTaskRepository.save(task)
+				.flatMap((savedTask) -> checkJobCompletion(savedTask.getScanJobId()));
+		}).then();
+	}
+
+	private Mono<ScanTaskEntity> requeue(ScanTaskEntity task) {
+		int attempts = (task.getRetryCount() != null) ? task.getRetryCount() : 0;
+		task.setRetryCount(attempts + 1);
+		task.setStatus(JobStatus.PENDING);
+		task.setAssignedSlaveId(null);
+		task.setStartedAt(null);
+		return this.scanTaskRepository.save(task);
+	}
+
+	/**
+	 * Cancels a job: its queued and running tasks are marked cancelled, and every worker
+	 * holding one of them is told to drop it.
+	 * @param jobId the job to cancel
+	 * @return completion signal
+	 */
+	public Mono<Void> cancelJob(Long jobId) {
+		return this.scanJobRepository.findById(jobId)
+			.flatMap((job) -> this.scanJobRepository.cancelJob(jobId, Instant.now())
+				.defaultIfEmpty(0)
+				.filter((cancelled) -> cancelled == 1)
+				.flatMap((cancelled) -> {
+					job.setStatus(JobStatus.CANCELLED);
+					return this.scanTaskRepository.findByScanJobId(jobId)
+						.filter((task) -> task.getStatus() == JobStatus.PENDING
+								|| task.getStatus() == JobStatus.RUNNING)
+						.concatMap(this::cancelTask)
+						.then(Mono.fromRunnable(() -> {
+							this.jobEventPublisher.emit(jobId,
+									JobEvent.failed(jobId, job.getTarget(), "Scan cancelled by user"));
+							this.jobEventPublisher.complete(jobId);
+						}));
+				}))
+			.then();
+	}
+
+	private Mono<Void> cancelTask(ScanTaskEntity task) {
+		String slaveId = task.getAssignedSlaveId();
+		task.setStatus(JobStatus.CANCELLED);
+		task.setCompletedAt(Instant.now());
+
+		Mono<Void> notifySlave = (slaveId != null) ? this.slaveNodeRepository.findById(slaveId)
+			.flatMap((slave) -> this.webClient.delete()
+				.uri(slave.getUrl() + "/api/v1/slave/tasks/" + task.getId())
+				.retrieve()
+				.bodyToMono(Void.class)
+				.timeout(Duration.ofSeconds(5))
+				.onErrorResume((e) -> {
+					log.warn("Could not cancel task {} on slave {}: {}", task.getId(), slaveId, e.getMessage());
+					return Mono.empty();
+				}))
+			.then() : Mono.empty();
+
+		return this.scanTaskRepository.save(task).then(notifySlave);
+	}
+
+	/**
+	 * Completes a task no node in the fleet can run, so its job is not held open by a
+	 * capability the fleet lacks.
+	 * @param taskId the unplaceable task
+	 * @param reason why no node can run it
+	 * @return completion signal
+	 */
+	public Mono<Void> onTaskUnsupported(Long taskId, String reason) {
+		return this.scanTaskRepository.findById(taskId)
+			.flatMap((task) -> this.scanTaskRepository.completeUnsupported(taskId, Instant.now())
+				.defaultIfEmpty(0)
+				.flatMap((closed) -> {
+					if (closed != 1) {
+						log.debug("Task {} was already closed by another cycle.", taskId);
+						return Mono.empty();
+					}
+					log.info("Task {} ({}) completed without running: {}", taskId, task.getPhase(), reason);
+					return checkJobCompletion(task.getScanJobId());
+				}));
+	}
+
 	private Mono<Void> checkJobCompletion(Long jobId) {
-		return scanTaskRepository.countActiveTasksForJob(jobId).flatMap((activeCount) -> {
-			if (activeCount == 0) {
-				log.info("All tasks completed or failed for job {}", jobId);
-				return scanJobRepository.findById(jobId).flatMap((job) -> {
-					return scanTaskRepository.countFailedTasksForJob(jobId).flatMap((failedCount) -> {
-						if (failedCount > 0) {
-							job.setStatus(JobStatus.FAILED);
+		return this.scanTaskRepository.countActiveTasksForJob(jobId).flatMap((activeCount) -> {
+			if (activeCount > 0) {
+				return Mono.empty();
+			}
+			return this.scanJobRepository.findById(jobId)
+				.filter((job) -> job.getStatus() == JobStatus.RUNNING)
+				.flatMap((job) -> this.scanTaskRepository.countFailedTasksForJob(jobId)
+					.flatMap((failedCount) -> closeJob(job, failedCount > 0)));
+		});
+	}
+
+	/**
+	 * Writes the job's terminal status and announces the outcome. The status update is
+	 * conditional and only the caller that wins it publishes, so a job whose last tasks
+	 * finish at the same moment is still reported once.
+	 * @param job the job whose tasks have all finished
+	 * @param failed whether any of its tasks failed
+	 * @return completion signal
+	 */
+	private Mono<Void> closeJob(ScanJobEntity job, boolean failed) {
+		Instant completedAt = Instant.now();
+		JobStatus status = failed ? JobStatus.FAILED : JobStatus.COMPLETED;
+		int testsCount = (job.getTestsCount() != null) ? job.getTestsCount() : 0;
+
+		return this.scanJobRepository.finishJob(job.getId(), status.name(), completedAt)
+			.defaultIfEmpty(0)
+			.flatMap((finished) -> {
+				if (finished != 1) {
+					log.debug("Job {} was already finalised by another cycle.", job.getId());
+					return Mono.empty();
+				}
+
+				log.info("All tasks completed or failed for job {}", job.getId());
+				job.setStatus(status);
+				job.setCompletedAt(completedAt);
+
+				return this.scanResultService
+					.finalizeJobResult(job.getResultId(), job.getTarget(), job.getStartedAt(), completedAt, testsCount)
+					.doOnNext((result) -> {
+						if (status == JobStatus.FAILED) {
+							this.jobEventPublisher.emit(job.getId(),
+									JobEvent.failed(job.getId(), job.getTarget(), "Some tasks failed"));
 						}
 						else {
-							job.setStatus(JobStatus.COMPLETED);
+							this.jobEventPublisher.emit(job.getId(),
+									JobEvent.completed(job.getId(), job.getTarget(), result));
 						}
-						job.setCompletedAt(Instant.now());
-
-						int testsCount = (job.getTestsCount() != null) ? job.getTestsCount() : 0;
-
-						return scanResultService
-							.finalizeJobResult(job.getResultId(), job.getTarget(), job.getStartedAt(),
-									job.getCompletedAt(), testsCount)
-							.flatMap((result) -> scanJobRepository.save(job).doOnSuccess((j) -> {
-								if (j.getStatus() == JobStatus.FAILED) {
-									jobEventPublisher.emit(jobId,
-											JobEvent.failed(jobId, job.getTarget(), "Some tasks failed"));
-								}
-								else {
-									long critical = result.riskSummary()
-										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.CRITICAL, 0L);
-									long high = result.riskSummary()
-										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.HIGH, 0L);
-									long medium = result.riskSummary()
-										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.MEDIUM, 0L);
-									long low = result.riskSummary()
-										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.LOW, 0L);
-									String grade = "A";
-									if (critical > 0) {
-										grade = "F";
-									}
-									else if (high > 0) {
-										grade = "D";
-									}
-									else if (medium > 0) {
-										grade = "C";
-									}
-									else if (low > 0) {
-										grade = "B";
-									}
-
-									long info = result.riskSummary()
-										.getOrDefault(ch.nexsol.orthrusdast.model.RiskLevel.INFO, 0L);
-
-									jobEventPublisher.emit(jobId,
-											JobEvent.completed(jobId, job.getTarget(), result.id(), grade,
-													result.vulnerabilities().size(), critical, high, medium, low, info,
-													result.operationsScanned()));
-								}
-								jobEventPublisher.complete(jobId);
-							}))
-							.then();
-					});
-				});
-			}
-			return Mono.empty();
-		});
+						this.jobEventPublisher.complete(job.getId());
+					})
+					.then();
+			});
 	}
 
 }

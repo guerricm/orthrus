@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -73,25 +74,12 @@ public class OidcRoleMapper {
 			return new DefaultOidcUser(mappedAuthorities, oidcUser.getIdToken(), oidcUser.getUserInfo()) {
 				@Override
 				public String getName() {
-					if (getAttributes().containsKey("preferred_username")) {
-						return getAttributes().get("preferred_username").toString();
-					}
-					if (finalAccessTokenAttrs != null && finalAccessTokenAttrs.containsKey("preferred_username")) {
-						return finalAccessTokenAttrs.get("preferred_username").toString();
-					}
-					if (getAttributes().containsKey("name")) {
-						return getAttributes().get("name").toString();
-					}
-					return super.getName();
+					return displayName(getAttributes(), finalAccessTokenAttrs, super::getName);
 				}
 
 				@Override
 				public Map<String, Object> getAttributes() {
-					Map<String, Object> attrs = new HashMap<>(super.getAttributes());
-					if (finalAccessTokenAttrs != null) {
-						attrs.putAll(finalAccessTokenAttrs);
-					}
-					return attrs;
+					return mergeAttributes(super.getAttributes(), finalAccessTokenAttrs);
 				}
 			};
 		});
@@ -131,28 +119,50 @@ public class OidcRoleMapper {
 			return new DefaultOAuth2User(mappedAuthorities, oauth2User.getAttributes(), userNameAttributeName) {
 				@Override
 				public String getName() {
-					if (getAttributes().containsKey("preferred_username")) {
-						return getAttributes().get("preferred_username").toString();
-					}
-					if (finalAccessTokenAttrs != null && finalAccessTokenAttrs.containsKey("preferred_username")) {
-						return finalAccessTokenAttrs.get("preferred_username").toString();
-					}
-					if (getAttributes().containsKey("name")) {
-						return getAttributes().get("name").toString();
-					}
-					return super.getName();
+					return displayName(getAttributes(), finalAccessTokenAttrs, super::getName);
 				}
 
 				@Override
 				public Map<String, Object> getAttributes() {
-					Map<String, Object> attrs = new HashMap<>(super.getAttributes());
-					if (finalAccessTokenAttrs != null) {
-						attrs.putAll(finalAccessTokenAttrs);
-					}
-					return attrs;
+					return mergeAttributes(super.getAttributes(), finalAccessTokenAttrs);
 				}
 			};
 		});
+	}
+
+	/**
+	 * Resolves the name shown in the UI. Keycloak puts the human-readable handle in
+	 * {@code preferred_username}, which may live on the ID token or only on the access
+	 * token; the {@code sub} UUID that Spring falls back to is unusable in a UI.
+	 * @param attributes the user's merged attributes
+	 * @param accessTokenAttributes claims parsed out of the access token, may be null
+	 * @param fallback the framework default, used when no readable name is present
+	 * @return the name to display
+	 */
+	static String displayName(Map<String, Object> attributes, Map<String, Object> accessTokenAttributes,
+			Supplier<String> fallback) {
+		for (Map<String, Object> source : List.of(attributes,
+				(accessTokenAttributes != null) ? accessTokenAttributes : Map.<String, Object>of())) {
+			Object preferred = source.get("preferred_username");
+			if (preferred != null) {
+				return preferred.toString();
+			}
+		}
+		Object name = attributes.get("name");
+		return (name != null) ? name.toString() : fallback.get();
+	}
+
+	/**
+	 * @param base the attributes resolved by Spring Security
+	 * @param accessTokenAttributes claims parsed out of the access token, may be null
+	 * @return the two sets merged, access-token claims winning
+	 */
+	static Map<String, Object> mergeAttributes(Map<String, Object> base, Map<String, Object> accessTokenAttributes) {
+		Map<String, Object> merged = new HashMap<>(base);
+		if (accessTokenAttributes != null) {
+			merged.putAll(accessTokenAttributes);
+		}
+		return merged;
 	}
 
 	private Map<String, Object> extractRolesFromAccessToken(String tokenValue,

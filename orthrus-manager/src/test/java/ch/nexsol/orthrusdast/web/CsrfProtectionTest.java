@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Verifies that CSRF protection is active on session-based UI endpoints and disabled on
  * the token-secured APIs.
  */
-@SpringBootTest(properties = { "spring.r2dbc.url=r2dbc:h2:mem:///csrftestdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+@SpringBootTest(properties = {
+		"spring.r2dbc.url=r2dbc:h2:mem:///csrftestdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
 		"spring.r2dbc.username=sa", "spring.r2dbc.password=" })
 @AutoConfigureWebTestClient
 class CsrfProtectionTest {

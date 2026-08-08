@@ -39,6 +39,7 @@
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
         <checkstyle.version>12.3.1</checkstyle.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
+        <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -150,9 +151,10 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Modules that expose HTTP endpoints add spring-boot-starter-webflux on top. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <artifactId>spring-boot-starter-webclient</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -221,16 +223,14 @@
                             <testSourceDirectory>src${file.separator}test${file.separator}java</testSourceDirectory>
                         </testSourceDirectories>
                     </configuration>
+                    <!-- Reports violations; run spring-javaformat:apply to fix them. -->
                     <executions>
                         <execution>
-                            <id>format-code-apply</id>
-                            <phase>generate-sources</phase>
+                            <id>format-code-validate</id>
+                            <phase>validate</phase>
                             <inherited>true</inherited>
-                            <configuration>
-                                <skip>false</skip>
-                            </configuration>
                             <goals>
-                                <goal>apply</goal>
+                                <goal>validate</goal>
                             </goals>
                         </execution>
                     </executions>
@@ -240,8 +240,9 @@
                     <artifactId>maven-checkstyle-plugin</artifactId>
                     <version>${maven-checkstyle-plugin.version}</version>
                     <configuration>
-                        <configLocation>src/checkstyle/checkstyle.xml</configLocation>
-                        <headerLocation>src/checkstyle/checkstyle-header.txt</headerLocation>
+                        <!-- Absolute, so it resolves the same from every module. -->
+                        <configLocation>${maven.multiModuleProjectDirectory}/src/checkstyle/checkstyle.xml</configLocation>
+                        <headerLocation>${maven.multiModuleProjectDirectory}/src/checkstyle/checkstyle-header.txt</headerLocation>
                         <consoleOutput>true</consoleOutput>
                         <failOnViolation>true</failOnViolation>
                         <includeTestSourceDirectory>true</includeTestSourceDirectory>
@@ -271,6 +272,49 @@
                         <phase>package</phase>
                         <goals>
                             <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Resolves ${revision} in the POMs that get installed and deployed. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten-clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>io.spring.javaformat</groupId>
+                <artifactId>spring-javaformat-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>checkstyle-validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>

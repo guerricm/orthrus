@@ -16,6 +16,12 @@
 
 package ch.nexsol.orthrusdast.sse;
 
+import java.util.Map;
+
+import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanGrade;
+import ch.nexsol.orthrusdast.model.ScanResult;
+
 /**
  * DTO representing a Server-Sent Event for a scan job lifecycle.
  */
@@ -42,6 +48,22 @@ public record JobEvent(Long jobId, String status, // PENDING, RUNNING, COMPLETED
 			int operationsScanned) {
 		return new JobEvent(jobId, "COMPLETED", target, resultId, "/web/scans/" + resultId + "/pdf", grade, totalVulns,
 				criticalVulns, highVulns, mediumVulns, lowVulns, infoVulns, operationsScanned, "Scan completed!");
+	}
+
+	/**
+	 * Builds the completion event from a scan result, deriving the grade and the per-risk
+	 * counters.
+	 * @param jobId the job that produced the result
+	 * @param target the scanned target
+	 * @param result the finalized scan result
+	 * @return the completion event
+	 */
+	public static JobEvent completed(Long jobId, String target, ScanResult result) {
+		Map<RiskLevel, Long> risk = result.riskSummary();
+		return completed(jobId, target, result.id(), ScanGrade.of(risk), result.vulnerabilities().size(),
+				risk.getOrDefault(RiskLevel.CRITICAL, 0L), risk.getOrDefault(RiskLevel.HIGH, 0L),
+				risk.getOrDefault(RiskLevel.MEDIUM, 0L), risk.getOrDefault(RiskLevel.LOW, 0L),
+				risk.getOrDefault(RiskLevel.INFO, 0L), result.operationsScanned());
 	}
 
 	public static JobEvent failed(Long jobId, String target, String reason) {

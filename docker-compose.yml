@@ -1,46 +1,74 @@
-version: '3.8'
-
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: orthrus-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-orthrus}
+      POSTGRES_USER: ${POSTGRES_USER:-orthrus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - orthrus_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The manager applies schema.sql on startup, so it must not start before the
+      # database accepts connections.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orthrus} -d ${POSTGRES_DB:-orthrus}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - orthrus-network
+
   orthrus-manager:
-    image: nexsoltech/orthrus-manager:0.0.1-SNAPSHOT # Replace with your actual registry/image tag
+    image: nexsoltech/orthrus-manager:1.0.0-SNAPSHOT # Replace with your actual registry/image tag
     container_name: orthrus-manager
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - ORTHRUS_MASTER_INTERNAL_TOKEN=super-secret-internal-token
-      - SPRING_R2DBC_URL=r2dbc:h2:file:////tmp/orthrus_db;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/${POSTGRES_DB:-orthrus}
+      SPRING_R2DBC_USERNAME: ${POSTGRES_USER:-orthrus}
+      SPRING_R2DBC_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Shared secret between the manager and its workers. The prod profile refuses to
+      # start while this, or the admin password below, is still the shipped default.
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-superadmin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       # Uncomment and configure these variables to enable Single Sign-On (SSO) with OpenID Connect (e.g. Keycloak, Auth0)
-      # - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID=orthrus-client
-      # - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET=your_client_secret
-      # - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_SCOPE=openid,profile,email
-      # - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI=https://your-idp.example.com/realms/master
+      # SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID: orthrus-client
+      # SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET: your_client_secret
+      # SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_SCOPE: openid,profile,email
+      # SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI: https://your-idp.example.com/realms/master
       # Enable Resource Server to accept JWT Bearer tokens on the API:
-      # - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://your-idp.example.com/realms/master
-    volumes:
-      - orthrus_db_data:/tmp # Mount H2 database data
+      # SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://your-idp.example.com/realms/master
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - orthrus-network
 
   orthrus-worker:
-    image: nexsoltech/orthrus-worker:0.0.1-SNAPSHOT # Replace with your actual registry/image tag
+    image: nexsoltech/orthrus-worker:1.0.0-SNAPSHOT # Replace with your actual registry/image tag
     container_name: orthrus-worker
     ports:
       - "8081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - ORTHRUS_MASTER_URL=http://orthrus-manager:8080
-      - ORTHRUS_MASTER_INTERNAL_TOKEN=super-secret-internal-token
-      - ORTHRUS_SLAVE_ID=slave-docker-node-1
-      - ORTHRUS_SLAVE_ADVERTISED_URL=http://orthrus-worker:8081
+      SPRING_PROFILES_ACTIVE: prod
+      ORTHRUS_MASTER_URL: http://orthrus-manager:8080
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ORTHRUS_SLAVE_ID: slave-docker-node-1
+      ORTHRUS_SLAVE_ADVERTISED_URL: http://orthrus-worker:8081
     depends_on:
       orthrus-manager:
         condition: service_started
+    restart: unless-stopped
     networks:
       - orthrus-network
 
 volumes:
-  orthrus_db_data:
+  orthrus_pgdata:
 
 networks:
   orthrus-network:

@@ -16,6 +16,7 @@
 
 package ch.nexsol.orthrusdast.web;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,7 @@ import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.entity.TestPlanEntity;
+import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
@@ -61,8 +63,6 @@ public class PlanController {
 
 	private static final Logger log = LoggerFactory.getLogger(PlanController.class);
 
-	static final List<String> DEFAULT_DISCOVERERS = List.of("openapi", "graphql", "blackbox", "well-known", "curl");
-
 	private final TestPlanRepository testPlanRepository;
 
 	private final ScanJobRepository scanJobRepository;
@@ -79,10 +79,16 @@ public class PlanController {
 
 	private final WebClient webClient;
 
+	/**
+	 * Offered when the fleet cannot be reached, so the editor still lists every
+	 * discoverer this build ships rather than a hand-maintained subset.
+	 */
+	private final List<String> defaultDiscoverers;
+
 	public PlanController(TestPlanRepository testPlanRepository, ScanJobRepository scanJobRepository,
 			SlaveNodeRepository slaveNodeRepository, ScanTaskRepository scanTaskRepository,
 			OAuth2TokenFetcher tokenFetcher, ObjectMapper objectMapper, JobEventPublisher jobEventPublisher,
-			WebClient.Builder webClientBuilder) {
+			WebClient.Builder webClientBuilder, List<EndpointDiscoverer> discoverers) {
 		this.testPlanRepository = testPlanRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -91,6 +97,7 @@ public class PlanController {
 		this.objectMapper = objectMapper;
 		this.jobEventPublisher = jobEventPublisher;
 		this.webClient = webClientBuilder.build();
+		this.defaultDiscoverers = discoverers.stream().map(EndpointDiscoverer::getId).sorted().toList();
 	}
 
 	@GetMapping("/plans/new")
@@ -145,7 +152,7 @@ public class PlanController {
 						return "plans/edit";
 					}).onErrorResume((e) -> {
 						log.warn("Failed to fetch capabilities from slave {}", activeSlave.getId(), e);
-						model.addAttribute("discoverers", DEFAULT_DISCOVERERS);
+						model.addAttribute("discoverers", this.defaultDiscoverers);
 						model.addAttribute("scanners", List.of());
 						model.addAttribute("error", "Failed to fetch capabilities from active slave: " + e.getMessage()
 								+ ". Using default discoverers.");
@@ -153,7 +160,7 @@ public class PlanController {
 					});
 				}
 				else {
-					model.addAttribute("discoverers", DEFAULT_DISCOVERERS);
+					model.addAttribute("discoverers", this.defaultDiscoverers);
 					model.addAttribute("scanners", List.of());
 					return Mono.just("plans/edit");
 				}
@@ -352,7 +359,7 @@ public class PlanController {
 					.defaultIfEmpty("fragments/plan-offcanvas :: edit")
 					.doOnNext((view) -> {
 						if (!model.containsAttribute("discoverers")) {
-							model.addAttribute("discoverers", DEFAULT_DISCOVERERS);
+							model.addAttribute("discoverers", this.defaultDiscoverers);
 							model.addAttribute("scanners", List.of());
 						}
 					}));
@@ -456,7 +463,10 @@ public class PlanController {
 		return webClient.get()
 			.uri(slave.getUrl() + "/api/v1/slave/capabilities")
 			.retrieve()
-			.bodyToMono(CapabilitiesResponse.class);
+			.bodyToMono(CapabilitiesResponse.class)
+			// This runs while a user waits on a page render, so an unresponsive node must
+			// not hold the response open.
+			.timeout(Duration.ofSeconds(5));
 	}
 
 	public record CapabilitiesResponse(List<String> discoverers, List<ScannerInfo> scanners) {
