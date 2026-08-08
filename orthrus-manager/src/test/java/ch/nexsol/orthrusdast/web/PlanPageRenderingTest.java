@@ -87,6 +87,13 @@ class PlanPageRenderingTest {
 		assertThat(toolbar).as("import is a plain sibling, not wrapped in a form").doesNotContain("<form");
 		assertThat(toolbar).as("import button family").contains("btn btn-outline-primary");
 		assertThat(toolbar).as("no control is a size down").doesNotContain("btn-sm");
+
+		// An inline icon otherwise sits on the text baseline, which places it off centre
+		// by
+		// an amount that depends on the glyph. Each control centres its own content
+		// instead.
+		long centred = toolbar.split("d-inline-flex align-items-center justify-content-center", -1).length - 1;
+		assertThat(centred).as("every toolbar control centres its icon and text").isEqualTo(3);
 	}
 
 	private String toolbarOf(String body) {
