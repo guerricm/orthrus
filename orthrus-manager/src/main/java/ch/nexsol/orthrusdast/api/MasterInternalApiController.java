@@ -18,8 +18,8 @@ package ch.nexsol.orthrusdast.api;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,23 +29,24 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
-import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
-import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
-import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
+import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
-import ch.nexsol.orthrusdast.sse.JobEvent;
-import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 
+/**
+ * Endpoints called by worker nodes, protected by a shared secret rather than by the
+ * session-cookie chain used for the UI.
+ */
 @RestController
 @RequestMapping("/api/internal")
 public class MasterInternalApiController {
 
-	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MasterInternalApiController.class);
+	private static final int DEFAULT_MAX_CONCURRENT_SCANS = 10;
 
 	private final SlaveNodeRepository slaveNodeRepository;
 
@@ -53,26 +54,23 @@ public class MasterInternalApiController {
 
 	private final ScanResultService scanResultService;
 
-	private final JobEventPublisher jobEventPublisher;
+	private final JobOrchestratorService jobOrchestratorService;
 
-	private final ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService;
-
-	private final ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository;
+	private final ScanTaskRepository scanTaskRepository;
 
 	public MasterInternalApiController(SlaveNodeRepository slaveNodeRepository, ScanJobRepository scanJobRepository,
-			ScanResultService scanResultService, JobEventPublisher jobEventPublisher,
-			ch.nexsol.orthrusdast.engine.JobOrchestratorService jobOrchestratorService,
-			ch.nexsol.orthrusdast.repository.ScanTaskRepository scanTaskRepository) {
+			ScanResultService scanResultService, JobOrchestratorService jobOrchestratorService,
+			ScanTaskRepository scanTaskRepository) {
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.scanResultService = scanResultService;
-		this.jobEventPublisher = jobEventPublisher;
 		this.jobOrchestratorService = jobOrchestratorService;
 		this.scanTaskRepository = scanTaskRepository;
 	}
 
 	/**
-	 * Called by Slave to register its presence.
+	 * Registers a worker. A worker that re-registers has restarted, so any task it was
+	 * still holding is requeued.
 	 * @param request the registration request
 	 * @return a mono containing the registered slave node
 	 */
@@ -80,205 +78,85 @@ public class MasterInternalApiController {
 	public Mono<ResponseEntity<SlaveNodeEntity>> registerSlave(@RequestBody SlaveRegistrationRequest request) {
 		SlaveNodeEntity node = new SlaveNodeEntity(request.id(), request.url(), NodeStatus.IDLE,
 				request.capabilities());
-		return slaveNodeRepository.findById(node.getId())
-			.flatMap((existing) -> slaveNodeRepository
-				.updateSlaveNodeUrlStatusCapabilitiesAndLastSeenAt(node.getId(), node.getUrl(), node.getStatus().name(),
-						node.getCapabilities(), node.getLastSeenAt())
-				.then(failZombieScansForSlave(node.getId()))
-				.thenReturn(ResponseEntity.ok(node)))
-			.switchIfEmpty(
-					Mono.defer(() -> slaveNodeRepository
-						.insertSlaveNode(node.getId(), node.getUrl(), node.getStatus(), node.getCapabilities(),
-								node.getLastSeenAt())
-						.thenReturn(ResponseEntity.ok(node))));
-	}
-
-	private Mono<Void> failZombieScansForSlave(String slaveId) {
-		return scanJobRepository.findByAssignedSlaveIdAndStatus(slaveId, JobStatus.RUNNING).flatMap((job) -> {
-			int retryCount = (job.getRetryCount() != null) ? job.getRetryCount() : 0;
-			if (retryCount < 3) {
-				log.info("Retrying zombie job {} (Attempt {}) because slave {} re-registered.", job.getId(),
-						(retryCount + 1), slaveId);
-				job.setRetryCount(retryCount + 1);
-				job.setStatus(JobStatus.PENDING);
-				job.setAssignedSlaveId(null);
-				job.setStartedAt(null);
-				return scanJobRepository.save(job).then();
-			}
-			else {
-				log.warn("Failing zombie job {} because slave {} re-registered.", job.getId(), slaveId);
-				job.setStatus(JobStatus.FAILED);
-				return scanJobRepository.save(job)
-					.doOnSuccess((j) -> jobEventPublisher.emit(j.getId(),
-							JobEvent.failed(j.getId(), j.getTarget(), "Slave node restarted")))
-					.then();
-			}
-		}).then();
+		return upsertNode(node)
+			.then(this.jobOrchestratorService.recoverTasksOfSlave(node.getId(), "Slave node restarted"))
+			.thenReturn(ResponseEntity.ok(node));
 	}
 
 	/**
-	 * Called by Slave to send a heartbeat.
+	 * Records the node, whether or not it is already known.
+	 * <p>
+	 * A worker registers on startup and re-registers whenever a heartbeat is rejected, so
+	 * two registrations can be in flight at once. Testing for the row first would let
+	 * both conclude it is absent and insert, so the insert is treated as the optimistic
+	 * path and a lost race falls back to an update.
+	 * @param node the node announcing itself
+	 * @return completion signal
+	 */
+	private Mono<Void> upsertNode(SlaveNodeEntity node) {
+		return touchNode(node).flatMap((rows) -> (rows > 0) ? Mono.<Void>empty()
+				: this.slaveNodeRepository
+					.insertSlaveNode(node.getId(), node.getUrl(), node.getStatus(), node.getCapabilities(),
+							node.getLastSeenAt())
+					.onErrorResume(DuplicateKeyException.class, (e) -> touchNode(node).then()))
+			.then();
+	}
+
+	private Mono<Integer> touchNode(SlaveNodeEntity node) {
+		return this.slaveNodeRepository.updateSlaveNodeUrlStatusCapabilitiesAndLastSeenAt(node.getId(), node.getUrl(),
+				node.getStatus().name(), node.getCapabilities(), node.getLastSeenAt());
+	}
+
+	/**
+	 * Reports a worker's liveness and current load. The worker owns the load figure; the
+	 * master alone turns it into a {@link NodeStatus}.
 	 * @param id the slave ID
-	 * @param status the status of the slave
-	 * @param url the url of the slave
+	 * @param activeTasks the number of tasks currently running on that node
+	 * @param url the url the node wants to be reached on
 	 * @return a mono of response entity
 	 */
 	@PostMapping("/slaves/{id}/heartbeat")
 	public Mono<ResponseEntity<Void>> slaveHeartbeat(@PathVariable String id,
-			@RequestParam(defaultValue = "IDLE") NodeStatus status, @RequestParam(required = false) String url) {
+			@RequestParam(defaultValue = "0") int activeTasks, @RequestParam(required = false) String url) {
 
-		Mono<Integer> updateMono;
-		if (url != null && !url.trim().isEmpty()) {
-			updateMono = slaveNodeRepository.updateSlaveNodeUrlStatusAndLastSeenAt(id, url, status.name(),
-					Instant.now());
-		}
-		else {
-			updateMono = slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(id, status.name(), Instant.now());
-		}
+		return this.slaveNodeRepository.findById(id).flatMap((slave) -> {
+			int maxScans = (slave.getMaxConcurrentScans() != null && slave.getMaxConcurrentScans() > 0)
+					? slave.getMaxConcurrentScans() : DEFAULT_MAX_CONCURRENT_SCANS;
+			NodeStatus status = (activeTasks >= maxScans) ? NodeStatus.BUSY : NodeStatus.IDLE;
 
-		return updateMono.flatMap((rows) -> {
-			if (rows == 0) {
-				return Mono.just(ResponseEntity.notFound().build());
+			if (url != null && !url.trim().isEmpty()) {
+				return this.slaveNodeRepository.updateSlaveNodeUrlStatusAndLastSeenAt(id, url, status.name(),
+						Instant.now());
 			}
-			return Mono.just(ResponseEntity.ok().<Void>build());
-		});
+			return this.slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(id, status.name(), Instant.now());
+		})
+			.map((rows) -> (rows == 0) ? ResponseEntity.notFound().<Void>build() : ResponseEntity.ok().<Void>build())
+			.defaultIfEmpty(ResponseEntity.notFound().build());
 	}
 
 	/**
-	 * Called by Slave to post a batch of attempts.
-	 * @param id the job ID
+	 * Marks a worker offline as it shuts down gracefully.
+	 * @param id the slave ID
+	 * @return a mono of response entity
+	 */
+	@PostMapping("/slaves/{id}/offline")
+	public Mono<ResponseEntity<Void>> slaveOffline(@PathVariable String id) {
+		return this.slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(id, NodeStatus.OFFLINE.name(), Instant.now())
+			.map((rows) -> (rows == 0) ? ResponseEntity.notFound().<Void>build() : ResponseEntity.ok().<Void>build())
+			.defaultIfEmpty(ResponseEntity.notFound().build());
+	}
+
+	/**
+	 * Records a batch of attempts produced by one of a job's tasks.
+	 * @param id the task ID
 	 * @param batch the batch of attempts
 	 * @return a mono of response entity
 	 */
-	@PostMapping("/jobs/{id}/attempts")
-	public Mono<ResponseEntity<Void>> postJobAttemptsBatch(@PathVariable Long id,
-			@RequestBody List<ScanAttempt> batch) {
-		return scanJobRepository.findById(id).flatMap((job) -> {
-			Mono<ScanJobEntity> ensureJobResultId = Mono.just(job);
-			if (job.getResultId() == null) {
-				job.setResultId(UUID.randomUUID().toString());
-				ensureJobResultId = scanResultService
-					.createPlaceholderResult(job.getResultId(), job.getTarget(),
-							(job.getCreatedAt() != null) ? job.getCreatedAt() : Instant.now())
-					.then(scanJobRepository.save(job));
-			}
-
-			int vulnsInBatch = 0;
-			for (ScanAttempt attempt : batch) {
-				if (attempt.vulnerabilities() != null) {
-					vulnsInBatch += attempt.vulnerabilities().size();
-				}
-			}
-
-			return ensureJobResultId.then(scanResultService.saveBatch(job.getResultId(), batch))
-				.then(scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, batch.size()))
-				.thenReturn(ResponseEntity.ok().<Void>build());
-		}).defaultIfEmpty(ResponseEntity.notFound().build());
-	}
-
-	/**
-	 * Called by Slave to mark job as complete.
-	 * @param id the job id
-	 * @param request the request body
-	 * @return a mono void response
-	 */
-	@PostMapping("/jobs/{id}/complete")
-	public Mono<ResponseEntity<Void>> postJobComplete(@PathVariable Long id, @RequestBody CompleteJobRequest request) {
-		return scanJobRepository.findById(id).flatMap((job) -> {
-			job.setStatus(JobStatus.COMPLETED);
-			job.setCompletedAt((request.endTime() != null) ? request.endTime() : Instant.now());
-
-			Mono<Void> ensureResultExists = Mono.empty();
-			if (job.getResultId() == null) {
-				job.setResultId(UUID.randomUUID().toString());
-				ensureResultExists = scanResultService.createPlaceholderResult(job.getResultId(), job.getTarget(),
-						(request.startTime() != null) ? request.startTime() : Instant.now());
-			}
-
-			int testsCount = (job.getTestsCount() != null) ? job.getTestsCount() : 0;
-
-			return ensureResultExists
-				.then(scanResultService.finalizeJobResult(job.getResultId(), job.getTarget(), request.startTime(),
-						job.getCompletedAt(), testsCount))
-				.flatMap((result) -> scanJobRepository.save(job).flatMap((j) -> {
-					long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
-					long high = result.riskSummary().getOrDefault(RiskLevel.HIGH, 0L);
-					long medium = result.riskSummary().getOrDefault(RiskLevel.MEDIUM, 0L);
-					long low = result.riskSummary().getOrDefault(RiskLevel.LOW, 0L);
-					String grade = "A";
-					if (critical > 0) {
-						grade = "F";
-					}
-					else if (high > 0) {
-						grade = "D";
-					}
-					else if (medium > 0) {
-						grade = "C";
-					}
-					else if (low > 0) {
-						grade = "B";
-					}
-
-					long info = result.riskSummary().getOrDefault(RiskLevel.INFO, 0L);
-
-					jobEventPublisher.emit(id,
-							JobEvent.completed(id, job.getTarget(), result.id(), grade, result.vulnerabilities().size(),
-									critical, high, medium, low, info, result.operationsScanned()));
-					jobEventPublisher.complete(id);
-
-					if (job.getAssignedSlaveId() != null) {
-						return slaveNodeRepository.findById(job.getAssignedSlaveId())
-							.flatMap((slave) -> scanJobRepository
-								.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
-								.flatMap((runningCount) -> {
-									int maxScans = ((slave.getMaxConcurrentScans() != null)
-											&& (slave.getMaxConcurrentScans() > 0)) ? slave.getMaxConcurrentScans()
-													: 10;
-									if (runningCount < maxScans) {
-										return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
-												NodeStatus.IDLE.name(), slave.getLastSeenAt());
-									}
-									return Mono.empty();
-								}))
-							.thenReturn(j);
-					}
-					return Mono.just(j);
-				}));
-		}).map((j) -> ResponseEntity.ok().<Void>build()).defaultIfEmpty(ResponseEntity.notFound().build());
-	}
-
-	@PostMapping("/jobs/{id}/fail")
-	public Mono<ResponseEntity<Void>> postJobFail(@PathVariable Long id, @RequestBody FailJobRequest request) {
-		return scanJobRepository.findById(id).flatMap((job) -> {
-			job.setStatus(JobStatus.FAILED);
-			return scanJobRepository.save(job).flatMap((j) -> {
-				jobEventPublisher.emit(id, JobEvent.failed(id, job.getTarget(), request.reason()));
-				jobEventPublisher.complete(id);
-				if (job.getAssignedSlaveId() != null) {
-					return slaveNodeRepository.findById(job.getAssignedSlaveId())
-						.flatMap((slave) -> scanJobRepository
-							.countByAssignedSlaveIdAndStatus(slave.getId(), JobStatus.RUNNING)
-							.flatMap((runningCount) -> {
-								int maxScans = ((slave.getMaxConcurrentScans() != null)
-										&& (slave.getMaxConcurrentScans() > 0)) ? slave.getMaxConcurrentScans() : 10;
-								if (runningCount < maxScans) {
-									return slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(slave.getId(),
-											NodeStatus.IDLE.name(), slave.getLastSeenAt());
-								}
-								return Mono.empty();
-							}))
-						.thenReturn(j);
-				}
-				return Mono.just(j);
-			});
-		}).map((j) -> ResponseEntity.ok().<Void>build()).defaultIfEmpty(ResponseEntity.notFound().build());
-	}
-
 	@PostMapping("/tasks/{id}/attempts")
 	public Mono<ResponseEntity<Void>> postTaskAttemptsBatch(@PathVariable Long id,
 			@RequestBody List<ScanAttempt> batch) {
-		return scanTaskRepository.findById(id).flatMap((task) -> {
-			return scanJobRepository.findById(task.getScanJobId()).flatMap((job) -> {
+		return this.scanTaskRepository.findById(id)
+			.flatMap((task) -> this.scanJobRepository.findById(task.getScanJobId()).flatMap((job) -> {
 				int vulnsInBatch = 0;
 				for (ScanAttempt attempt : batch) {
 					if (attempt.vulnerabilities() != null) {
@@ -286,32 +164,30 @@ public class MasterInternalApiController {
 					}
 				}
 
-				return scanResultService.saveBatch(job.getResultId(), batch)
-					.then(scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, batch.size()))
+				return this.scanResultService.saveBatch(job.getResultId(), batch)
+					.then(this.scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, batch.size()))
 					.thenReturn(ResponseEntity.ok().<Void>build());
-			});
-		}).defaultIfEmpty(ResponseEntity.notFound().build());
+			}))
+			.defaultIfEmpty(ResponseEntity.notFound().build());
 	}
 
 	@PostMapping("/tasks/{id}/complete")
 	public Mono<ResponseEntity<Void>> postTaskComplete(@PathVariable Long id,
 			@RequestBody CompleteTaskRequest request) {
-		return jobOrchestratorService.onScanTaskComplete(id, request.testsCount(), request.vulnsCount())
+		return this.jobOrchestratorService.onScanTaskComplete(id, request.testsCount(), request.vulnsCount())
 			.thenReturn(ResponseEntity.ok().<Void>build());
 	}
 
 	@PostMapping("/tasks/{id}/fail")
-	public Mono<ResponseEntity<Void>> postTaskFail(@PathVariable Long id, @RequestBody FailJobRequest request) {
-		return jobOrchestratorService.onTaskFailed(id, request.reason()).thenReturn(ResponseEntity.ok().<Void>build());
+	public Mono<ResponseEntity<Void>> postTaskFail(@PathVariable Long id, @RequestBody FailTaskRequest request) {
+		return this.jobOrchestratorService.onTaskFailed(id, request.reason())
+			.thenReturn(ResponseEntity.ok().<Void>build());
 	}
 
 	public record SlaveRegistrationRequest(String id, String url, String capabilities) {
 	}
 
-	record CompleteJobRequest(Instant startTime, Instant endTime) {
-	}
-
-	record FailJobRequest(String reason) {
+	record FailTaskRequest(String reason) {
 	}
 
 	public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {

@@ -18,7 +18,7 @@ orthrus:
     blackbox-timeout-ms: 5000
 
   master:
-    url: http://localhost:8080
+    url: ${ORTHRUS_MASTER_URL:http://localhost:8080}
     internal-token: "change-me-in-production"
 
   slave:

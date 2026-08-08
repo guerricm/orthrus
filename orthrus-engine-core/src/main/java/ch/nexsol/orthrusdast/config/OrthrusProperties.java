@@ -129,6 +129,20 @@ public class OrthrusProperties {
 
 		private int offlineSlaveDeletionMinutes = 15;
 
+		/**
+		 * How long to wait for a node to acknowledge a task before treating the dispatch
+		 * as failed. Acknowledgement only, not execution.
+		 */
+		private int dispatchTimeoutMs = 10000;
+
+		public int getDispatchTimeoutMs() {
+			return dispatchTimeoutMs;
+		}
+
+		public void setDispatchTimeoutMs(int dispatchTimeoutMs) {
+			this.dispatchTimeoutMs = dispatchTimeoutMs;
+		}
+
 		public String getUrl() {
 			return url;
 		}

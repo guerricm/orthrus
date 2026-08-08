@@ -19,6 +19,8 @@ package ch.nexsol.orthrusdast.client;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -35,13 +37,18 @@ import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.engine.ScanService;
-import ch.nexsol.orthrusdast.model.NodeStatus;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 
+/**
+ * Talks to the master on behalf of this worker node. The node reports how many tasks it
+ * is running and the master derives the node status from it.
+ */
 @Component
 @EnableScheduling
 @ConditionalOnProperty(name = "orthrus.slave.mode", havingValue = "server", matchIfMissing = true)
 public class MasterApiClient {
+
+	private static final Logger log = LoggerFactory.getLogger(MasterApiClient.class);
 
 	private final WebClient webClient;
 
@@ -51,9 +58,9 @@ public class MasterApiClient {
 
 	private final String slaveUrl;
 
-	private NodeStatus currentStatus = NodeStatus.IDLE;
+	private final AtomicInteger activeTaskCount = new AtomicInteger();
 
-	private static final Logger log = LoggerFactory.getLogger(MasterApiClient.class);
+	private final AtomicBoolean registering = new AtomicBoolean();
 
 	private boolean masterDownLogged = false;
 
@@ -71,46 +78,56 @@ public class MasterApiClient {
 		this.slaveUrl = properties.getSlave().getAdvertisedUrl();
 	}
 
+	/**
+	 * Announces this node to the master. Called on startup and again whenever a heartbeat
+	 * is rejected; the guard keeps those two from registering at the same time.
+	 */
 	@EventListener(ApplicationReadyEvent.class)
 	public void registerToMaster() {
-		String families = scanService.getAvailableScannerObjects()
+		if (!this.registering.compareAndSet(false, true)) {
+			log.debug("Registration already in flight; skipping.");
+			return;
+		}
+
+		String families = this.scanService.getAvailableScannerObjects()
 			.stream()
 			.map((s) -> s.getFamily().name())
 			.distinct()
 			.collect(Collectors.joining(","));
-		String caps = String.join(",", scanService.getAvailableDiscoverers()) + ","
-				+ scanService.getAvailableScannerObjects()
+		String caps = String.join(",", this.scanService.getAvailableDiscoverers()) + ","
+				+ this.scanService.getAvailableScannerObjects()
 					.stream()
 					.map((s) -> s.getId())
 					.collect(Collectors.joining(","))
 				+ "," + families;
-		String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\", \"capabilities\": \"%s\"}", slaveId, slaveUrl,
-				caps);
-		if (!masterDownLogged) {
-			log.info("Registering slave to master at {}", masterUrl);
+		String payload = String.format("{\"id\": \"%s\", \"url\": \"%s\", \"capabilities\": \"%s\"}", this.slaveId,
+				this.slaveUrl, caps);
+		if (!this.masterDownLogged) {
+			log.info("Registering slave to master at {}", this.masterUrl);
 		}
 		else {
-			log.debug("Registering slave to master at {}", masterUrl);
+			log.debug("Registering slave to master at {}", this.masterUrl);
 		}
 
-		webClient.post()
-			.uri(masterUrl + "/api/internal/slaves/register")
+		this.webClient.post()
+			.uri(this.masterUrl + "/api/internal/slaves/register")
 			.contentType(MediaType.APPLICATION_JSON)
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
+			.doFinally((signal) -> this.registering.set(false))
 			.subscribe((success) -> {
-				if (masterDownLogged) {
-					log.info("Successfully reconnected and registered to master with ID: {}", slaveId);
-					masterDownLogged = false;
+				if (this.masterDownLogged) {
+					log.info("Successfully reconnected and registered to master with ID: {}", this.slaveId);
+					this.masterDownLogged = false;
 				}
 				else {
-					log.info("Successfully registered to master with ID: {}", slaveId);
+					log.info("Successfully registered to master with ID: {}", this.slaveId);
 				}
 			}, (error) -> {
-				if (!masterDownLogged) {
+				if (!this.masterDownLogged) {
 					log.warn("Failed to register to master: {}", error.getMessage());
-					masterDownLogged = true;
+					this.masterDownLogged = true;
 				}
 				else {
 					log.debug("Failed to register to master: {}", error.getMessage());
@@ -118,20 +135,30 @@ public class MasterApiClient {
 			});
 	}
 
+	/**
+	 * Records how many tasks this node is running and pushes the figure to the master
+	 * immediately, rather than waiting for the next heartbeat.
+	 * @param activeTasks the number of tasks currently executing on this node
+	 */
+	public void reportLoad(int activeTasks) {
+		this.activeTaskCount.set(activeTasks);
+		sendHeartbeat();
+	}
+
 	@Scheduled(fixedDelayString = "${orthrus.master.heartbeat-interval-ms:10000}")
 	public void sendHeartbeat() {
-		webClient.post()
-			.uri(masterUrl + "/api/internal/slaves/" + slaveId + "/heartbeat?status=" + currentStatus + "&url="
-					+ slaveUrl)
+		this.webClient.post()
+			.uri(this.masterUrl + "/api/internal/slaves/" + this.slaveId + "/heartbeat?activeTasks="
+					+ this.activeTaskCount.get() + "&url=" + this.slaveUrl)
 			.retrieve()
 			.bodyToMono(Void.class)
 			.subscribe((success) -> {
-				if (masterDownLogged) {
+				if (this.masterDownLogged) {
 					log.info("Heartbeat successful. Master is back online.");
-					masterDownLogged = false;
+					this.masterDownLogged = false;
 				}
 			}, (error) -> {
-				if (!masterDownLogged) {
+				if (!this.masterDownLogged) {
 					log.warn("Heartbeat failed ({}). Attempting to re-register...", error.getMessage());
 				}
 				else {
@@ -141,51 +168,22 @@ public class MasterApiClient {
 			});
 	}
 
-	public Mono<Void> sendJobAttemptsBatch(Long jobId, List<ScanAttempt> batch) {
-		return webClient.post()
-			.uri(masterUrl + "/api/internal/jobs/" + jobId + "/attempts")
-			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(batch)
-			.retrieve()
-			.bodyToMono(Void.class);
-	}
-
-	public Mono<Void> completeJob(Long jobId, Instant startTime) {
-		// We only send the startTime and endTime. The Master will calculate totals from
-		// the batches it received.
-		String payload = String.format("{\"startTime\": \"%s\", \"endTime\": \"%s\"}", startTime.toString(),
-				Instant.now().toString());
-		return webClient.post()
-			.uri(masterUrl + "/api/internal/jobs/" + jobId + "/complete")
-			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(payload)
+	/**
+	 * Tells the master this node is going away, so no further work is dispatched to it.
+	 */
+	public void markOffline() {
+		this.activeTaskCount.set(0);
+		this.webClient.post()
+			.uri(this.masterUrl + "/api/internal/slaves/" + this.slaveId + "/offline")
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
-			.doOnError((e) -> {
-				log.error("Failed to send complete job to master: {}", e.getMessage());
-				setStatus(NodeStatus.IDLE);
-			});
-	}
-
-	public Mono<Void> failJob(Long jobId, String reason) {
-		String payload = String.format("{\"reason\": \"%s\"}", reason.replace("\"", "\\\""));
-		return webClient.post()
-			.uri(masterUrl + "/api/internal/jobs/" + jobId + "/fail")
-			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(payload)
-			.retrieve()
-			.bodyToMono(Void.class)
-			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
-			.doOnError((e) -> {
-				log.error("Failed to send fail job to master: {}", e.getMessage());
-				setStatus(NodeStatus.IDLE);
-			});
+			.subscribe((success) -> log.debug("Master notified of shutdown"),
+					(error) -> log.debug("Could not notify master of shutdown: {}", error.getMessage()));
 	}
 
 	public Mono<Void> sendTaskAttemptsBatch(Long taskId, List<ScanAttempt> batch) {
-		return webClient.post()
-			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/attempts")
+		return this.webClient.post()
+			.uri(this.masterUrl + "/api/internal/tasks/" + taskId + "/attempts")
 			.contentType(MediaType.APPLICATION_JSON)
 			.bodyValue(batch)
 			.retrieve()
@@ -196,36 +194,24 @@ public class MasterApiClient {
 		String payload = String.format(
 				"{\"startTime\": \"%s\", \"endTime\": \"%s\", \"testsCount\": %d, \"vulnsCount\": %d}",
 				startTime.toString(), Instant.now().toString(), testsCount, vulnsCount);
-		return webClient.post()
-			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/complete")
+		return this.webClient.post()
+			.uri(this.masterUrl + "/api/internal/tasks/" + taskId + "/complete")
 			.contentType(MediaType.APPLICATION_JSON)
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
-			.doOnError((e) -> {
-				log.error("Failed to send complete task to master: {}", e.getMessage());
-				setStatus(NodeStatus.IDLE);
-			});
+			.doOnError((e) -> log.error("Failed to send complete task to master: {}", e.getMessage()));
 	}
 
 	public Mono<Void> failTask(Long taskId, String reason) {
 		String payload = String.format("{\"reason\": \"%s\"}", reason.replace("\"", "\\\""));
-		return webClient.post()
-			.uri(masterUrl + "/api/internal/tasks/" + taskId + "/fail")
+		return this.webClient.post()
+			.uri(this.masterUrl + "/api/internal/tasks/" + taskId + "/fail")
 			.contentType(MediaType.APPLICATION_JSON)
 			.bodyValue(payload)
 			.retrieve()
 			.bodyToMono(Void.class)
-			.doOnSuccess((v) -> setStatus(NodeStatus.IDLE))
-			.doOnError((e) -> {
-				log.error("Failed to send fail task to master: {}", e.getMessage());
-				setStatus(NodeStatus.IDLE);
-			});
-	}
-
-	public void setStatus(NodeStatus status) {
-		this.currentStatus = status;
+			.doOnError((e) -> log.error("Failed to send fail task to master: {}", e.getMessage()));
 	}
 
 }

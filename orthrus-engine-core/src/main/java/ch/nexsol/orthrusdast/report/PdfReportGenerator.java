@@ -44,6 +44,7 @@ import ch.nexsol.orthrusdast.model.AttemptStatus;
 import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
 import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanGrade;
 import ch.nexsol.orthrusdast.model.ScanResult;
 
 /**
@@ -111,21 +112,7 @@ public class PdfReportGenerator implements ReportGenerator {
 				context.setVariable("countLow", low);
 				context.setVariable("countInfo", info);
 
-				// 3. Calculate Global Grade
-				String grade = "A";
-				if (critical > 0) {
-					grade = "F";
-				}
-				else if (high > 0) {
-					grade = "D";
-				}
-				else if (medium > 0) {
-					grade = "C";
-				}
-				else if (low > 0) {
-					grade = "B";
-				}
-				context.setVariable("globalGrade", grade);
+				context.setVariable("globalGrade", ScanGrade.of(result.riskSummary()));
 
 				// 4. Execution Details (if --include-passed)
 				if (includePassed && result.attempts() != null && !result.attempts().isEmpty()) {

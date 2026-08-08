@@ -26,12 +26,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
+import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
-import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.repository.TestPlanRepository;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 
@@ -50,10 +49,10 @@ class ScanViewControllerTest {
 	private TestPlanRepository testPlanRepository;
 
 	@Mock
-	private SlaveNodeRepository slaveNodeRepository;
+	private JobEventPublisher jobEventPublisher;
 
 	@Mock
-	private JobEventPublisher jobEventPublisher;
+	private JobOrchestratorService jobOrchestratorService;
 
 	private final tools.jackson.databind.ObjectMapper objectMapper = new tools.jackson.databind.ObjectMapper();
 
@@ -61,8 +60,8 @@ class ScanViewControllerTest {
 
 	@BeforeEach
 	void setUp() {
-		controller = new ScanViewController(scanJobRepository, scanResultService, testPlanRepository,
-				slaveNodeRepository, jobEventPublisher, objectMapper, WebClient.builder());
+		controller = new ScanViewController(scanJobRepository, scanResultService, testPlanRepository, jobEventPublisher,
+				objectMapper, jobOrchestratorService);
 	}
 
 	@Test

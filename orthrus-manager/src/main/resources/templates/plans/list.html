@@ -8,13 +8,40 @@
             <div class="col-lg-12">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Test Plans</h2>
-                    <a href="/plans/new" class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle me-1" viewBox="0 0 16 16">
-                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-                        </svg>
-                        Create New Plan
-                    </a>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="file" id="planImportFile" accept="application/json,.json" class="d-none"
+                               th:attr="data-import-url=@{/plans/import}"/>
+                        <label for="planImportFile" class="btn btn-outline-primary mb-0 d-inline-flex align-items-center justify-content-center" title="Import plans from a JSON export">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-upload me-1" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                            </svg>
+                            Import
+                        </label>
+                        <a href="/plans/export" class="btn btn-outline-primary d-inline-flex align-items-center justify-content-center" title="Export every plan (secrets are masked)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download me-1" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                            </svg>
+                            Export all
+                        </a>
+                        <a href="/plans/new" class="btn btn-primary d-inline-flex align-items-center justify-content-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle me-1" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                            Create New Plan
+                        </a>
+                    </div>
+                </div>
+
+                <div th:if="${importedCount != null}" class="alert alert-success" role="alert">
+                    <span th:text="${importedCount} + ' test plan(s) imported.'">0 test plan(s) imported.</span>
+                    <span th:if="${importedNeedingSecrets != null and importedNeedingSecrets > 0}"
+                          th:text="' ' + ${importedNeedingSecrets} + ' of them had masked credentials: edit each plan to enter them again before running it.'"></span>
+                </div>
+                <div th:if="${importFailed}" class="alert alert-danger" role="alert">
+                    Import failed: the file is not a readable Orthrus test plan export.
                 </div>
 
                 <!-- Error Card: No online slaves -->
@@ -79,6 +106,12 @@
                                           <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/>
                                         </svg>
                                     </a>
+                                    <a th:href="@{/plans/{id}/export(id=${mappedPlan['plan'].id})}" class="btn btn-sm btn-outline-secondary ms-2" title="Export Plan (secrets are masked)" onclick="event.stopPropagation();">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
+                                          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                          <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                        </svg>
+                                    </a>
                                     <form th:action="@{/plans/{id}/run(id=${mappedPlan['plan'].id})}" method="post" class="d-inline ms-2" onsubmit="event.stopPropagation();">
                                         <input th:replace="~{fragments/layout :: csrf}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Run Now">
@@ -110,6 +143,40 @@
                 </div>
             </div>
         </div>
+        <script>
+            // The upload carries its CSRF token in a header: Spring Security reads the token
+            // from a urlencoded body or from a header, never from a multipart body. The
+            // token is published by the layout as meta tags.
+            (function () {
+                var input = document.getElementById('planImportFile');
+                if (!input) {
+                    return;
+                }
+                input.addEventListener('change', function () {
+                    if (!input.files.length) {
+                        return;
+                    }
+                    var token = document.querySelector('meta[name="_csrf"]');
+                    var header = document.querySelector('meta[name="_csrf_header"]');
+                    var headers = {};
+                    if (token && header) {
+                        headers[header.content] = token.content;
+                    }
+                    var payload = new FormData();
+                    payload.append('file', input.files[0]);
+                    fetch(input.dataset.importUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: headers,
+                        body: payload
+                    }).then(function (response) {
+                        window.location = response.redirected ? response.url : '/plans?importError=1';
+                    }).catch(function () {
+                        window.location = '/plans?importError=1';
+                    });
+                });
+            })();
+        </script>
     </main>
 </body>
 

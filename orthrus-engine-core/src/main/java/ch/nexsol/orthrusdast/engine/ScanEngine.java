@@ -16,7 +16,6 @@
 
 package ch.nexsol.orthrusdast.engine;
 
-import java.time.Instant;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -70,7 +69,6 @@ public class ScanEngine {
 
 	public Flux<ScanAttempt> runScan(EndpointDiscoverer discoverer, String targetUrl, ScanConfiguration config) {
 		log.info("Starting scan engine with concurrency: {}", config.concurrency());
-		Instant startTime = Instant.now();
 
 		// Filter scanners based on configuration
 		List<SecurityScanner> activeScanners = allScanners.stream()
@@ -87,15 +85,7 @@ public class ScanEngine {
 			}
 
 			log.info("Discovered {} operations. Starting scan...", operations.size());
-
-			return Flux.fromIterable(operations)
-				.flatMap((op) -> scanOperation(op, activeScanners, config), config.concurrency())
-				.doOnNext((attempt) -> {
-					for (Vulnerability vuln : attempt.vulnerabilities()) {
-						log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(),
-								vuln.operationUrl());
-					}
-				});
+			return scanAll(operations, activeScanners, config);
 		});
 	}
 
@@ -118,8 +108,13 @@ public class ScanEngine {
 		log.info("Active scanners for family {}: {}", family,
 				activeScanners.stream().map(SecurityScanner::getId).toList());
 
+		return scanAll(operations, activeScanners, config);
+	}
+
+	private Flux<ScanAttempt> scanAll(List<Operation> operations, List<SecurityScanner> scanners,
+			ScanConfiguration config) {
 		return Flux.fromIterable(operations)
-			.flatMap((op) -> scanOperation(op, activeScanners, config), config.concurrency())
+			.flatMap((op) -> scanOperation(op, scanners, config), config.concurrency())
 			.doOnNext((attempt) -> {
 				for (Vulnerability vuln : attempt.vulnerabilities()) {
 					log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
