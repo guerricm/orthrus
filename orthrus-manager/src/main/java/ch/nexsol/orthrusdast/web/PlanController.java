@@ -294,7 +294,7 @@ public class PlanController {
 					+ report.plansNeedingSecrets().size())
 			.onErrorResume((ex) -> {
 				log.warn("Test plan import failed", ex);
-				return Mono.just("redirect:/plans?importError");
+				return Mono.just("redirect:/plans?importError=1");
 			});
 	}
 

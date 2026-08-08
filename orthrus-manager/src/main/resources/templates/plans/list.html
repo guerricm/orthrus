@@ -9,12 +9,21 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Test Plans</h2>
                     <div class="d-flex gap-2">
-                        <form id="planImportForm" action="/plans/import" method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
-                            <input th:replace="~{fragments/layout :: csrf}"/>
-                            <input type="file" id="planImportFile" name="file" accept="application/json,.json" class="form-control form-control-sm" style="max-width: 15rem;" required/>
-                            <button type="submit" class="btn btn-outline-light btn-sm">Import</button>
+                        <form id="planImportForm" action="/plans/import" method="post" enctype="multipart/form-data" class="d-inline">
+                            <input type="file" id="planImportFile" name="file" accept="application/json,.json" class="d-none"/>
+                            <label for="planImportFile" class="btn btn-outline-primary mb-0" title="Import plans from a JSON export">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-upload me-1" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                                </svg>
+                                Import
+                            </label>
                         </form>
-                        <a href="/plans/export" class="btn btn-outline-light btn-sm d-flex align-items-center" title="Export every plan (secrets are masked)">
+                        <a href="/plans/export" class="btn btn-outline-primary" title="Export every plan (secrets are masked)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download me-1" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                            </svg>
                             Export all
                         </a>
                     <a href="/plans/new" class="btn btn-primary">
@@ -135,37 +144,42 @@
                 </div>
             </div>
         </div>
+        <script>
+            // The upload carries its CSRF token in a header: Spring Security reads the token
+            // from a urlencoded body or from a header, never from a multipart body. The
+            // token is published by the layout as meta tags.
+            (function () {
+                var form = document.getElementById('planImportForm');
+                var input = document.getElementById('planImportFile');
+                if (!form || !input) {
+                    return;
+                }
+                input.addEventListener('change', function () {
+                    if (!input.files.length) {
+                        return;
+                    }
+                    var token = document.querySelector('meta[name="_csrf"]');
+                    var header = document.querySelector('meta[name="_csrf_header"]');
+                    var headers = {};
+                    if (token && header) {
+                        headers[header.content] = token.content;
+                    }
+                    var payload = new FormData();
+                    payload.append('file', input.files[0]);
+                    fetch(form.action, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: headers,
+                        body: payload
+                    }).then(function (response) {
+                        window.location = response.redirected ? response.url : '/plans?importError=1';
+                    }).catch(function () {
+                        window.location = '/plans?importError=1';
+                    });
+                });
+            })();
+        </script>
     </main>
-<script>
-    // Spring Security reads the CSRF token from a urlencoded body or from a header, never
-    // from a multipart body, so the upload is sent with the token in the header.
-    (function () {
-        var form = document.getElementById('planImportForm');
-        if (!form) {
-            return;
-        }
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            var file = document.getElementById('planImportFile').files[0];
-            if (!file) {
-                return;
-            }
-            var token = form.querySelector('input[name="_csrf"]');
-            var payload = new FormData();
-            payload.append('file', file);
-            fetch(form.action, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: token ? { 'X-CSRF-TOKEN': token.value } : {},
-                body: payload
-            }).then(function (response) {
-                window.location = response.redirected ? response.url : '/plans?importError';
-            }).catch(function () {
-                window.location = '/plans?importError';
-            });
-        });
-    })();
-</script>
 </body>
 
 </html>
