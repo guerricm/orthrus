@@ -9,12 +9,12 @@ Orthrus DAST is a modern, reactive Dynamic Application Security Testing (DAST) t
 ## Features
 
 ### Discovery Modes
-Orthrus supports 5 discovery modes to map your API surface:
+Orthrus supports 6 discovery modes to map your API surface:
 - `openapi`: Parses OpenAPI v3 specifications (JSON/YAML)
 - `graphql`: Utilizes the GraphQL introspection query to dump the schema, dynamically building valid queries and mutations for testing.
 - `blackbox`: Crawls and fuzzes a target URL to discover endpoints dynamically.
 - `gateway`: Connects to API Gateways (Traefik, Kong, Spring Cloud, HAProxy, K8s) to extract routing rules dynamically.
-- `curl`: Reads cURL commands from a file.
+- `curl`: Registers a single target URL as the only operation to scan.
 - `well-known`: Scans for standard sensitive files (e.g. `/.env`, `/.git/config`).
 
 #### Gateway Mode Details
@@ -159,7 +159,7 @@ If you want to run a scan from your terminal without spinning up the Master/UI i
 docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 ```
 ### CLI Options
-- `-d, --discoverer=<discovererId>`: Discoverer to use (`openapi`, `blackbox`, `curl`, `well-known`, `gateway`).
+- `-d, --discoverer=<discovererId>`: Discoverer to use (`openapi`, `graphql`, `blackbox`, `curl`, `well-known`, `gateway`).
 - `-t, --target=<target>`: Target URL or Spec path.
 - `-c, --concurrency=<concurrency>`: Number of concurrent threads for scanning (default: 10).
 - `-f, --format=<format>`: Report format (`json`, `sarif`, `html`, `pdf`, `console`). Default is `console`.
@@ -167,7 +167,7 @@ docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 - `--lang=<language>`: Report language (`en`, `fr`).
 - `--include-passed`: Include passed tests in the report.
 - `--app-url=<appUrl>`: Public Application URL for Gateway Discovery (e.g. `http://myapp.com`).
-- `--gateway-type=<gatewayType>`: Gateway type: `auto`, `traefik`, `kong`, `spring-cloud-gateway`, `k8s`.
+- `--gateway-type=<gatewayType>`: Gateway type: `auto`, `traefik`, `kong`, `spring-cloud-gateway`, `haproxy`, `k8s`.
 - `--host=<overrideHost>`: Override host URL.
 - `--k8s-token=<k8sToken>`: Kubernetes ServiceAccount Token (or set K8S_TOKEN env var).
 - `--auth-bearer=<bearerToken>`: Bearer token for API authentication (User A).

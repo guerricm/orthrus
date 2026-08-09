@@ -88,11 +88,13 @@ public class FrontendController {
 		discovererDescriptions.put("graphql",
 				"Introspects GraphQL schemas to discover available queries, mutations, and input types, enabling deep scanning of single-endpoint APIs.");
 		discovererDescriptions.put("blackbox",
-				"Performs brute-force and fuzzing techniques across a wide range of common API routes and parameter names to blindly discover undocumented endpoints.");
+				"Crawls the target's HTML links and forms, then brute-forces a dictionary of common API routes to blindly discover undocumented endpoints.");
+		discovererDescriptions.put("gateway",
+				"Reads the routing table of an API Gateway (Traefik, Spring Cloud Gateway, Kong, HAProxy or Kubernetes Ingress) through its Admin API, then fuzzes every extracted route prefix against the application.");
 		discovererDescriptions.put("well-known",
-				"Explores standard predictable paths (e.g., /.well-known/, /swagger-ui.html, /robots.txt) to uncover hidden API endpoints, administrative interfaces, or sensitive configuration files.");
+				"Explores standard predictable paths (e.g., /.well-known/openid-configuration, /swagger-ui.html, /.env, /actuator) to uncover hidden API endpoints, administrative interfaces, or sensitive configuration files.");
 		discovererDescriptions.put("curl",
-				"Parses raw cURL commands to extract target URLs, HTTP methods, headers, and request payloads, allowing you to easily scan specific endpoints captured from your browser.");
+				"Registers a single target URL as the only operation to scan, letting you check one specific endpoint captured from your browser.");
 		model.addAttribute("discoverers", discovererDescriptions);
 
 		return scanResultService.findAll().collectList().map((history) -> {
