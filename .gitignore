@@ -38,3 +38,6 @@ tasks/lessons.md
 
 # Local compose secrets
 .env
+
+# CodeGraph local index
+.codegraph/
