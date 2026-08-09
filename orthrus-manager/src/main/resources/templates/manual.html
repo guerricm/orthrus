@@ -101,11 +101,11 @@
                                 </tr>
                                 <tr>
                                     <td><code>curl</code></td>
-                                    <td><code>curl -X GET "https://api..."</code></td>
+                                    <td><code>https://api.example.com/users</code></td>
                                     <td>
                                         <strong>Use Case:</strong> You want to test a single specific request.<br />
-                                        Paste a raw cURL command copied from your browser's Developer Tools. Orthrus
-                                        will parse the URL, method, headers, and body to test that exact endpoint.
+                                        Registers the target URL as the one and only operation to scan, issued as a
+                                        <code>GET</code>. Authentication is applied from the scan configuration.
                                     </td>
                                 </tr>
                                 <tr>
@@ -113,8 +113,21 @@
                                     <td><code>https://api.example.com</code></td>
                                     <td>
                                         <strong>Use Case:</strong> You have zero documentation.<br />
-                                        Performs aggressive directory brute-forcing and parameter fuzzing to blindly map
-                                        an undocumented API surface.
+                                        Crawls the target's HTML (links and forms, up to a configurable depth), then
+                                        brute-forces a dictionary of common API paths to blindly map an undocumented
+                                        surface.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>gateway</code></td>
+                                    <td><code>https://gateway-admin.example.com</code></td>
+                                    <td>
+                                        <strong>Use Case:</strong> Your API sits behind an API Gateway.<br />
+                                        Queries the Gateway's Admin API (Traefik, Spring Cloud Gateway, Kong, HAProxy or
+                                        Kubernetes Ingress) to read its routing table, then fuzzes each extracted route
+                                        prefix against the application. The target is the <strong>Admin API</strong>
+                                        URL; set <em>Application URL</em> to the public application, and provide a
+                                        ServiceAccount token for Kubernetes Ingress.
                                     </td>
                                 </tr>
                             </tbody>

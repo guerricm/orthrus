@@ -66,7 +66,7 @@ public class ScanCommand implements Callable<Integer> {
 	}
 
 	@Option(names = { "-d", "--discoverer" },
-			description = "Discoverer to use (openapi, blackbox, curl, well-known, gateway)", required = true)
+			description = "Discoverer to use (openapi, graphql, blackbox, curl, well-known, gateway)", required = true)
 	String discovererId;
 
 	@Option(names = { "-t", "--target" }, description = "Target URL or Spec path", required = true)
@@ -120,7 +120,8 @@ public class ScanCommand implements Callable<Integer> {
 			defaultValue = "10")
 	int concurrency;
 
-	@Option(names = { "--gateway-type" }, description = "Gateway type: auto, traefik, kong, spring-cloud-gateway, k8s",
+	@Option(names = { "--gateway-type" },
+			description = "Gateway type: auto, traefik, kong, spring-cloud-gateway, haproxy, k8s",
 			defaultValue = "auto")
 	String gatewayType;
 
