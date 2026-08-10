@@ -18,6 +18,9 @@ package ch.nexsol.orthrusai.orchestrator;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+import ch.nexsol.orthrusai.orchestrator.config.AiOrchestratorProperties;
 
 /**
  * Entry point of the AI orchestrator. Given a target and an objective it plans a scan
@@ -25,6 +28,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * results it observes.
  */
 @SpringBootApplication
+@EnableConfigurationProperties(AiOrchestratorProperties.class)
 public class OrthrusAiOrchestratorApplication {
 
 	public static void main(String[] args) {
