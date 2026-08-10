@@ -27,9 +27,11 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
@@ -66,6 +68,15 @@ public class SensitiveQueryScanner implements SecurityScanner {
 
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
+		return run(operation, null);
+	}
+
+	@Override
+	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		return run(operation, (context != null && context.hasBaseline()) ? context.baselineResponse() : null);
+	}
+
+	private Flux<Vulnerability> run(Operation operation, ScanHttpResponse baseline) {
 		return Flux.defer(() -> {
 			Flux<Vulnerability> passiveVulns = Flux.empty();
 			Flux<Vulnerability> activeVulns = Flux.empty();
@@ -89,7 +100,13 @@ public class SensitiveQueryScanner implements SecurityScanner {
 
 				if (paramMatch != null) {
 					final String matchedParam = paramMatch;
-					passiveVulns = httpClient.send(operation).flatMapMany((response) -> {
+					// The passive finding is decided by the parameter name; the response
+					// is
+					// only attached as evidence, so reuse the engine baseline when
+					// present.
+					Mono<ScanHttpResponse> passiveResponse = (baseline != null) ? Mono.just(baseline)
+							: httpClient.send(operation);
+					passiveVulns = passiveResponse.flatMapMany((response) -> {
 						Vulnerability vuln = createVulnerabilityWithTrace(
 								"Sensitive Information in Query String (Passive)",
 								"The endpoint accepts a parameter named '" + matchedParam

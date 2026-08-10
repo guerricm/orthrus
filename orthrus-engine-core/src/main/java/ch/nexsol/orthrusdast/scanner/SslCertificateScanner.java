@@ -25,8 +25,6 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
@@ -48,15 +46,13 @@ import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
- * Scans the SSL/TLS configuration and certificate of the target. Caches the results per
- * hostname to avoid redundant connections.
+ * Scans the SSL/TLS configuration and certificate of the target. Declared host-scoped so
+ * the engine runs it once per host:port instead of once per operation.
  */
 @Component
 public class SslCertificateScanner implements SecurityScanner {
 
 	private static final Logger log = LoggerFactory.getLogger(SslCertificateScanner.class);
-
-	private final Set<String> scannedHosts = ConcurrentHashMap.newKeySet();
 
 	@Override
 	public String getId() {
@@ -74,6 +70,11 @@ public class SslCertificateScanner implements SecurityScanner {
 	}
 
 	@Override
+	public ScannerScope getScope() {
+		return ScannerScope.HOST;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (operation.url() == null || !operation.url().toLowerCase().startsWith("https://")) {
@@ -84,14 +85,8 @@ public class SslCertificateScanner implements SecurityScanner {
 				URL url = new URL(operation.url());
 				String hostname = url.getHost();
 				int port = (url.getPort() != -1) ? url.getPort() : url.getDefaultPort();
-				String hostKey = hostname + ":" + port;
 
-				// Only scan each host once
-				if (!scannedHosts.add(hostKey)) {
-					return Flux.<Vulnerability>empty();
-				}
-
-				log.debug("Scanning SSL/TLS for host: {}", hostKey);
+				log.debug("Scanning SSL/TLS for host: {}:{}", hostname, port);
 				return scanHost(hostname, port, operation);
 			}).onErrorResume((ex) -> {
 				log.warn("Failed to parse URL for SSL scanning: {}", operation.url());

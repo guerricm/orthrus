@@ -36,6 +36,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
@@ -43,16 +44,30 @@ import ch.nexsol.orthrusdast.model.SecurityScheme;
  * Reactive HTTP client wrapper around WebClient. Centralizes all HTTP interactions for
  * scanners: - Timeout management - Auth header injection - Response capture (status,
  * headers, body, timing) - Error handling (returns response info even on 4xx/5xx)
+ *
+ * <p>
+ * Retry behaviour is delegated to {@link HttpRetryPolicy}: requests that hit a retryable
+ * status (429/5xx, and 401/403 that may be edge blocks) are backed off and re-sent,
+ * honouring {@code Retry-After}. When retries are exhausted the last real response is
+ * handed back rather than a synthetic error, so scanners still see the actual status.
  */
 @Component
 public class ScanHttpClient {
 
 	private static final Logger log = LoggerFactory.getLogger(ScanHttpClient.class);
 
+	private static final int MAX_BODY_BYTES = 250_000;
+
 	private final WebClient webClient;
 
-	public ScanHttpClient(WebClient webClient) {
+	private final HttpRetryPolicy retryPolicy;
+
+	private final Duration requestTimeout;
+
+	public ScanHttpClient(WebClient webClient, OrthrusProperties properties) {
 		this.webClient = webClient;
+		this.retryPolicy = HttpRetryPolicy.from(properties.getHttp());
+		this.requestTimeout = Duration.ofMillis(properties.getHttp().getRequestTimeoutMs());
 	}
 
 	/**
@@ -96,8 +111,22 @@ public class ScanHttpClient {
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride,
 			boolean retryTransientErrors) {
-		long startTime = System.currentTimeMillis();
+		String body = (bodyOverride != null) ? bodyOverride : operation.body();
 
+		// Rebuilt on every attempt so the captured timing reflects only the last try, not
+		// the accumulated retry backoff (which would otherwise inflate response times and
+		// trip time-based injection heuristics).
+		Mono<ScanHttpResponse> attemptMono = Mono
+			.defer(() -> singleAttempt(operation, extraHeaders, body, retryTransientErrors));
+
+		return attemptMono.retryWhen(buildRetry(retryTransientErrors))
+			.timeout(requestTimeout)
+			.onErrorResume((e) -> recoverFromError(operation, e));
+	}
+
+	private Mono<ScanHttpResponse> singleAttempt(Operation operation, Map<String, String> extraHeaders, String body,
+			boolean retryTransientErrors) {
+		long startTime = System.currentTimeMillis();
 		HttpMethod method = operation.method();
 
 		WebClient.RequestBodySpec requestSpec = webClient.method(method).uri(buildUri(operation)).headers((headers) -> {
@@ -121,24 +150,23 @@ public class ScanHttpClient {
 			});
 		});
 
-		String body = (bodyOverride != null) ? bodyOverride : operation.body();
+		Function<ClientResponse, Mono<ScanHttpResponse>> responseHandler = (
+				clientResponse) -> clientResponse.bodyToMono(String.class).defaultIfEmpty("").map((responseBody) -> {
+					String finalBody = responseBody;
+					if (finalBody.length() > MAX_BODY_BYTES) {
+						finalBody = finalBody.substring(0, MAX_BODY_BYTES) + "\n...[TRUNCATED BY ORTHRUS DAST]...";
+					}
+					return new ScanHttpResponse(clientResponse.statusCode(), clientResponse.headers().asHttpHeaders(),
+							finalBody, System.currentTimeMillis() - startTime);
+				}).flatMap((response) -> {
+					int status = response.statusCode().value();
+					if (retryTransientErrors && retryPolicy.isRetryable(status)) {
+						Duration retryAfter = HttpRetryPolicy.parseRetryAfter(response.headers());
+						return Mono.error(new RetryableResponseException(status, response, retryAfter));
+					}
+					return Mono.just(response);
+				});
 
-		Function<ClientResponse, Mono<ScanHttpResponse>> responseHandler = (clientResponse) -> {
-			int status = clientResponse.statusCode().value();
-			if (retryTransientErrors && (status == 429 || status == 502 || status == 503 || status == 504)) {
-				return Mono.error(new TransientHttpException("Transient HTTP error (" + status + ")"));
-			}
-			return clientResponse.bodyToMono(String.class).defaultIfEmpty("").map((responseBody) -> {
-				String finalBody = responseBody;
-				if (finalBody.length() > 250_000) {
-					finalBody = finalBody.substring(0, 250_000) + "\n...[TRUNCATED BY ORTHRUS DAST]...";
-				}
-				return new ScanHttpResponse(clientResponse.statusCode(), clientResponse.headers().asHttpHeaders(),
-						finalBody, System.currentTimeMillis() - startTime);
-			});
-		};
-
-		Mono<ScanHttpResponse> resultMono;
 		if (body != null && !body.isEmpty()) {
 			String cType = (operation.headers() != null) ? operation.headers().get("Content-Type") : null;
 			if (cType == null) {
@@ -147,40 +175,47 @@ public class ScanHttpClient {
 			if (cType != null) {
 				requestSpec.contentType(MediaType.parseMediaType(cType));
 			}
-			resultMono = requestSpec.bodyValue(body).exchangeToMono(responseHandler);
+			return requestSpec.bodyValue(body).exchangeToMono(responseHandler);
 		}
-		else {
-			resultMono = requestSpec.exchangeToMono(responseHandler);
+		return requestSpec.exchangeToMono(responseHandler);
+	}
+
+	private Retry buildRetry(boolean retryTransientErrors) {
+		return Retry.from((companion) -> companion.flatMap((signal) -> {
+			Throwable failure = signal.failure();
+			boolean retryable = failure instanceof RetryableResponseException
+					|| (retryTransientErrors && isTransientNetworkError(failure));
+			if (!retryable || signal.totalRetries() >= retryPolicy.maxRetries()) {
+				// Exhausted, or not a retryable failure: propagate so onErrorResume can
+				// surface the real response (or a synthetic error for network failures).
+				return Mono.error(failure);
+			}
+			Duration retryAfter = (failure instanceof RetryableResponseException rre) ? rre.retryAfter() : null;
+			Duration backoff = retryPolicy.backoffFor(signal.totalRetries(), retryAfter);
+			return Mono.delay(backoff).thenReturn(signal.totalRetries());
+		}));
+	}
+
+	private Mono<ScanHttpResponse> recoverFromError(Operation operation, Throwable e) {
+		// A retryable status that survived all attempts: hand back the real response so
+		// scanners judge the actual status rather than a fabricated 503.
+		if (e instanceof RetryableResponseException rre) {
+			return Mono.just(rre.response());
 		}
 
-		return resultMono.retryWhen(Retry.backoff(4, Duration.ofSeconds(1)) // Retries
-																			// 4
-																			// times
-																			// with
-																			// exp
-																			// backoff
-																			// (1s,
-																			// 2s,
-																			// 4s,
-																			// 8s)
-			.filter((e) -> e instanceof TransientHttpException || (retryTransientErrors && isTransientNetworkError(e)))
-			.onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> retrySignal.failure()))
-			.timeout(Duration.ofSeconds(30))
-			.onErrorResume((e) -> {
-				String logUrl = operation.url();
-				if (logUrl != null && logUrl.length() > 100) {
-					logUrl = logUrl.substring(0, 100) + "...[TRUNCATED]";
-				}
+		String logUrl = operation.url();
+		if (logUrl != null && logUrl.length() > 100) {
+			logUrl = logUrl.substring(0, 100) + "...[TRUNCATED]";
+		}
 
-				String errorMsg = e.getMessage();
-				if (e instanceof TimeoutException) {
-					errorMsg = "Request timed out after 15 seconds";
-				}
+		String errorMsg = e.getMessage();
+		if (e instanceof TimeoutException) {
+			errorMsg = "Request exceeded the " + requestTimeout.toMillis() + "ms budget";
+		}
 
-				log.warn("HTTP request failed for {} {}: {}", operation.method().name(), logUrl, errorMsg);
-				return Mono.just(new ScanHttpResponse(HttpStatus.SERVICE_UNAVAILABLE, new HttpHeaders(),
-						"Error: " + errorMsg, System.currentTimeMillis() - startTime));
-			});
+		log.warn("HTTP request failed for {} {}: {}", operation.method().name(), logUrl, errorMsg);
+		return Mono.just(new ScanHttpResponse(HttpStatus.SERVICE_UNAVAILABLE, new HttpHeaders(), "Error: " + errorMsg,
+				requestTimeout.toMillis()));
 	}
 
 	/**
@@ -251,10 +286,29 @@ public class ScanHttpClient {
 		return false;
 	}
 
-	private static class TransientHttpException extends RuntimeException {
+	/**
+	 * Signals that a fully-read response carried a retryable status. It transports the
+	 * captured {@link ScanHttpResponse} so that, once retries are exhausted, the real
+	 * response can be surfaced to scanners instead of a synthetic error.
+	 */
+	private static final class RetryableResponseException extends RuntimeException {
 
-		TransientHttpException(String message) {
-			super(message);
+		private final transient ScanHttpResponse response;
+
+		private final transient Duration retryAfter;
+
+		RetryableResponseException(int status, ScanHttpResponse response, Duration retryAfter) {
+			super("Retryable HTTP status " + status);
+			this.response = response;
+			this.retryAfter = retryAfter;
+		}
+
+		ScanHttpResponse response() {
+			return response;
+		}
+
+		Duration retryAfter() {
+			return retryAfter;
 		}
 
 	}
