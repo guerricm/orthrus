@@ -16,8 +16,10 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.time.Duration;
 import java.util.List;
 
+import io.netty.channel.ChannelOption;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -35,13 +37,23 @@ import ch.nexsol.orthrusdast.model.Vulnerability;
 @Component
 public class CleartextScanner implements SecurityScanner {
 
+	private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(10);
+
+	private static final int CONNECT_TIMEOUT_MS = 5000;
+
 	private final WebClient noRedirectClient;
 
 	public CleartextScanner(ScanHttpClient httpClient) {
+		// A dedicated client is needed to observe redirects instead of following them.
+		// Bounded timeouts prevent a target that accepts the connection but never replies
+		// from stalling the scan indefinitely.
+		reactor.netty.http.client.HttpClient nettyClient = reactor.netty.http.client.HttpClient.create()
+			.followRedirect(false)
+			.responseTimeout(RESPONSE_TIMEOUT)
+			.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS);
 
 		this.noRedirectClient = WebClient.builder()
-			.clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(
-					reactor.netty.http.client.HttpClient.create().followRedirect(false)))
+			.clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(nettyClient))
 			.build();
 	}
 

@@ -110,19 +110,26 @@ public class InsecureDeserializationScanner implements SecurityScanner {
 					});
 				});
 
-				Flux<Vulnerability> blindVulns = httpClient.send(oastOp)
-					.flatMapMany((res) -> Flux.<Vulnerability>empty()) // We don't care
-																		// about the
-																		// response body
-					.concatWith(oastService.pollInteractions(oastSession)
-						.map((interaction) -> createVulnerabilityWithTrace("Blind Insecure Deserialization (OAST)",
-								"The endpoint successfully deserialized a gadget payload (URL) and made an out-of-band request to the OAST server.",
-								RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_502,
-								List.of("CAPEC-586"), 9.8,
-								"An interaction was received from " + interaction.remoteAddress() + " via "
-										+ interaction.protocol(),
-								"Disable default typing in Jackson/Fastjson. Avoid deserializing untrusted data.",
-								oastOp, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
+				// The gadget only pays off through an out-of-band callback: skip it
+				// entirely when no collector is listening.
+				Flux<Vulnerability> blindVulns = Flux.empty();
+				if (oastService.isEnabled()) {
+					blindVulns = httpClient.send(oastOp)
+						.flatMapMany((res) -> Flux.<Vulnerability>empty()) // We don't
+																			// care
+																			// about the
+																			// response
+																			// body
+						.concatWith(oastService.pollInteractions(oastSession)
+							.map((interaction) -> createVulnerabilityWithTrace("Blind Insecure Deserialization (OAST)",
+									"The endpoint successfully deserialized a gadget payload (URL) and made an out-of-band request to the OAST server.",
+									RiskLevel.CRITICAL, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_502,
+									List.of("CAPEC-586"), 9.8,
+									"An interaction was received from " + interaction.remoteAddress() + " via "
+											+ interaction.protocol(),
+									"Disable default typing in Jackson/Fastjson. Avoid deserializing untrusted data.",
+									oastOp, null, "API Endpoint (Network)", "Unauthorized Access / Data Exposure")));
+				}
 
 				return Flux.concat(errorBasedVulns, blindVulns);
 			});

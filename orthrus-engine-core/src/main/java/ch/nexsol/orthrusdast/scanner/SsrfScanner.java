@@ -63,9 +63,13 @@ public class SsrfScanner implements SecurityScanner {
 		return Flux.defer(() -> {
 			return oastService.createSession().flatMapMany((session) -> {
 
-				// Payloads: AWS Metadata and Blind OAST URL
-				List<String> payloads = List.of("http://169.254.169.254/latest/meta-data/",
-						"http://" + session.domain(), "file:///etc/passwd");
+				// In-band payloads (AWS metadata, local file) always run; the blind OAST
+				// URL is only injected when a collector can observe the callback.
+				List<String> payloads = new java.util.ArrayList<>(
+						List.of("http://169.254.169.254/latest/meta-data/", "file:///etc/passwd"));
+				if (oastService.isEnabled()) {
+					payloads.add("http://" + session.domain());
+				}
 
 				Flux<Vulnerability> errorBasedVulns = Flux.fromIterable(payloads).concatMap((payload) -> {
 					return InjectionHelper.generateInjectedOperations(operation, payload)

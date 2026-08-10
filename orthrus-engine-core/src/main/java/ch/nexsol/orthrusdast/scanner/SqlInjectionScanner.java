@@ -29,6 +29,7 @@ import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
@@ -75,17 +76,27 @@ public class SqlInjectionScanner implements SecurityScanner {
 
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
+		return run(operation, null);
+	}
+
+	@Override
+	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		return run(operation, (context != null && context.hasBaseline()) ? context.baselineResponse() : null);
+	}
+
+	private Flux<Vulnerability> run(Operation operation, ScanHttpResponse baseline) {
 		return Flux.defer(() -> {
 			log.debug("Scanning for SQL Injection: {}", operation.url());
 
 			return oastService.createSession().flatMapMany((oastSession) -> {
 				// Gather the error signatures and a timing baseline once per endpoint.
+				// The
+				// engine baseline is reused for timing when available.
 				Mono<List<String>> sqlErrors = payloadLoader.getPayloads("sql-errors").collectList();
-				Mono<Long> baseline = httpClient.send(operation)
-					.map(ScanHttpResponse::responseTimeMs)
-					.onErrorReturn(0L);
+				Mono<Long> baselineMono = (baseline != null) ? Mono.just(baseline.responseTimeMs())
+						: httpClient.send(operation).map(ScanHttpResponse::responseTimeMs).onErrorReturn(0L);
 
-				return Mono.zip(sqlErrors, baseline).flatMapMany((ctx) -> {
+				return Mono.zip(sqlErrors, baselineMono).flatMapMany((ctx) -> {
 					List<String> signatures = ctx.getT1();
 					long baselineMs = ctx.getT2();
 

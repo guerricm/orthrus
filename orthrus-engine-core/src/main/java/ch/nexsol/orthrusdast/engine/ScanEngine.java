@@ -16,7 +16,10 @@
 
 package ch.nexsol.orthrusdast.engine;
 
+import java.net.URI;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +34,8 @@ import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
+import ch.nexsol.orthrusdast.scanner.ScanContext;
+import ch.nexsol.orthrusdast.scanner.ScannerScope;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 
 /**
@@ -113,47 +118,100 @@ public class ScanEngine {
 
 	private Flux<ScanAttempt> scanAll(List<Operation> operations, List<SecurityScanner> scanners,
 			ScanConfiguration config) {
-		return Flux.fromIterable(operations)
-			.flatMap((op) -> scanOperation(op, scanners, config), config.concurrency())
-			.doOnNext((attempt) -> {
-				for (Vulnerability vuln : attempt.vulnerabilities()) {
-					log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
-				}
-			});
+		List<SecurityScanner> operationScanners = scanners.stream()
+			.filter((s) -> s.getScope() != ScannerScope.HOST)
+			.toList();
+		List<SecurityScanner> hostScanners = scanners.stream()
+			.filter((s) -> s.getScope() == ScannerScope.HOST)
+			.toList();
+
+		Flux<ScanAttempt> perOperation = Flux.fromIterable(operations)
+			.flatMap((op) -> scanOperation(op, operationScanners, config), config.concurrency());
+
+		Flux<ScanAttempt> perHost = Flux.empty();
+		if (!hostScanners.isEmpty()) {
+			// One representative operation per host: host-scoped scanners (TLS, scheme
+			// enforcement) probe a property that is identical across every endpoint on
+			// the
+			// same host, so running them once avoids dozens of duplicate probes.
+			Map<String, Operation> representativeByHost = new LinkedHashMap<>();
+			for (Operation op : operations) {
+				representativeByHost.putIfAbsent(hostKey(op), op);
+			}
+			log.info("Running {} host-scoped scanner(s) once per host across {} host(s)", hostScanners.size(),
+					representativeByHost.size());
+			perHost = Flux.fromIterable(representativeByHost.values())
+				.flatMap((op) -> scanHost(op, hostScanners, config), config.concurrency());
+		}
+
+		return Flux.merge(perOperation, perHost).doOnNext((attempt) -> {
+			for (Vulnerability vuln : attempt.vulnerabilities()) {
+				log.warn("Found vulnerability: {} [{}] on {}", vuln.name(), vuln.riskLevel(), vuln.operationUrl());
+			}
+		});
 	}
 
 	private Flux<ScanAttempt> scanOperation(Operation operation, List<SecurityScanner> scanners,
 			ScanConfiguration config) {
+		if (scanners.isEmpty()) {
+			return Flux.empty();
+		}
 		log.debug("Scanning operation: {} {}", operation.method().name(), operation.url());
-		return httpClient.send(operation)
-			.retryWhen(reactor.util.retry.Retry.backoff(3, java.time.Duration.ofSeconds(1)))
-			.flatMapMany((response) -> {
-				if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
-					log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method().name(),
-							operation.url(), response.statusCode().value());
-					return Flux.fromIterable(scanners)
-						.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-								operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
-				}
-
-				return Flux.fromIterable(scanners)
-					.flatMap((scanner) -> scanner.scan(operation, config)
-						.collectList()
-						.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-								operation.url(), vulns.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED, vulns))
-						.onErrorResume((e) -> {
-							log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(),
-									e.getMessage());
-							return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(),
-									operation.method().name(), operation.url(), AttemptStatus.ERROR, List.of()));
-						}));
-			})
-			.onErrorResume((e) -> {
-				log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
+		// A single baseline request per operation, shared with scanners via ScanContext
+		// so
+		// they do not each re-issue the same unmodified request.
+		return httpClient.send(operation).flatMapMany((response) -> {
+			if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
+				log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method().name(),
+						operation.url(), response.statusCode().value());
 				return Flux.fromIterable(scanners)
 					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-							operation.url(), AttemptStatus.ERROR, List.of()));
+							operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
+			}
+
+			ScanContext context = new ScanContext(response);
+			return Flux.fromIterable(scanners).flatMap((scanner) -> runScanner(scanner, operation, config, context));
+		}).onErrorResume((e) -> {
+			log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
+			return Flux.fromIterable(scanners)
+				.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+						operation.url(), AttemptStatus.ERROR, List.of()));
+		});
+	}
+
+	private Flux<ScanAttempt> scanHost(Operation representative, List<SecurityScanner> scanners,
+			ScanConfiguration config) {
+		log.debug("Scanning host: {}", hostKey(representative));
+		// Host-scoped scanners do their own probing (TLS handshake, scheme downgrade) and
+		// do not need the engine baseline, so no baseline request is issued here.
+		ScanContext context = new ScanContext(null);
+		return Flux.fromIterable(scanners).flatMap((scanner) -> runScanner(scanner, representative, config, context));
+	}
+
+	private Mono<ScanAttempt> runScanner(SecurityScanner scanner, Operation operation, ScanConfiguration config,
+			ScanContext context) {
+		return scanner.scan(operation, config, context)
+			.collectList()
+			.map((vulns) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+					operation.url(), vulns.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED, vulns))
+			.onErrorResume((e) -> {
+				log.error("Scanner {} failed on operation {}: {}", scanner.getId(), operation.url(), e.getMessage());
+				return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+						operation.url(), AttemptStatus.ERROR, List.of()));
 			});
+	}
+
+	private static String hostKey(Operation operation) {
+		try {
+			URI uri = URI.create(operation.url());
+			String scheme = (uri.getScheme() != null) ? uri.getScheme().toLowerCase() : "";
+			String host = (uri.getHost() != null) ? uri.getHost().toLowerCase() : "";
+			int port = uri.getPort();
+			return scheme + "://" + host + ":" + port;
+		}
+		catch (RuntimeException ex) {
+			return String.valueOf(operation.url());
+		}
 	}
 
 }

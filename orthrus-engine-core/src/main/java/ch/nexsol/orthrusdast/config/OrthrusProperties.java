@@ -39,6 +39,9 @@ public class OrthrusProperties {
 	@Valid
 	private Discovery discovery = new Discovery();
 
+	@Valid
+	private Oast oast = new Oast();
+
 	public Http getHttp() {
 		return http;
 	}
@@ -71,6 +74,14 @@ public class OrthrusProperties {
 		this.discovery = discovery;
 	}
 
+	public Oast getOast() {
+		return oast;
+	}
+
+	public void setOast(Oast oast) {
+		this.oast = oast;
+	}
+
 	public static class Http {
 
 		private int connectTimeoutMs = 5000;
@@ -80,6 +91,31 @@ public class OrthrusProperties {
 		private int maxRedirects = 5;
 
 		private boolean ignoreSslErrors = false;
+
+		/**
+		 * Overall per-request budget, retries included. Must exceed readTimeoutMs plus
+		 * the cumulative retry backoff, otherwise a request that is being legitimately
+		 * retried is aborted before it can succeed.
+		 */
+		private int requestTimeoutMs = 60000;
+
+		/**
+		 * How many times a request is re-sent when the target signals a temporary
+		 * condition (429, 502, 503, 504) or the connection fails.
+		 */
+		private int maxRetries = 4;
+
+		/**
+		 * First backoff step. Each further attempt doubles it, used as a floor when the
+		 * server sends no {@code Retry-After} and capped by {@code retryMaxBackoffMs}.
+		 */
+		private long retryBackoffMs = 1000;
+
+		/**
+		 * Upper bound on any single backoff wait, so a large {@code Retry-After} cannot
+		 * stall a scan indefinitely.
+		 */
+		private long retryMaxBackoffMs = 30000;
 
 		public int getConnectTimeoutMs() {
 			return connectTimeoutMs;
@@ -111,6 +147,98 @@ public class OrthrusProperties {
 
 		public void setIgnoreSslErrors(boolean ignoreSslErrors) {
 			this.ignoreSslErrors = ignoreSslErrors;
+		}
+
+		public int getRequestTimeoutMs() {
+			return requestTimeoutMs;
+		}
+
+		public void setRequestTimeoutMs(int requestTimeoutMs) {
+			this.requestTimeoutMs = requestTimeoutMs;
+		}
+
+		public int getMaxRetries() {
+			return maxRetries;
+		}
+
+		public void setMaxRetries(int maxRetries) {
+			this.maxRetries = maxRetries;
+		}
+
+		public long getRetryBackoffMs() {
+			return retryBackoffMs;
+		}
+
+		public void setRetryBackoffMs(long retryBackoffMs) {
+			this.retryBackoffMs = retryBackoffMs;
+		}
+
+		public long getRetryMaxBackoffMs() {
+			return retryMaxBackoffMs;
+		}
+
+		public void setRetryMaxBackoffMs(long retryMaxBackoffMs) {
+			this.retryMaxBackoffMs = retryMaxBackoffMs;
+		}
+
+	}
+
+	public static class Oast {
+
+		/**
+		 * Whether out-of-band interaction detection is enabled. When false, scanners skip
+		 * OOB probing entirely instead of emitting payloads against an unreachable
+		 * server.
+		 */
+		private boolean enabled = false;
+
+		/**
+		 * Interactsh server host used to register sessions and poll interactions (e.g.
+		 * {@code oast.pro}). Required when {@link #enabled} is true.
+		 */
+		private String serverHost;
+
+		/**
+		 * Optional authentication token for self-hosted Interactsh servers.
+		 */
+		private String token;
+
+		/**
+		 * How long to poll for interactions after payloads have been sent, giving
+		 * out-of-band callbacks time to arrive.
+		 */
+		private long pollTimeoutMs = 8000;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getServerHost() {
+			return serverHost;
+		}
+
+		public void setServerHost(String serverHost) {
+			this.serverHost = serverHost;
+		}
+
+		public String getToken() {
+			return token;
+		}
+
+		public void setToken(String token) {
+			this.token = token;
+		}
+
+		public long getPollTimeoutMs() {
+			return pollTimeoutMs;
+		}
+
+		public void setPollTimeoutMs(long pollTimeoutMs) {
+			this.pollTimeoutMs = pollTimeoutMs;
 		}
 
 	}

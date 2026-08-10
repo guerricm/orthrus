@@ -100,13 +100,16 @@ public class XxeScanner implements SecurityScanner {
 						return Flux.just(vuln);
 					}
 					return Flux.empty();
-				}).concatWith(httpClient.send(testOpOast).flatMapMany((res) -> Flux.empty())); // Send
-																								// OAST
-																								// payload
-																								// but
-																								// ignore
-																								// response
-																								// body
+				})
+					.concatWith(oastService.isEnabled()
+							? httpClient.send(testOpOast).flatMapMany((res) -> Flux.<Vulnerability>empty())
+							: Flux.<Vulnerability>empty()); // Send
+															// OAST
+															// payload
+															// but
+															// ignore
+															// response
+															// body
 
 				return scanVulns.concatWith(oastService.pollInteractions(oastSession)
 					.map((interaction) -> createVulnerabilityWithTrace("Out-Of-Band (Blind) XXE Injection",
