@@ -1,0 +1,52 @@
+server:
+  port: 8091
+  shutdown: graceful
+
+spring:
+  main:
+    web-application-type: reactive
+  codec:
+    max-in-memory-size: 50MB
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  ai:
+    # Provider is chosen here; code only depends on ChatClient. Set to anthropic | openai | ollama
+    # to activate that provider (its api-key / base-url must then be provided). "none" keeps the
+    # context loadable with no LLM credentials (used until orthrus.ai.enabled is turned on).
+    model:
+      chat: ${ORTHRUS_AI_PROVIDER:none}
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+
+orthrus:
+  master:
+    url: ${ORTHRUS_MASTER_URL:http://localhost:8080}
+    internal-token: "change-me-in-production"
+    heartbeat-interval-ms: 10000
+  slave:
+    id: ${SLAVE_ID:${HOSTNAME:localhost}:${server.port}}
+    advertised-url: ${SLAVE_ADVERTISED_URL:http://${HOSTNAME:localhost}:${server.port}}
+
+  ai:
+    # Master switch for the LLM agents. When false the module still boots and registers, but tasks
+    # are executed by a deterministic echo strategy (useful for wiring/integration tests).
+    enabled: ${ORTHRUS_AI_ENABLED:false}
+    # Scanner families this AI node advertises to the manager (comma-separated ScannerFamily names).
+    # The manager only routes these phases here; the rest stay on the deterministic workers.
+    families: ${ORTHRUS_AI_FAMILIES:INJECTION,XSS,LOGIC}
+    scanner:
+      model: ${ORTHRUS_AI_SCANNER_MODEL:}
+    budget:
+      max-http-calls-per-operation: 40
+      max-tool-iterations: 12
+      task-timeout-seconds: 900
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
