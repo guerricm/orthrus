@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
@@ -59,12 +60,21 @@ class ScannerIntegrationTests {
 		if (baseUrl.endsWith("/")) {
 			baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
 		}
-		httpClient = new ScanHttpClient(WebClient.create());
+		httpClient = new ScanHttpClient(WebClient.create(), testProperties());
 	}
 
 	@AfterEach
 	void tearDown() throws IOException {
 		mockWebServer.shutdown();
+	}
+
+	// Negligible backoff so retryable statuses (e.g. the 500 error-based SQLi probe) are
+	// exercised without waiting for the production backoff schedule.
+	private static OrthrusProperties testProperties() {
+		OrthrusProperties props = new OrthrusProperties();
+		props.getHttp().setRetryBackoffMs(1);
+		props.getHttp().setRetryMaxBackoffMs(2);
+		return props;
 	}
 
 	@Test

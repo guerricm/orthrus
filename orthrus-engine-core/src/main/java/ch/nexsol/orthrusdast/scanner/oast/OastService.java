@@ -24,6 +24,14 @@ import reactor.core.publisher.Mono;
 public interface OastService {
 
 	/**
+	 * Whether out-of-band detection is actually operational. When false, scanners must
+	 * skip OOB-only probes rather than emit payloads that call back to an unreachable
+	 * collector.
+	 * @return true if OOB interactions can be observed
+	 */
+	boolean isEnabled();
+
+	/**
 	 * Registers a new unique domain for receiving Out-Of-Band interactions.
 	 * @return the result
 	 */

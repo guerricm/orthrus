@@ -29,6 +29,7 @@ import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
@@ -59,41 +60,50 @@ public class SecurityHeadersScanner implements SecurityScanner {
 	}
 
 	@Override
+	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		// The "normal response" check can reuse the engine baseline; only the
+		// bogus-method
+		// error probe remains a dedicated request.
+		if (context != null && context.hasBaseline()) {
+			return Flux.defer(() -> run(operation, Mono.just(context.baselineResponse())));
+		}
+		return scan(operation);
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
-		return Flux.defer(() -> {
-			Mono<ScanHttpResponse> normalResponseMono = httpClient.send(operation);
+		return Flux.defer(() -> run(operation, httpClient.send(operation)));
+	}
 
-			// Send a bogus method to trigger a container-level error page (e.g., 405 or
-			// 400) which often leaks Server headers
-			Operation errorOp = new Operation(operation.url(), HttpMethod.valueOf("BOGUS_METHOD_TEST"),
-					operation.headers(), operation.queryParams(), operation.body(), operation.securityRequirements(),
-					operation.expectedContentTypes(), operation.authScheme());
-			Mono<ScanHttpResponse> errorResponseMono = httpClient.send(errorOp, false)
-				.onErrorResume((e) -> Mono.empty());
+	private Flux<Vulnerability> run(Operation operation, Mono<ScanHttpResponse> normalResponseMono) {
+		// Send a bogus method to trigger a container-level error page (e.g., 405 or
+		// 400) which often leaks Server headers
+		Operation errorOp = new Operation(operation.url(), HttpMethod.valueOf("BOGUS_METHOD_TEST"), operation.headers(),
+				operation.queryParams(), operation.body(), operation.securityRequirements(),
+				operation.expectedContentTypes(), operation.authScheme());
+		Mono<ScanHttpResponse> errorResponseMono = httpClient.send(errorOp, false).onErrorResume((e) -> Mono.empty());
 
-			return Flux.merge(normalResponseMono, errorResponseMono).flatMap((response) -> {
-				List<Vulnerability> vulns = new ArrayList<>();
+		return Flux.merge(normalResponseMono, errorResponseMono).flatMap((response) -> {
+			List<Vulnerability> vulns = new ArrayList<>();
 
-				// Only check missing security headers on the 2xx normal response to avoid
-				// false positives on error pages
-				if (response.isSuccessful()) {
-					checkHeader(response, "Strict-Transport-Security", "HSTS", CWEReference.CWE_693, operation, vulns);
-					checkHeader(response, "X-Content-Type-Options", "X-Content-Type-Options", CWEReference.CWE_693,
-							operation, vulns);
-					checkHeader(response, "X-Frame-Options", "X-Frame-Options", CWEReference.CWE_1021, operation,
-							vulns);
-					checkHeader(response, "Content-Security-Policy", "CSP", CWEReference.CWE_693, operation, vulns);
-					checkHeader(response, "Permissions-Policy", "Permissions-Policy", CWEReference.CWE_693, operation,
-							vulns);
-					checkHeader(response, "Referrer-Policy", "Referrer-Policy", CWEReference.CWE_693, operation, vulns);
-				}
+			// Only check missing security headers on the 2xx normal response to avoid
+			// false positives on error pages
+			if (response.isSuccessful()) {
+				checkHeader(response, "Strict-Transport-Security", "HSTS", CWEReference.CWE_693, operation, vulns);
+				checkHeader(response, "X-Content-Type-Options", "X-Content-Type-Options", CWEReference.CWE_693,
+						operation, vulns);
+				checkHeader(response, "X-Frame-Options", "X-Frame-Options", CWEReference.CWE_1021, operation, vulns);
+				checkHeader(response, "Content-Security-Policy", "CSP", CWEReference.CWE_693, operation, vulns);
+				checkHeader(response, "Permissions-Policy", "Permissions-Policy", CWEReference.CWE_693, operation,
+						vulns);
+				checkHeader(response, "Referrer-Policy", "Referrer-Policy", CWEReference.CWE_693, operation, vulns);
+			}
 
-				// Server info leakage can happen on both normal and error responses!
-				checkServerInfoLeakage(response, operation, vulns);
+			// Server info leakage can happen on both normal and error responses!
+			checkServerInfoLeakage(response, operation, vulns);
 
-				return Flux.fromIterable(vulns);
-			}).distinct(Vulnerability::name); // Avoid duplicate info leakage reports
-		});
+			return Flux.fromIterable(vulns);
+		}).distinct(Vulnerability::name); // Avoid duplicate info leakage reports
 	}
 
 	private void checkHeader(ScanHttpResponse response, String headerName, String shortName, CWEReference cwe,

@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
@@ -61,12 +62,21 @@ class ScannerCorrectnessTests {
 		if (baseUrl.endsWith("/")) {
 			baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
 		}
-		httpClient = new ScanHttpClient(WebClient.create());
+		httpClient = new ScanHttpClient(WebClient.create(), testProperties());
 	}
 
 	@AfterEach
 	void tearDown() throws IOException {
 		mockWebServer.shutdown();
+	}
+
+	// Keeps retry backoff negligible so tests that return retryable statuses (403, 500,
+	// ...) exercise the retry path without sleeping for the production backoff schedule.
+	private static OrthrusProperties testProperties() {
+		OrthrusProperties props = new OrthrusProperties();
+		props.getHttp().setRetryBackoffMs(1);
+		props.getHttp().setRetryMaxBackoffMs(2);
+		return props;
 	}
 
 	// ----- DetectionUtils (pure heuristics) -----
