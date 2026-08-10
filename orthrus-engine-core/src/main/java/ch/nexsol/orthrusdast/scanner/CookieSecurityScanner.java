@@ -28,6 +28,7 @@ import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
@@ -58,21 +59,31 @@ public class CookieSecurityScanner implements SecurityScanner {
 	}
 
 	@Override
+	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		// Cookie flags live on the unmodified response, so reuse the engine baseline
+		// instead of issuing another identical request.
+		if (context != null && context.hasBaseline()) {
+			return analyze(operation, context.baselineResponse());
+		}
+		return scan(operation);
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
-		return Flux.defer(() -> {
-			return httpClient.send(operation).flatMapMany((response) -> {
-				List<Vulnerability> vulns = new ArrayList<>();
+		return Flux.defer(() -> httpClient.send(operation).flatMapMany((response) -> analyze(operation, response)));
+	}
 
-				List<String> cookies = response.headers().get(HttpHeaders.SET_COOKIE);
-				if (cookies != null && !cookies.isEmpty()) {
-					for (String cookie : cookies) {
-						checkCookie(cookie, operation, vulns, response);
-					}
-				}
+	private Flux<Vulnerability> analyze(Operation operation, ScanHttpResponse response) {
+		List<Vulnerability> vulns = new ArrayList<>();
 
-				return Flux.fromIterable(vulns);
-			});
-		});
+		List<String> cookies = response.headers().get(HttpHeaders.SET_COOKIE);
+		if (cookies != null && !cookies.isEmpty()) {
+			for (String cookie : cookies) {
+				checkCookie(cookie, operation, vulns, response);
+			}
+		}
+
+		return Flux.fromIterable(vulns);
 	}
 
 	private void checkCookie(String cookie, Operation operation, List<Vulnerability> vulns, ScanHttpResponse response) {

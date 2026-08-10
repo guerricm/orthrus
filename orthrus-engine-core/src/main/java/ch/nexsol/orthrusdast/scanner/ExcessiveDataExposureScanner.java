@@ -30,9 +30,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
 
@@ -85,12 +87,24 @@ public class ExcessiveDataExposureScanner implements SecurityScanner {
 
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
+		return scanInternal(operation, null);
+	}
+
+	@Override
+	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		// The body inspection needs only the unmodified response: reuse the engine
+		// baseline.
+		return scanInternal(operation, (context != null && context.hasBaseline()) ? context.baselineResponse() : null);
+	}
+
+	private Flux<Vulnerability> scanInternal(Operation operation, ScanHttpResponse baseline) {
 		if (operation.method().name().equals("OPTIONS") || operation.method().name().equals("HEAD")) {
 			return Flux.empty();
 		}
 
 		return payloadLoaderService.getPayloads("sensitive-keys").collectList().flatMapMany((sensitiveKeys) -> {
-			return httpClient.send(operation).flatMapMany((response) -> {
+			Mono<ScanHttpResponse> responseMono = (baseline != null) ? Mono.just(baseline) : httpClient.send(operation);
+			return responseMono.flatMapMany((response) -> {
 
 				if (!response.isSuccessful()) {
 					return Flux.empty();

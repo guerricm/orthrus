@@ -28,6 +28,7 @@ import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.oast.OastService;
 
@@ -77,6 +78,15 @@ public class CommandInjectionScanner implements SecurityScanner {
 
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
+		return run(operation, null);
+	}
+
+	@Override
+	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		return run(operation, (context != null && context.hasBaseline()) ? context.baselineResponse() : null);
+	}
+
+	private Flux<Vulnerability> run(Operation operation, ScanHttpResponse baselineResponse) {
 		return Flux.defer(() -> {
 			return oastService.createSession().flatMapMany((oastSession) -> {
 				String oastPayloadContent = "curl http://" + oastSession.domain();
@@ -84,18 +94,24 @@ public class CommandInjectionScanner implements SecurityScanner {
 
 				List<String> allPayloads = new ArrayList<>(List.of(PAYLOADS));
 
-				// Add OAST & Time-based payloads
+				// Add time-based payloads, and OAST callbacks only when out-of-band
+				// detection is operational (otherwise the callback can never be
+				// observed).
+				boolean oob = oastService.isEnabled();
 				for (String prefix : new String[] { "; ", "| ", "& ", "$(", "`" }) {
 					String suffix = prefix.contains("(") ? ")" : (prefix.contains("`") ? "`" : "");
-					allPayloads.add(prefix + oastPayloadContent + suffix);
+					if (oob) {
+						allPayloads.add(prefix + oastPayloadContent + suffix);
+					}
 					allPayloads.add(prefix + timePayloadContent + suffix);
 				}
 
 				// Measure a timing baseline once so time-based detection can compare
 				// against the endpoint's natural latency instead of a fixed threshold.
-				Mono<Long> baseline = httpClient.send(operation)
-					.map(ScanHttpResponse::responseTimeMs)
-					.onErrorReturn(0L);
+				// The
+				// engine baseline is reused when available.
+				Mono<Long> baseline = (baselineResponse != null) ? Mono.just(baselineResponse.responseTimeMs())
+						: httpClient.send(operation).map(ScanHttpResponse::responseTimeMs).onErrorReturn(0L);
 
 				Flux<Vulnerability> scanVulns = baseline.flatMapMany((baselineMs) -> Flux.fromIterable(allPayloads)
 					.concatMap((payload) -> InjectionHelper.generateInjectedOperations(operation, payload)

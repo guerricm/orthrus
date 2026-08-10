@@ -50,6 +50,26 @@ public interface SecurityScanner {
 	ScannerFamily getFamily();
 
 	/**
+	 * @return the granularity at which this scanner must run; defaults to per-operation
+	 */
+	default ScannerScope getScope() {
+		return ScannerScope.OPERATION;
+	}
+
+	/**
+	 * Executes the scan with the shared per-operation context. Scanners that can reuse
+	 * the baseline response the engine already captured should override this; the default
+	 * ignores the context and falls back to the configuration-aware entry point.
+	 * @param operation the operation to scan
+	 * @param config the scan configuration
+	 * @param context the shared per-operation context (baseline response, ...)
+	 * @return a Flux of found vulnerabilities
+	 */
+	default Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
+		return scan(operation, config);
+	}
+
+	/**
 	 * Executes the scan on the given operation with context configuration.
 	 * @param operation the operation to scan
 	 * @param config the scan configuration
