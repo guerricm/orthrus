@@ -88,6 +88,38 @@ class ScanHttpClientRetryTest {
 	}
 
 	@Test
+	void blockingStatusUsesSmallerBudget() {
+		// 403 is retried only blockingMaxRetries (default 1) times, so 2 requests total,
+		// then the real 403 is surfaced — it does not pay the full transient budget.
+		for (int i = 0; i < 6; i++) {
+			server.enqueue(new MockResponse().setResponseCode(403).setBody("blocked"));
+		}
+
+		Operation op = Operation.simple(server.url("/").toString(), HttpMethod.GET);
+		ScanHttpResponse response = client.send(op).block();
+
+		assertThat(response).isNotNull();
+		assertThat(response.statusCode().value()).isEqualTo(403);
+		assertThat(response.body()).isEqualTo("blocked");
+		assertThat(server.getRequestCount()).isEqualTo(2);
+	}
+
+	@Test
+	void serverErrorUsesSmallerBudget() {
+		// 500 (typically an error-based injection signal) is retried only once.
+		for (int i = 0; i < 6; i++) {
+			server.enqueue(new MockResponse().setResponseCode(500).setBody("boom"));
+		}
+
+		Operation op = Operation.simple(server.url("/").toString(), HttpMethod.GET);
+		ScanHttpResponse response = client.send(op).block();
+
+		assertThat(response).isNotNull();
+		assertThat(response.statusCode().value()).isEqualTo(500);
+		assertThat(server.getRequestCount()).isEqualTo(2);
+	}
+
+	@Test
 	void doesNotRetryFinalStatus() {
 		server.enqueue(new MockResponse().setResponseCode(404).setBody("nope"));
 

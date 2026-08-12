@@ -39,23 +39,45 @@ public class HttpRetryPolicy {
 
 	private final int maxRetries;
 
+	private final int blockingMaxRetries;
+
 	private final Duration baseBackoff;
 
 	private final Duration maxBackoff;
 
-	public HttpRetryPolicy(int maxRetries, Duration baseBackoff, Duration maxBackoff) {
+	public HttpRetryPolicy(int maxRetries, int blockingMaxRetries, Duration baseBackoff, Duration maxBackoff) {
 		this.maxRetries = maxRetries;
+		this.blockingMaxRetries = blockingMaxRetries;
 		this.baseBackoff = baseBackoff;
 		this.maxBackoff = maxBackoff;
 	}
 
 	public static HttpRetryPolicy from(OrthrusProperties.Http http) {
-		return new HttpRetryPolicy(http.getMaxRetries(), Duration.ofMillis(http.getRetryBackoffMs()),
-				Duration.ofMillis(http.getRetryMaxBackoffMs()));
+		return new HttpRetryPolicy(http.getMaxRetries(), http.getBlockingMaxRetries(),
+				Duration.ofMillis(http.getRetryBackoffMs()), Duration.ofMillis(http.getRetryMaxBackoffMs()));
 	}
 
+	/**
+	 * Retry budget for clearly transient failures (429/5xx-transient, network errors).
+	 * @return the maximum retries
+	 */
 	public int maxRetries() {
 		return maxRetries;
+	}
+
+	/**
+	 * Maximum retries allowed for a response with the given status. Ambiguous statuses
+	 * (401/403 blocks, 500) get the smaller {@code blockingMaxRetries} budget so they do
+	 * not stall the scan or multiply traffic; everything else gets the transient budget.
+	 * @param status the HTTP status code
+	 * @return the retry budget for that status
+	 */
+	public int maxRetriesForStatus(int status) {
+		return switch (classify(status)) {
+			case RETRYABLE_BLOCKING -> blockingMaxRetries;
+			case RETRYABLE_TRANSIENT -> (status == 500) ? blockingMaxRetries : maxRetries;
+			default -> maxRetries;
+		};
 	}
 
 	/**

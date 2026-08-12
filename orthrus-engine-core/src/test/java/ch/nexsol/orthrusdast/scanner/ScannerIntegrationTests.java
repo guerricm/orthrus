@@ -80,7 +80,7 @@ class ScannerIntegrationTests {
 	@Test
 	void testSqlInjectionScanner() {
 		SqlInjectionScanner scanner = new SqlInjectionScanner(httpClient, new PayloadLoaderService(),
-				new PayloadMutator(), new InteractshClient());
+				new PayloadMutator(), InteractshClient.disabled());
 
 		Operation op = new Operation(baseUrl + "/users", HttpMethod.GET, Map.<String, String>of(), Map.of("id", "1"),
 				null, List.<String>of(), List.<String>of(), null);
@@ -103,7 +103,7 @@ class ScannerIntegrationTests {
 	@Test
 	void testXssScanner() {
 		XssScanner scanner = new XssScanner(httpClient, new PayloadLoaderService(), new PayloadMutator(),
-				new InteractshClient());
+				InteractshClient.disabled());
 
 		Operation op = new Operation(baseUrl + "/search", HttpMethod.GET, Map.<String, String>of(), Map.of("q", "test"),
 				null, List.<String>of(), List.<String>of(), null);
