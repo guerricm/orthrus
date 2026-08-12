@@ -115,12 +115,15 @@ public class ScanHttpClient {
 
 		// Rebuilt on every attempt so the captured timing reflects only the last try, not
 		// the accumulated retry backoff (which would otherwise inflate response times and
-		// trip time-based injection heuristics).
+		// trip time-based injection heuristics). The timeout is applied per attempt, not
+		// to
+		// the whole retry chain, so legitimate retry backoff (including a server
+		// Retry-After)
+		// cannot trip it and discard the real response.
 		Mono<ScanHttpResponse> attemptMono = Mono
-			.defer(() -> singleAttempt(operation, extraHeaders, body, retryTransientErrors));
+			.defer(() -> singleAttempt(operation, extraHeaders, body, retryTransientErrors).timeout(requestTimeout));
 
 		return attemptMono.retryWhen(buildRetry(retryTransientErrors))
-			.timeout(requestTimeout)
 			.onErrorResume((e) -> recoverFromError(operation, e));
 	}
 
@@ -185,7 +188,11 @@ public class ScanHttpClient {
 			Throwable failure = signal.failure();
 			boolean retryable = failure instanceof RetryableResponseException
 					|| (retryTransientErrors && isTransientNetworkError(failure));
-			if (!retryable || signal.totalRetries() >= retryPolicy.maxRetries()) {
+			// Ambiguous statuses (401/403 blocks, 500) get a smaller budget than clearly
+			// transient failures; network errors use the transient budget.
+			int applicableMax = (failure instanceof RetryableResponseException rre)
+					? retryPolicy.maxRetriesForStatus(rre.status()) : retryPolicy.maxRetries();
+			if (!retryable || signal.totalRetries() >= applicableMax) {
 				// Exhausted, or not a retryable failure: propagate so onErrorResume can
 				// surface the real response (or a synthetic error for network failures).
 				return Mono.error(failure);
@@ -293,14 +300,21 @@ public class ScanHttpClient {
 	 */
 	private static final class RetryableResponseException extends RuntimeException {
 
+		private final int status;
+
 		private final transient ScanHttpResponse response;
 
 		private final transient Duration retryAfter;
 
 		RetryableResponseException(int status, ScanHttpResponse response, Duration retryAfter) {
 			super("Retryable HTTP status " + status);
+			this.status = status;
 			this.response = response;
 			this.retryAfter = retryAfter;
+		}
+
+		int status() {
+			return status;
 		}
 
 		ScanHttpResponse response() {
