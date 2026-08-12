@@ -64,12 +64,19 @@ public class InteractshClient implements OastService {
 		}
 	}
 
+	private InteractshClient(boolean enabled, String serverHost) {
+		this.enabled = enabled;
+		this.serverHost = serverHost;
+	}
+
 	/**
-	 * Disabled instance for tests and contexts without configuration.
+	 * A disabled instance for tests and contexts without configuration. Kept private as a
+	 * factory (rather than a second public constructor) so Spring has a single,
+	 * unambiguous injectable constructor.
+	 * @return a disabled OAST client
 	 */
-	public InteractshClient() {
-		this.enabled = false;
-		this.serverHost = null;
+	public static InteractshClient disabled() {
+		return new InteractshClient(false, null);
 	}
 
 	@Override
