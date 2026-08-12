@@ -76,71 +76,71 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 ## Getting Started
 
 ### Prerequisites
-- Java 25 or higher
-- Maven 3.8+
-- Docker (optional, for containerized deployments)
+- Docker and Docker Compose
+- _(Only if you build the images from source)_ Java 25+ and Maven 3.8+
 
-### Building the Project
-Compile and package the entire multi-module application:
+## Running the Application
+
+Orthrus runs as a stack — PostgreSQL, the **Master** (Web UI + orchestration) and one or more **Workers** (high-concurrency scan execution) — brought up together with Docker Compose. This is the recommended and only supported way to run the platform.
+
+### 1. Configure secrets
+Every credential is mandatory: on the `prod` profile the Master refuses to start while the shipped defaults are still in place. Copy the template and fill it in:
 ```bash
-./mvnw clean package -DskipTests
+cp .env.example .env
+# edit .env and set at least:
+#   POSTGRES_PASSWORD, ORTHRUS_INTERNAL_TOKEN, ADMIN_PASSWORD
 ```
-This generates three executable JARs:
-- `orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar`
-- `orthrus-worker/target/orthrus-worker-0.0.1-SNAPSHOT.jar`
-- `orthrus-cli/target/orthrus-cli-0.0.1-SNAPSHOT.jar`
 
-You can also build Docker images locally:
+### 2. Start the stack
+```bash
+docker compose up -d
+```
+This starts three services on a private network:
+- `orthrus-postgres` — the database (schema applied automatically on first start)
+- `orthrus-manager` — Web UI + REST API on **http://localhost:8080**
+- `orthrus-worker` — a scan worker on `:8081`, auto-registered with the Master
+
+Follow the logs and check status with:
+```bash
+docker compose logs -f orthrus-manager
+docker compose ps
+```
+
+### 3. Stop the stack
+```bash
+docker compose down        # stop, keep the database volume
+docker compose down -v     # stop and drop all persisted data
+```
+
+### Building the images from source (optional)
+The `docker-compose.yml` references published images, so this step is only needed if you want to run your own build. It produces the Manager, Worker and CLI images locally:
 ```bash
 mvn spring-boot:build-image -pl orthrus-manager
 mvn spring-boot:build-image -pl orthrus-worker
 mvn spring-boot:build-image -pl orthrus-cli
 ```
 
-## Running the Application
-
-### Using Docker Compose (Recommended)
-You can quickly start a Master and Slave node using the provided `docker-compose.yml`:
-```bash
-docker-compose up -d
-```
-
-### Running Manually (Java)
-1. **Start postgresql:
-   ```bash
-   docker run --name orthrus_database -p "45432:5432" -e POSTGRES_DB=orthrus -e POSTGRES_USER=orthrus -e POSTGRES_PASSWORD=orthrus -d postgres:17
-   ```
-2. **Start the Master node** (orchestrates scans and provides the Web UI):
-   ```bash
-   java -jar orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar
-   ```
-3. **Start one or more Slave nodes** (executes the actual high-concurrency scans):
-   ```bash
-   java -jar orthrus-worker/target/orthrus-worker-0.0.1-SNAPSHOT.jar --server.port=8081
-   ```
-
 
 ### Security & Authentication
-> **Note**: The Web UI and API are secured by default. You must log in using the default credentials:
-> - **Username**: `superadmin`
-> - **Password**: `superadmin`
-> 
-> You can change these by setting `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables.
+> **Note**: The Web UI and API are secured. The admin account is configured through `.env`:
+> - **Username**: `ADMIN_USERNAME` (defaults to `superadmin`)
+> - **Password**: `ADMIN_PASSWORD` (mandatory — the `prod` profile refuses to start on the shipped default)
+>
+> Log in with those credentials at `http://localhost:8080`.
 
 #### Single Sign-On (SSO) with OAuth2 / OIDC
 Orthrus natively supports OAuth2/OIDC login via standard Spring Security configuration.
-To enable SSO (e.g., with Keycloak, Auth0, Google), simply provide the standard `spring.security.oauth2.client` properties in your `application.yml` or as environment variables before starting the Master.
+To enable SSO (e.g., with Keycloak, Auth0, Google), provide the standard `spring.security.oauth2.client` properties to the Master. The `docker-compose.yml` already ships these keys commented out under `services.orthrus-manager.environment` — uncomment and fill them in (or add them to your `.env`):
 
-**Example: Generic OIDC SSO via Environment Variables**
-```bash
-export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID="orthrus-client"
-export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET="your_client_secret"
-export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_SCOPE="openid,profile,email"
-export SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI="https://your-idp.example.com/realms/master"
-export SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="https://your-idp.example.com/realms/master"
-java -jar orthrus-manager/target/orthrus-manager-0.0.1-SNAPSHOT.jar
+```yaml
+# docker-compose.yml → services.orthrus-manager.environment
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID: orthrus-client
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET: your_client_secret
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_SCOPE: openid,profile,email
+SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI: https://your-idp.example.com/realms/master
+SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://your-idp.example.com/realms/master
 ```
-When configured, the "Sign in with OpenID Connect" button will allow users to log in. Note that users logging in via OAuth2 will receive the default `ROLE_USER` role unless their token provides specific Orthrus roles mapping.
+Then apply the change with `docker compose up -d`. When configured, the "Sign in with OpenID Connect" button will allow users to log in. Note that users logging in via OAuth2 will receive the default `ROLE_USER` role unless their token provides specific Orthrus roles mapping.
 
 ## Using the Web Interface
 Once the Master is running, navigate to `http://localhost:8080` to access the Web UI.
@@ -153,7 +153,7 @@ Once the Master is running, navigate to `http://localhost:8080` to access the We
 
 
 ## Using the Standalone CLI
-If you want to run a scan from your terminal without spinning up the Master/UI infrastructure, use the CLI JAR autonomously.
+If you want to run a scan from your terminal without spinning up the Master/UI stack, use the CLI container autonomously — no database or Master required.
 
 ```bash
 docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]

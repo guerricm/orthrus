@@ -93,17 +93,27 @@ public class OrthrusProperties {
 		private boolean ignoreSslErrors = false;
 
 		/**
-		 * Overall per-request budget, retries included. Must exceed readTimeoutMs plus
-		 * the cumulative retry backoff, otherwise a request that is being legitimately
-		 * retried is aborted before it can succeed.
+		 * Ceiling for a single attempt (applied per try, not to the whole retry chain),
+		 * so retry backoff — including a server {@code Retry-After} — never trips it and
+		 * discards the real response. A hung attempt that exceeds this is treated as a
+		 * transient failure and retried.
 		 */
 		private int requestTimeoutMs = 60000;
 
 		/**
-		 * How many times a request is re-sent when the target signals a temporary
+		 * How many times a request is re-sent when the target signals a clearly transient
 		 * condition (429, 502, 503, 504) or the connection fails.
 		 */
 		private int maxRetries = 4;
+
+		/**
+		 * Retry budget for ambiguous statuses (401/403 that may be edge blocks, and 500).
+		 * These are frequently definitive — an auth wall, or an error-based injection
+		 * probe deliberately provoking a 500 — so they get a much smaller budget: enough
+		 * to ride out a transient block without paying a full backoff schedule on every
+		 * endpoint or multiplying injection traffic.
+		 */
+		private int blockingMaxRetries = 1;
 
 		/**
 		 * First backoff step. Each further attempt doubles it, used as a floor when the
@@ -163,6 +173,14 @@ public class OrthrusProperties {
 
 		public void setMaxRetries(int maxRetries) {
 			this.maxRetries = maxRetries;
+		}
+
+		public int getBlockingMaxRetries() {
+			return blockingMaxRetries;
+		}
+
+		public void setBlockingMaxRetries(int blockingMaxRetries) {
+			this.blockingMaxRetries = blockingMaxRetries;
 		}
 
 		public long getRetryBackoffMs() {

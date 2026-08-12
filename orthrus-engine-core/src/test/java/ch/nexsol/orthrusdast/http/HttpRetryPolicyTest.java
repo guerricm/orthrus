@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class HttpRetryPolicyTest {
 
-	private final HttpRetryPolicy policy = new HttpRetryPolicy(4, Duration.ofSeconds(1), Duration.ofSeconds(30));
+	private final HttpRetryPolicy policy = new HttpRetryPolicy(4, 1, Duration.ofSeconds(1), Duration.ofSeconds(30));
 
 	@Test
 	void classifiesRetryableAndFinalStatuses() {
@@ -40,6 +40,20 @@ class HttpRetryPolicyTest {
 		assertThat(HttpRetryPolicy.classify(200)).isEqualTo(StatusClass.FINAL);
 		assertThat(HttpRetryPolicy.classify(404)).isEqualTo(StatusClass.FINAL);
 		assertThat(HttpRetryPolicy.classify(422)).isEqualTo(StatusClass.FINAL);
+	}
+
+	@Test
+	void ambiguousStatusesGetSmallerBudget() {
+		// Clearly transient failures get the full budget.
+		assertThat(policy.maxRetriesForStatus(429)).isEqualTo(4);
+		assertThat(policy.maxRetriesForStatus(503)).isEqualTo(4);
+		assertThat(policy.maxRetriesForStatus(502)).isEqualTo(4);
+
+		// Ambiguous statuses (auth walls, error-based-injection 500s) get the small
+		// budget.
+		assertThat(policy.maxRetriesForStatus(401)).isEqualTo(1);
+		assertThat(policy.maxRetriesForStatus(403)).isEqualTo(1);
+		assertThat(policy.maxRetriesForStatus(500)).isEqualTo(1);
 	}
 
 	@Test
