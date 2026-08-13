@@ -169,7 +169,15 @@ public class ScanEngine {
 							operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
 			}
 
-			ScanContext context = new ScanContext(response);
+			// Only share a genuine response as the baseline. A 5xx (including the
+			// synthetic
+			// 503 produced when the baseline request failed) is unreliable as a timing or
+			// body baseline — sharing it would, for instance, feed a 60s synthetic
+			// latency
+			// into time-based injection detection — so scanners fall back to their own
+			// probe.
+			ScanContext context = (response.statusCode().value() >= 500) ? new ScanContext(null)
+					: new ScanContext(response);
 			return Flux.fromIterable(scanners).flatMap((scanner) -> runScanner(scanner, operation, config, context));
 		}).onErrorResume((e) -> {
 			log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
@@ -206,7 +214,16 @@ public class ScanEngine {
 			URI uri = URI.create(operation.url());
 			String scheme = (uri.getScheme() != null) ? uri.getScheme().toLowerCase() : "";
 			String host = (uri.getHost() != null) ? uri.getHost().toLowerCase() : "";
+			// Normalize the implicit default port so e.g. https://h/a and https://h:443/b
+			// collapse to the same host and host-scoped scanners run only once.
 			int port = uri.getPort();
+			if (port == -1) {
+				port = switch (scheme) {
+					case "https" -> 443;
+					case "http" -> 80;
+					default -> -1;
+				};
+			}
 			return scheme + "://" + host + ":" + port;
 		}
 		catch (RuntimeException ex) {
