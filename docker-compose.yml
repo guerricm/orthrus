@@ -35,6 +35,10 @@ services:
       ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-superadmin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      # Uncomment to show the "AI Campaign" entry in the UI and route it to the orchestrator.
+      # Only enable this together with the "ai" profile services below (they run the orchestrator).
+      # Leave it commented (not empty) when AI is off, or the feature would activate with no backend.
+      # ORTHRUS_AI_ORCHESTRATOR_URL: http://orthrus-ai-orchestrator:8090
       # Uncomment and configure these variables to enable Single Sign-On (SSO) with OpenID Connect (e.g. Keycloak, Auth0)
       # SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID: orthrus-client
       # SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET: your_client_secret
@@ -60,6 +64,66 @@ services:
       ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
       ORTHRUS_SLAVE_ID: slave-docker-node-1
       ORTHRUS_SLAVE_ADVERTISED_URL: http://orthrus-worker:8081
+    depends_on:
+      orthrus-manager:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - orthrus-network
+
+  # --- Optional AI orchestration (separable add-on) -----------------------------------------------
+  # These only start with the "ai" profile:  docker compose --profile ai up
+  # They need an LLM provider. The defaults below target an Ollama running on the host; for a SaaS
+  # provider set ORTHRUS_AI_PROVIDER=anthropic|openai and the matching API key in .env. To surface the
+  # AI Campaign button in the UI, also uncomment ORTHRUS_AI_ORCHESTRATOR_URL in the manager above.
+
+  orthrus-ai-scanner:
+    image: nexsoltech/orthrus-ai-scanner:1.0.0-SNAPSHOT # Replace with your actual registry/image tag
+    container_name: orthrus-ai-scanner
+    profiles: ["ai"]
+    ports:
+      - "8091:8091"
+    environment:
+      # Registers with the manager as an AI "smart worker" for the families it advertises.
+      ORTHRUS_MASTER_URL: http://orthrus-manager:8080
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ORTHRUS_SLAVE_ID: ai-scanner-node-1
+      ORTHRUS_SLAVE_ADVERTISED_URL: http://orthrus-ai-scanner:8091
+      ORTHRUS_AI_ENABLED: "true"
+      ORTHRUS_AI_FAMILIES: ${ORTHRUS_AI_FAMILIES:-INJECTION,XSS,LOGIC}
+      # Provider selection (anthropic | openai | ollama) and credentials.
+      ORTHRUS_AI_PROVIDER: ${ORTHRUS_AI_PROVIDER:-ollama}
+      ORTHRUS_AI_SCANNER_MODEL: ${ORTHRUS_AI_SCANNER_MODEL:-qwen2.5:7b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    extra_hosts:
+      # Lets the container reach an Ollama running on the Docker host.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      orthrus-manager:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - orthrus-network
+
+  orthrus-ai-orchestrator:
+    image: nexsoltech/orthrus-ai-orchestrator:1.0.0-SNAPSHOT # Replace with your actual registry/image tag
+    container_name: orthrus-ai-orchestrator
+    profiles: ["ai"]
+    ports:
+      - "8090:8090"
+    environment:
+      # Drives the manager's public API to plan and launch scans.
+      ORTHRUS_MANAGER_URL: http://orthrus-manager:8080
+      ORTHRUS_AI_ENABLED: "true"
+      ORTHRUS_AI_PROVIDER: ${ORTHRUS_AI_PROVIDER:-ollama}
+      ORTHRUS_AI_ORCHESTRATOR_MODEL: ${ORTHRUS_AI_ORCHESTRATOR_MODEL:-qwen2.5:7b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       orthrus-manager:
         condition: service_started
