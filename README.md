@@ -329,6 +329,20 @@ ORTHRUS_AI_ENABLED=true ORTHRUS_AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... \
   java -jar orthrus-ai-scanner/target/orthrus-ai-scanner-*.jar   # serves :8091
 ```
 
+With Docker Compose the two modules live behind the `ai` profile, so they only start when asked:
+
+```bash
+# Base stack only (no AI):
+docker compose up -d
+# Base stack + AI scanner + orchestrator (defaults to an Ollama on the host):
+docker compose --profile ai up -d
+```
+
+Pick the provider with `ORTHRUS_AI_PROVIDER` (`ollama` | `anthropic` | `openai`) and the model with
+`ORTHRUS_AI_SCANNER_MODEL` / `ORTHRUS_AI_ORCHESTRATOR_MODEL` in your `.env`. To show the **AI Campaign**
+button in the manager UI, also uncomment `ORTHRUS_AI_ORCHESTRATOR_URL` on the manager service. A small
+tool-capable model (e.g. `qwen2.5:7b`) is recommended over large MoE models for the agentic loop.
+
 ## Disclaimer
 
 > [!WARNING]
