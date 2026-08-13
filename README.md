@@ -284,6 +284,65 @@ public class MyCustomScanner implements SecurityScanner {
 }
 ```
 
+## AI Orchestration (optional add-on)
+
+Two optional modules add LLM-driven orchestration on top of the deterministic engine. They are
+**fully autonomous**: they depend on no other orthrus module and integrate purely over the
+documented HTTP contracts, so the base product builds and runs without them.
+
+- **`orthrus-ai-scanner`** — a "smart worker". It registers with the manager as a slave node,
+  advertises the scanner families it should own (`orthrus.ai.families`), and runs each dispatched
+  family task with an LLM agent that **generates its own payloads** (no static payload lists),
+  forges requests through a scope-guarded, budget-capped HTTP tool, and records only confirmed
+  findings. The manager routes tasks to it exactly like any worker — no manager change required.
+- **`orthrus-ai-orchestrator`** — the campaign brain. `POST /api/v1/campaigns {"target","objective"}`
+  makes it fingerprint the target, produce a structured plan (discoverer + prioritised families),
+  and launch the corresponding scan through the manager's public API.
+
+Both are **multi-provider**: the code depends only on Spring AI's `ChatClient`; the provider is
+pure configuration.
+
+```yaml
+# Enable the agents and pick a provider (anthropic | openai | ollama)
+orthrus:
+  ai:
+    enabled: true
+spring:
+  ai:
+    model:
+      chat: anthropic          # ORTHRUS_AI_PROVIDER
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+```
+
+When `orthrus.ai.enabled` is `false` (the default), each module still boots and runs a
+deterministic fallback (an echo executor / a static planner), so the wiring is testable without any
+model credentials. Guard-rails: the agents' only network access is a tool restricted to the target
+host, capped by a per-endpoint HTTP-call budget and a per-task timeout.
+
+```bash
+# Build just the AI modules
+mvn -pl orthrus-ai-scanner,orthrus-ai-orchestrator -am verify
+
+# Run an AI scanner node against a manager on :8080
+ORTHRUS_AI_ENABLED=true ORTHRUS_AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... \
+  java -jar orthrus-ai-scanner/target/orthrus-ai-scanner-*.jar   # serves :8091
+```
+
+With Docker Compose the two modules live behind the `ai` profile, so they only start when asked:
+
+```bash
+# Base stack only (no AI):
+docker compose up -d
+# Base stack + AI scanner + orchestrator (defaults to an Ollama on the host):
+docker compose --profile ai up -d
+```
+
+Pick the provider with `ORTHRUS_AI_PROVIDER` (`ollama` | `anthropic` | `openai`) and the model with
+`ORTHRUS_AI_SCANNER_MODEL` / `ORTHRUS_AI_ORCHESTRATOR_MODEL` in your `.env`. To show the **AI Campaign**
+button in the manager UI, also uncomment `ORTHRUS_AI_ORCHESTRATOR_URL` on the manager service. A small
+tool-capable model (e.g. `qwen2.5:7b`) is recommended over large MoE models for the agentic loop.
+
 ## Disclaimer
 
 > [!WARNING]

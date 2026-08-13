@@ -21,6 +21,8 @@
         <module>orthrus-worker</module>
         <module>orthrus-manager</module>
         <module>orthrus-cli</module>
+        <module>orthrus-ai-scanner</module>
+        <module>orthrus-ai-orchestrator</module>
     </modules>
 
     <properties>
@@ -40,10 +42,20 @@
         <checkstyle.version>12.3.1</checkstyle.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
+        <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Spring AI BOM (agentic orchestration in the orthrus-ai-* modules) -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <!-- Modules -->
             <dependency>
                 <groupId>ch.nexsol.security</groupId>
