@@ -68,6 +68,24 @@ class OrthrusManagerClientTests {
 	}
 
 	@Test
+	void sendsBasicAuthWhenCredentialsConfigured() {
+		java.util.concurrent.atomic.AtomicReference<String> authHeader = new java.util.concurrent.atomic.AtomicReference<>();
+		this.server = HttpServer.create().port(0).handle((request, response) -> {
+			authHeader.set(request.requestHeaders().get("Authorization"));
+			return response.status(200).header("Content-Type", "application/json").sendString(Mono.just("[]"));
+		}).bindNow();
+		AiOrchestratorProperties properties = new AiOrchestratorProperties();
+		properties.getManager().setUrl("http://localhost:" + this.server.port());
+		properties.getManager().setUsername("superadmin");
+		properties.getManager().setPassword("superadmin");
+		OrthrusManagerClient client = new OrthrusManagerClient(properties, WebClient.builder());
+
+		client.getDiscoverers().block();
+
+		assertThat(authHeader.get()).startsWith("Basic ");
+	}
+
+	@Test
 	void launchesScanAndParsesAcceptedJob() {
 		OrthrusManagerClient client = clientFor(
 				"{\"jobId\":42,\"target\":\"http://app.test\",\"status\":\"PENDING\",\"eventStreamUrl\":\"/sse/42\"}");

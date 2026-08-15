@@ -32,6 +32,7 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
@@ -92,6 +93,12 @@ public class SecurityConfig {
 			.hasAnyRole("ADMIN", "USER"))
 			.formLogin((form) -> form.loginPage("/login"))
 			.logout((logout) -> logout.requiresLogout(ServerWebExchangeMatchers.pathMatchers("/logout")))
+			// HTTP Basic lets programmatic API clients (e.g. the AI orchestrator)
+			// authenticate on
+			// /api/v1/**. Browser UI requests without credentials still go through the
+			// custom entry
+			// point below (redirect to /login), so no Basic dialog pops for humans.
+			.httpBasic(Customizer.withDefaults())
 			// CSRF protects the session-cookie UI. Internal API uses a shared-secret
 			// filter and /api/v1 uses bearer tokens; neither has a session to ride.
 			.csrf((csrf) -> csrf
