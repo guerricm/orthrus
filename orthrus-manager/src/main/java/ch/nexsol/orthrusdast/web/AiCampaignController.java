@@ -23,7 +23,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.web.ai.AiOrchestratorClient;
@@ -52,24 +52,31 @@ public class AiCampaignController {
 	}
 
 	@PostMapping("/ai/campaign")
-	public Mono<String> launchCampaign(@RequestParam String target, @RequestParam(required = false) String objective,
-			Model model) {
-		if (target == null || target.isBlank()) {
-			model.addAttribute("error", "A target is required.");
-			return Mono.just("ai/campaign");
-		}
-		return this.orchestratorClient.launchCampaign(target.trim(), objective).map((result) -> {
-			if (result.jobId() == null) {
-				model.addAttribute("error", "The orchestrator could not launch a scan on the manager.");
-				model.addAttribute("plan", result.plan());
-				return "ai/campaign";
+	public Mono<String> launchCampaign(ServerWebExchange exchange, Model model) {
+		// WebFlux does not bind form-urlencoded body fields via @RequestParam (that reads
+		// query
+		// params only), so the form data is read from the exchange like the other web
+		// forms do.
+		return exchange.getFormData().flatMap((form) -> {
+			String target = form.getFirst("target");
+			String objective = form.getFirst("objective");
+			if (target == null || target.isBlank()) {
+				model.addAttribute("error", "A target is required.");
+				return Mono.just("ai/campaign");
 			}
-			log.info("AI campaign launched job {} on {}", result.jobId(), result.target());
-			return "redirect:/scans/all";
-		}).onErrorResume((e) -> {
-			log.error("AI campaign for {} failed: {}", target, e.getMessage());
-			model.addAttribute("error", "AI orchestrator error: " + e.getMessage());
-			return Mono.just("ai/campaign");
+			return this.orchestratorClient.launchCampaign(target.trim(), objective).map((result) -> {
+				if (result.jobId() == null) {
+					model.addAttribute("error", "The orchestrator could not launch a scan on the manager.");
+					model.addAttribute("plan", result.plan());
+					return "ai/campaign";
+				}
+				log.info("AI campaign launched job {} on {}", result.jobId(), result.target());
+				return "redirect:/scans/all";
+			}).onErrorResume((e) -> {
+				log.error("AI campaign for {} failed: {}", target, e.getMessage());
+				model.addAttribute("error", "AI orchestrator error: " + e.getMessage());
+				return Mono.just("ai/campaign");
+			});
 		});
 	}
 
