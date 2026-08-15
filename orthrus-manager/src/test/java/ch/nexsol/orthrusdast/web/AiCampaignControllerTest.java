@@ -20,6 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import reactor.core.publisher.Mono;
@@ -34,9 +37,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
- * The AI campaign page validates its input, hands off to the orchestrator, and redirects
- * to the existing scan monitoring on success while surfacing errors on the form
- * otherwise.
+ * The AI campaign page reads the form body (WebFlux does not bind form fields
+ * via @RequestParam), hands off to the orchestrator, and redirects to the existing scan
+ * monitoring on success while surfacing errors on the form otherwise.
  */
 @ExtendWith(MockitoExtension.class)
 class AiCampaignControllerTest {
@@ -48,6 +51,12 @@ class AiCampaignControllerTest {
 		return new AiCampaignController(this.orchestratorClient);
 	}
 
+	private static MockServerWebExchange formExchange(String body) {
+		return MockServerWebExchange.from(MockServerHttpRequest.post("/ai/campaign")
+			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+			.body(body));
+	}
+
 	@Test
 	void redirectsToScansOnSuccessfulLaunch() {
 		ScanPlan plan = new ScanPlan("openapi", null, 10, false, "focus");
@@ -55,7 +64,9 @@ class AiCampaignControllerTest {
 			.thenReturn(Mono.just(new CampaignResult(plan, 7L, "http://app.test", "/sse/7")));
 
 		Model model = new ConcurrentModel();
-		String view = this.controller().launchCampaign("http://app.test", "find injection", model).block();
+		String view = this.controller()
+			.launchCampaign(formExchange("target=http://app.test&objective=find injection"), model)
+			.block();
 
 		assertThat(view).isEqualTo("redirect:/scans/all");
 	}
@@ -63,7 +74,7 @@ class AiCampaignControllerTest {
 	@Test
 	void rejectsBlankTarget() {
 		Model model = new ConcurrentModel();
-		String view = this.controller().launchCampaign("  ", null, model).block();
+		String view = this.controller().launchCampaign(formExchange("target=&objective=x"), model).block();
 
 		assertThat(view).isEqualTo("ai/campaign");
 		assertThat(model.getAttribute("error")).isNotNull();
@@ -75,7 +86,7 @@ class AiCampaignControllerTest {
 			.thenReturn(Mono.error(new RuntimeException("connection refused")));
 
 		Model model = new ConcurrentModel();
-		String view = this.controller().launchCampaign("http://app.test", null, model).block();
+		String view = this.controller().launchCampaign(formExchange("target=http://app.test"), model).block();
 
 		assertThat(view).isEqualTo("ai/campaign");
 		assertThat(model.getAttribute("error")).asString().contains("connection refused");
@@ -88,7 +99,7 @@ class AiCampaignControllerTest {
 			.thenReturn(Mono.just(new CampaignResult(plan, null, "http://app.test", null)));
 
 		Model model = new ConcurrentModel();
-		String view = this.controller().launchCampaign("http://app.test", null, model).block();
+		String view = this.controller().launchCampaign(formExchange("target=http://app.test"), model).block();
 
 		assertThat(view).isEqualTo("ai/campaign");
 		assertThat(model.getAttribute("error")).isNotNull();
