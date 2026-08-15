@@ -18,22 +18,33 @@ package ch.nexsol.orthrusdast.api;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
+import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
+import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
+import ch.nexsol.orthrusdast.model.GatewayType;
+import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
 import ch.nexsol.orthrusdast.model.ScanAttempt;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
@@ -58,14 +69,69 @@ public class MasterInternalApiController {
 
 	private final ScanTaskRepository scanTaskRepository;
 
+	private final ObjectMapper objectMapper;
+
+	/**
+	 * Discoverer ids on the classpath, used to recover them from a worker's flat
+	 * capability string.
+	 */
+	private final Set<String> knownDiscovererIds;
+
 	public MasterInternalApiController(SlaveNodeRepository slaveNodeRepository, ScanJobRepository scanJobRepository,
 			ScanResultService scanResultService, JobOrchestratorService jobOrchestratorService,
-			ScanTaskRepository scanTaskRepository) {
+			ScanTaskRepository scanTaskRepository, ObjectMapper objectMapper, List<EndpointDiscoverer> discoverers) {
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.scanResultService = scanResultService;
 		this.jobOrchestratorService = jobOrchestratorService;
 		this.scanTaskRepository = scanTaskRepository;
+		this.objectMapper = objectMapper;
+		this.knownDiscovererIds = discoverers.stream().map(EndpointDiscoverer::getId).collect(Collectors.toSet());
+	}
+
+	/**
+	 * Lists the discoverers the connected worker fleet provides. Same view as the public
+	 * API, exposed to internal token-bearing services (e.g. the AI orchestrator).
+	 * @return the discoverer ids currently runnable
+	 */
+	@GetMapping("/discoverers")
+	public Mono<List<String>> discoverers() {
+		return this.slaveNodeRepository.findAll()
+			.filter((slave) -> Boolean.TRUE.equals(slave.getIsActive()))
+			.filter((slave) -> slave.getStatus() != NodeStatus.OFFLINE)
+			.filter((slave) -> slave.getCapabilities() != null)
+			.flatMap((slave) -> Flux.fromArray(slave.getCapabilities().split(",")))
+			.map(String::trim)
+			.filter(this.knownDiscovererIds::contains)
+			.distinct()
+			.sort()
+			.collectList();
+	}
+
+	/**
+	 * Queues a scan on behalf of an internal service. A minimal counterpart to the public
+	 * scan endpoint (no OAuth2 token fetching or auth schemes): the scheduler picks the
+	 * queued job up.
+	 * @param request the scan request
+	 * @return 202 with the queued job
+	 */
+	@PostMapping(value = "/scans", consumes = MediaType.APPLICATION_JSON_VALUE,
+			produces = MediaType.APPLICATION_JSON_VALUE)
+	public Mono<ResponseEntity<InternalScanAccepted>> createScan(@RequestBody InternalScanRequest request) {
+		ScanConfiguration config = new ScanConfiguration(
+				(request.includeScanners() != null) ? request.includeScanners() : List.of(),
+				(request.excludeScanners() != null) ? request.excludeScanners() : List.of(),
+				(request.concurrency() != null && request.concurrency() > 0) ? request.concurrency() : 10, 5000, 10000,
+				request.ignoreSslErrors() != null && request.ignoreSslErrors(), "json", null, null,
+				(request.language() != null) ? request.language() : "en",
+				request.includePassed() != null && request.includePassed(), GatewayType.AUTO, null, null, null, null);
+
+		return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(config))
+			.flatMap((configJson) -> this.scanJobRepository
+				.save(new ScanJobEntity(request.discovererId(), request.target(), configJson, JobStatus.PENDING, null)))
+			.map((job) -> ResponseEntity.accepted()
+				.body(new InternalScanAccepted(job.getId(), job.getTarget(), job.getStatus().name(),
+						"/api/sse/jobs/" + job.getId() + "/events")));
 	}
 
 	/**
@@ -191,6 +257,35 @@ public class MasterInternalApiController {
 	}
 
 	public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
+	}
+
+	/**
+	 * Scan request from an internal service (e.g. the AI orchestrator). A minimal subset
+	 * of the public scan request; unset fields fall back to defaults.
+	 *
+	 * @param discovererId the discoverer to use
+	 * @param target the target to scan
+	 * @param includeScanners scanner ids to restrict to, or null/empty for all
+	 * @param excludeScanners scanner ids to skip
+	 * @param concurrency per-scan concurrency, or null for the default
+	 * @param ignoreSslErrors whether to ignore TLS errors, or null for false
+	 * @param language report language, or null for "en"
+	 * @param includePassed whether to keep passed attempts, or null for false
+	 */
+	public record InternalScanRequest(String discovererId, String target, List<String> includeScanners,
+			List<String> excludeScanners, Integer concurrency, Boolean ignoreSslErrors, String language,
+			Boolean includePassed) {
+	}
+
+	/**
+	 * Returned on acceptance of an internal scan request.
+	 *
+	 * @param jobId the queued job's id
+	 * @param target the target
+	 * @param status the initial status
+	 * @param eventStreamUrl the SSE URL to follow the job
+	 */
+	public record InternalScanAccepted(Long jobId, String target, String status, String eventStreamUrl) {
 	}
 
 }

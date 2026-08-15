@@ -68,21 +68,20 @@ class OrthrusManagerClientTests {
 	}
 
 	@Test
-	void sendsBasicAuthWhenCredentialsConfigured() {
-		java.util.concurrent.atomic.AtomicReference<String> authHeader = new java.util.concurrent.atomic.AtomicReference<>();
+	void sendsInternalTokenHeader() {
+		java.util.concurrent.atomic.AtomicReference<String> tokenHeader = new java.util.concurrent.atomic.AtomicReference<>();
 		this.server = HttpServer.create().port(0).handle((request, response) -> {
-			authHeader.set(request.requestHeaders().get("Authorization"));
+			tokenHeader.set(request.requestHeaders().get("X-Orthrus-Internal-Token"));
 			return response.status(200).header("Content-Type", "application/json").sendString(Mono.just("[]"));
 		}).bindNow();
 		AiOrchestratorProperties properties = new AiOrchestratorProperties();
 		properties.getManager().setUrl("http://localhost:" + this.server.port());
-		properties.getManager().setUsername("superadmin");
-		properties.getManager().setPassword("superadmin");
+		properties.getManager().setInternalToken("s3cret-token");
 		OrthrusManagerClient client = new OrthrusManagerClient(properties, WebClient.builder());
 
 		client.getDiscoverers().block();
 
-		assertThat(authHeader.get()).startsWith("Basic ");
+		assertThat(tokenHeader.get()).isEqualTo("s3cret-token");
 	}
 
 	@Test

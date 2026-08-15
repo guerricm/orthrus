@@ -29,12 +29,14 @@ import ch.nexsol.orthrusai.orchestrator.wire.ScanJobAccepted;
 import ch.nexsol.orthrusai.orchestrator.wire.ScanRequest;
 
 /**
- * Drives the orthrus manager's public API. The orchestrator never touches the manager's
- * internals; it launches scans and reads the fleet's discoverers exactly as an external
- * API client would.
+ * Reaches the orthrus manager over its internal API, authenticating with the shared
+ * secret exactly like a worker does. The orchestrator is an internal service, so it uses
+ * the token rather than human credentials.
  */
 @Component
 public class OrthrusManagerClient {
+
+	private static final String INTERNAL_TOKEN_HEADER = "X-Orthrus-Internal-Token";
 
 	private final WebClient webClient;
 
@@ -42,14 +44,9 @@ public class OrthrusManagerClient {
 
 	public OrthrusManagerClient(AiOrchestratorProperties properties, WebClient.Builder webClientBuilder) {
 		this.managerUrl = properties.getManager().getUrl();
-		String username = properties.getManager().getUsername();
-		// The manager secures its public API; authenticate with HTTP Basic when
-		// credentials are set.
-		if (username != null && !username.isBlank()) {
-			webClientBuilder
-				.defaultHeaders((headers) -> headers.setBasicAuth(username, properties.getManager().getPassword()));
-		}
-		this.webClient = webClientBuilder.build();
+		this.webClient = webClientBuilder
+			.defaultHeader(INTERNAL_TOKEN_HEADER, properties.getManager().getInternalToken())
+			.build();
 	}
 
 	/**
@@ -58,7 +55,7 @@ public class OrthrusManagerClient {
 	 */
 	public Mono<List<String>> getDiscoverers() {
 		return this.webClient.get()
-			.uri(this.managerUrl + "/api/v1/scans/discoverers")
+			.uri(this.managerUrl + "/api/internal/discoverers")
 			.retrieve()
 			.bodyToMono(new ParameterizedTypeReference<List<String>>() {
 			})
@@ -72,7 +69,7 @@ public class OrthrusManagerClient {
 	 */
 	public Mono<ScanJobAccepted> launchScan(ScanRequest request) {
 		return this.webClient.post()
-			.uri(this.managerUrl + "/api/v1/scans")
+			.uri(this.managerUrl + "/api/internal/scans")
 			.bodyValue(request)
 			.retrieve()
 			.bodyToMono(ScanJobAccepted.class)
