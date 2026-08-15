@@ -42,6 +42,13 @@ public class OrthrusManagerClient {
 
 	public OrthrusManagerClient(AiOrchestratorProperties properties, WebClient.Builder webClientBuilder) {
 		this.managerUrl = properties.getManager().getUrl();
+		String username = properties.getManager().getUsername();
+		// The manager secures its public API; authenticate with HTTP Basic when
+		// credentials are set.
+		if (username != null && !username.isBlank()) {
+			webClientBuilder
+				.defaultHeaders((headers) -> headers.setBasicAuth(username, properties.getManager().getPassword()));
+		}
 		this.webClient = webClientBuilder.build();
 	}
 
