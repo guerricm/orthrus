@@ -44,9 +44,11 @@ public class AiOrchestratorProperties {
 
 		private String url = "http://localhost:8080";
 
-		private String username = "";
-
-		private String password = "";
+		/**
+		 * Shared secret to reach the manager's internal API, the same token the workers
+		 * use.
+		 */
+		private String internalToken = "change-me-in-production";
 
 		public String getUrl() {
 			return this.url;
@@ -56,20 +58,12 @@ public class AiOrchestratorProperties {
 			this.url = url;
 		}
 
-		public String getUsername() {
-			return this.username;
+		public String getInternalToken() {
+			return this.internalToken;
 		}
 
-		public void setUsername(String username) {
-			this.username = username;
-		}
-
-		public String getPassword() {
-			return this.password;
-		}
-
-		public void setPassword(String password) {
-			this.password = password;
+		public void setInternalToken(String internalToken) {
+			this.internalToken = internalToken;
 		}
 
 	}

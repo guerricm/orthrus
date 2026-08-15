@@ -78,7 +78,8 @@ class MasterInternalApiControllerTest {
 	@BeforeEach
 	void setUp() {
 		this.controller = new MasterInternalApiController(this.slaveNodeRepository, this.scanJobRepository,
-				this.scanResultService, this.jobOrchestratorService, this.scanTaskRepository);
+				this.scanResultService, this.jobOrchestratorService, this.scanTaskRepository,
+				new tools.jackson.databind.ObjectMapper(), java.util.List.of());
 
 		when(this.jobOrchestratorService.recoverTasksOfSlave(anyString(), anyString())).thenReturn(Mono.empty());
 		when(this.slaveNodeRepository.insertSlaveNode(anyString(), anyString(), any(), anyString(), any()))
