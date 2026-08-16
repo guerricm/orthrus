@@ -151,8 +151,13 @@ public class SystemController {
 
 	private ScanJobEntity prepareReplayedJob(ScanJobEntity job, String updatedConfigJson) {
 		if (job.getStatus() == JobStatus.COMPLETED) {
-			return new ScanJobEntity(job.getDiscovererId(), job.getTarget(), updatedConfigJson, JobStatus.PENDING,
-					job.getTestPlanId());
+			ScanJobEntity replay = new ScanJobEntity(job.getDiscovererId(), job.getTarget(), updatedConfigJson,
+					JobStatus.PENDING, job.getTestPlanId());
+			// Preserve how the scan was run: an AI scan must replay on the AI nodes, not
+			// fall back to a deterministic run. The recon is re-fetched when the job
+			// starts.
+			replay.setAiMode(job.isAiMode());
+			return replay;
 		}
 		else {
 			job.setScanConfigurationJson(updatedConfigJson);
@@ -163,6 +168,9 @@ public class SystemController {
 			job.setResultId(null);
 			job.setVulnsCount(null);
 			job.setTestsCount(null);
+			// Drop the previous run's shared recon so the replay re-recons the target
+			// fresh.
+			job.setAiContext(null);
 			return job;
 		}
 	}

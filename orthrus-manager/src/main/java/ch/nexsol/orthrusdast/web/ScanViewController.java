@@ -315,6 +315,7 @@ public class ScanViewController {
 				model.addAttribute("status", job.getStatus().name());
 				model.addAttribute("resultId", job.getResultId());
 				model.addAttribute("assignedSlaveId", job.getAssignedSlaveId());
+				model.addAttribute("aiMode", job.isAiMode());
 
 				return Mono
 					.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))

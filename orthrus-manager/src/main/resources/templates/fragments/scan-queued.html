@@ -20,6 +20,7 @@
                     <strong>#<span th:text="${jobId}"></span></strong>
                     <span class="text-muted mx-2">&bull;</span>
                     <strong th:if="${planName != null}" th:text="${planName}"></strong>
+                    <span th:if="${aiMode}" class="badge bg-info text-dark ms-2" title="Runs on the AI scanner nodes">AI</span>
                     <span class="text-muted mx-2" th:if="${planName != null}">&bull;</span>
                     <span class="badge bg-secondary text-light text-uppercase"
                         th:text="${discovererId != null ? discovererId : 'openapi'}">openapi</span>

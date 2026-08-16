@@ -6,7 +6,10 @@
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
             <strong class="text-light" th:text="'#' + ${scan.id}">#1</strong>
         </td>
-        <td class="bg-transparent border-secondary fw-bold text-primary" style="padding: 1rem; vertical-align: middle;" th:text="${scan.planName ?: '-'}">Plan Name</td>
+        <td class="bg-transparent border-secondary fw-bold text-primary" style="padding: 1rem; vertical-align: middle;">
+            <span th:text="${scan.planName ?: '-'}">Plan Name</span>
+            <span th:if="${scan.aiMode}" class="badge bg-info text-dark ms-1" title="Ran on the AI scanner nodes">AI</span>
+        </td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${#temporals.format(scan.createdAt, 'HH:mm:ss dd/MM/yyyy')}">10:00 01/01/2026</td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle; word-break: break-all;"><code class="text-info" th:text="${scan.target}">https://api.example.com</code></td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
