@@ -84,7 +84,7 @@ public class ReconService {
 			if (!looksOpenApi || paths == null || !paths.isObject()) {
 				return List.of();
 			}
-			String base = origin(target);
+			String base = resolveBase(target, root);
 			List<DiscoveredEndpoint> endpoints = new ArrayList<>();
 			paths.properties().forEach((entry) -> {
 				String path = entry.getKey();
@@ -101,6 +101,51 @@ public class ReconService {
 		catch (RuntimeException ex) {
 			return List.of();
 		}
+	}
+
+	/**
+	 * Resolves the base URL that OpenAPI paths are relative to. Honours the document's
+	 * {@code servers[0].url} (absolute, or relative to the document's origin), and
+	 * otherwise falls back to the document's parent path, so a spec fetched from
+	 * {@code https://host/api/v3/openapi.json} yields {@code https://host/api/v3}, not
+	 * just {@code https://host}. Getting this wrong makes every probe hit a 404.
+	 * @param target the URL the document was fetched from
+	 * @param root the parsed OpenAPI document
+	 * @return the base URL to prefix paths with, without a trailing slash
+	 */
+	private String resolveBase(String target, JsonNode root) {
+		JsonNode servers = root.get("servers");
+		if (servers != null && servers.isArray() && !servers.isEmpty()) {
+			JsonNode first = servers.get(0);
+			String url = (first != null && first.hasNonNull("url")) ? first.get("url").asString().trim() : "";
+			if (!url.isEmpty()) {
+				if (url.startsWith("http://") || url.startsWith("https://")) {
+					return stripTrailingSlash(url);
+				}
+				return origin(target) + stripTrailingSlash(url.startsWith("/") ? url : "/" + url);
+			}
+		}
+		return docBase(target);
+	}
+
+	private String docBase(String target) {
+		try {
+			URI uri = URI.create(target);
+			String path = uri.getRawPath();
+			if (path == null || path.isEmpty() || path.equals("/")) {
+				return origin(target);
+			}
+			int lastSlash = path.lastIndexOf('/');
+			String parent = (lastSlash > 0) ? path.substring(0, lastSlash) : "";
+			return origin(target) + parent;
+		}
+		catch (IllegalArgumentException ex) {
+			return origin(target);
+		}
+	}
+
+	private String stripTrailingSlash(String url) {
+		return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
 	}
 
 	private String origin(String target) {

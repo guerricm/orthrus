@@ -16,6 +16,9 @@
 
 package ch.nexsol.orthrusai.scanner.ai.tool;
 
+import java.time.Duration;
+import java.util.List;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
+import ch.nexsol.orthrusai.scanner.wire.AiRecon;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -83,6 +87,35 @@ class HttpProbeToolTests {
 
 		assertThat(result).startsWith("REFUSED");
 		assertThat(ctx.httpCallsUsed()).isZero();
+	}
+
+	@Test
+	void appliesConfiguredHeaderAndQueryCredentialsOnEveryRequest() {
+		StringBuilder receivedAuth = new StringBuilder();
+		StringBuilder receivedUri = new StringBuilder();
+		DisposableServer echo = HttpServer.create().port(0).handle((request, response) -> {
+			String auth = request.requestHeaders().get("Authorization");
+			receivedAuth.append((auth != null) ? auth : "");
+			receivedUri.append(request.uri());
+			return response.status(200).sendString(Mono.just("ok"));
+		}).bindNow();
+		String echoTarget = "http://localhost:" + echo.port() + "/api";
+		try {
+			RunContext ctx = new RunContext(echoTarget, "ai-injection", 5);
+			List<AiRecon.Credential> credentials = List.of(
+					new AiRecon.Credential("HEADER", "Authorization", "Bearer secret-token"),
+					new AiRecon.Credential("QUERY", "api_key", "k123"));
+			HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx, credentials,
+					Duration.ofSeconds(10));
+
+			tool.sendRequest(echoTarget, "GET", null, null);
+
+			assertThat(receivedAuth.toString()).isEqualTo("Bearer secret-token");
+			assertThat(receivedUri.toString()).contains("api_key=k123");
+		}
+		finally {
+			echo.disposeNow();
+		}
 	}
 
 	@Test

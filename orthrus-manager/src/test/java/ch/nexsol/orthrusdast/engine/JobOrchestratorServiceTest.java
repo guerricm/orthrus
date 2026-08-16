@@ -55,6 +55,7 @@ import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiJobReconService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,6 +86,9 @@ class JobOrchestratorServiceTest {
 	@Mock
 	private SlaveNodeRepository slaveNodeRepository;
 
+	@Mock
+	private AiJobReconService aiJobReconService;
+
 	private MockWebServer slave;
 
 	private JobOrchestratorService orchestrator;
@@ -98,7 +102,9 @@ class JobOrchestratorServiceTest {
 
 		this.orchestrator = new JobOrchestratorService(this.scanJobRepository, this.scanTaskRepository,
 				this.scanResultService, this.jobEventPublisher, this.slaveNodeRepository, WebClient.builder(),
-				scannerCatalog(), new tools.jackson.databind.ObjectMapper());
+				scannerCatalog(), new tools.jackson.databind.ObjectMapper(), this.aiJobReconService);
+
+		when(this.aiJobReconService.contextJsonFor(any(ScanJobEntity.class))).thenReturn(Mono.empty());
 
 		when(this.scanTaskRepository.save(any(ScanTaskEntity.class))).thenAnswer((invocation) -> {
 			ScanTaskEntity task = invocation.getArgument(0);

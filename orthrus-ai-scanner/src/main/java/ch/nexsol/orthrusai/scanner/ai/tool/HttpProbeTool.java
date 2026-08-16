@@ -17,6 +17,8 @@
 package ch.nexsol.orthrusai.scanner.ai.tool;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -32,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
+import ch.nexsol.orthrusai.scanner.wire.AiRecon;
 
 /**
  * The agent's only way to touch the network. It forges the request the model asks for,
@@ -54,11 +57,22 @@ public class HttpProbeTool {
 
 	private final RunContext runContext;
 
+	private final List<AiRecon.Credential> credentials;
+
+	private final Duration readTimeout;
+
 	public HttpProbeTool(WebClient webClient, ScopeGuard scopeGuard, ObjectMapper objectMapper, RunContext runContext) {
+		this(webClient, scopeGuard, objectMapper, runContext, List.of(), Duration.ofSeconds(15));
+	}
+
+	public HttpProbeTool(WebClient webClient, ScopeGuard scopeGuard, ObjectMapper objectMapper, RunContext runContext,
+			List<AiRecon.Credential> credentials, Duration readTimeout) {
 		this.webClient = webClient;
 		this.scopeGuard = scopeGuard;
 		this.objectMapper = objectMapper;
 		this.runContext = runContext;
+		this.credentials = (credentials != null) ? credentials : List.of();
+		this.readTimeout = readTimeout;
 	}
 
 	@Tool(description = "Send an HTTP request to the target under test and return the response "
@@ -81,17 +95,52 @@ public class HttpProbeTool {
 
 		HttpMethod httpMethod = HttpMethod.valueOf((method != null) ? method.trim().toUpperCase() : "GET");
 		try {
-			WebClient.RequestBodySpec spec = this.webClient.method(httpMethod).uri(url);
+			WebClient.RequestBodySpec spec = this.webClient.method(httpMethod).uri(applyQueryCredentials(url));
+			applyConfiguredCredentials(spec);
 			applyHeaders(spec, headersJson);
 			if (body != null && !body.isBlank()) {
 				spec.bodyValue(body);
 			}
-			return spec.exchangeToMono(this::render).timeout(Duration.ofSeconds(15)).block(Duration.ofSeconds(20));
+			return spec.exchangeToMono(this::render).timeout(this.readTimeout).block(this.readTimeout.plusSeconds(5));
 		}
 		catch (RuntimeException ex) {
 			log.debug("Probe {} {} failed: {}", httpMethod, url, ex.getMessage());
 			return "ERROR: request failed: " + ex.getMessage();
 		}
+	}
+
+	/**
+	 * Attaches the operator-configured credentials (header and cookie) to every request,
+	 * so the agent probes as an authenticated client instead of guessing tokens it cannot
+	 * know.
+	 * @param spec the request being built
+	 */
+	private void applyConfiguredCredentials(WebClient.RequestBodySpec spec) {
+		for (AiRecon.Credential c : this.credentials) {
+			if (c == null || c.name() == null || c.value() == null) {
+				continue;
+			}
+			String location = (c.location() != null) ? c.location().toUpperCase(Locale.ROOT) : "HEADER";
+			if ("COOKIE".equals(location)) {
+				spec.cookie(c.name(), c.value());
+			}
+			else if (!"QUERY".equals(location)) {
+				spec.header(c.name(), c.value().replaceAll("[\\r\\n]", ""));
+			}
+		}
+	}
+
+	private String applyQueryCredentials(String url) {
+		StringBuilder built = new StringBuilder(url);
+		boolean hasQuery = url.contains("?");
+		for (AiRecon.Credential c : this.credentials) {
+			if (c == null || c.name() == null || c.value() == null || !"QUERY".equalsIgnoreCase(c.location())) {
+				continue;
+			}
+			built.append(hasQuery ? '&' : '?').append(c.name()).append('=').append(c.value());
+			hasQuery = true;
+		}
+		return built.toString();
 	}
 
 	private void applyHeaders(WebClient.RequestBodySpec spec, String headersJson) {

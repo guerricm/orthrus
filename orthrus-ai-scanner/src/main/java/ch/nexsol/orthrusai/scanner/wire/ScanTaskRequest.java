@@ -26,7 +26,9 @@ package ch.nexsol.orthrusai.scanner.wire;
  * @param discovererId the discoverer to use for endpoint discovery
  * @param target the target under test
  * @param scanConfigurationJson the serialized scan configuration
+ * @param aiContextJson the orchestrator's shared recon (serialized: base URL, endpoints,
+ * target fingerprint), or null to have this node run its own local recon
  */
 public record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
-		String scanConfigurationJson) {
+		String scanConfigurationJson, String aiContextJson) {
 }

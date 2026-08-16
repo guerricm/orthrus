@@ -80,6 +80,18 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	Mono<Integer> attachResult(Long id, String resultId);
 
 	/**
+	 * Stores the orchestrator's shared recon on an AI job, touching that column only so
+	 * it does not race with the counter updates. Read back at dispatch and forwarded to
+	 * each scan task.
+	 * @param id the job
+	 * @param aiContext the serialized recon result
+	 * @return the number of rows updated
+	 */
+	@org.springframework.data.r2dbc.repository.Modifying
+	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET ai_context = :aiContext WHERE id = :id")
+	Mono<Integer> saveAiContext(Long id, String aiContext);
+
+	/**
 	 * Moves a running job to its terminal status. Only the caller that gets 1 back should
 	 * publish the outcome, so the job is finalised and announced exactly once.
 	 * @param id the job

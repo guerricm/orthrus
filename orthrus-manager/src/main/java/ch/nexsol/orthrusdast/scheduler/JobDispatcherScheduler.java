@@ -309,7 +309,7 @@ public class JobDispatcherScheduler {
 
 		return this.scanJobRepository.findById(task.getScanJobId()).flatMap((job) -> {
 			ScanTaskRequest payload = new ScanTaskRequest(task.getId(), job.getId(), task.getPhase(),
-					job.getDiscovererId(), job.getTarget(), job.getScanConfigurationJson());
+					job.getDiscovererId(), job.getTarget(), job.getScanConfigurationJson(), job.getAiContext());
 
 			// Column-scoped update: results stream in concurrently and a whole-row write
 			// would roll back the counters.
@@ -331,7 +331,7 @@ public class JobDispatcherScheduler {
 	}
 
 	record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
-			String scanConfigurationJson) {
+			String scanConfigurationJson, String aiContextJson) {
 	}
 
 }

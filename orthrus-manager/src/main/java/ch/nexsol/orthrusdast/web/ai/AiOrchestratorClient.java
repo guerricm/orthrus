@@ -64,4 +64,26 @@ public class AiOrchestratorClient {
 			.timeout(Duration.ofSeconds(120));
 	}
 
+	/**
+	 * Asks the orchestrator to fingerprint a target and map its endpoints, once per AI
+	 * job. The credentials and host let it fetch a protected OpenAPI document and resolve
+	 * the right base path. The manager persists the result and forwards it to each node.
+	 * @param target the target to recon
+	 * @param openapiOverrideHost the base host to force, or null
+	 * @param credentials the credentials to send while reconning, may be empty
+	 * @return the shared recon result
+	 */
+	public Mono<AiReconResult> recon(String target, String openapiOverrideHost,
+			List<AiScanContext.Credential> credentials) {
+		Map<String, Object> body = Map.of("target", target, "openapiOverrideHost",
+				(openapiOverrideHost != null) ? openapiOverrideHost : "", "credentials",
+				(credentials != null) ? credentials : List.of());
+		return this.webClient.post()
+			.uri(this.orchestratorUrl + "/api/v1/recon")
+			.bodyValue(body)
+			.retrieve()
+			.bodyToMono(AiReconResult.class)
+			.timeout(Duration.ofSeconds(120));
+	}
+
 }

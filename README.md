@@ -294,10 +294,17 @@ documented HTTP contracts, so the base product builds and runs without them.
   advertises the scanner families it should own (`orthrus.ai.families`), and runs each dispatched
   family task with an LLM agent that **generates its own payloads** (no static payload lists),
   forges requests through a scope-guarded, budget-capped HTTP tool, and records only confirmed
-  findings. The manager routes tasks to it exactly like any worker — no manager change required.
-- **`orthrus-ai-orchestrator`** — the campaign brain. `POST /api/v1/campaigns {"target","objective"}`
-  makes it fingerprint the target, produce a structured plan (discoverer + prioritised families),
-  and launch the corresponding scan through the manager's public API.
+  findings. It advertises an `AI-EXECUTOR` capability so the manager can route AI runs to it. When
+  the task carries the orchestrator's shared recon it works from those endpoints and context; with
+  no orchestrator it falls back to its own local recon, so it still runs standalone.
+- **`orthrus-ai-orchestrator`** — the planning **and recon** brain. It never launches a scan; it
+  answers two calls the manager makes:
+    - `POST /api/v1/plan {"target","objective","availableDiscoverers"}` → a structured plan
+      (recommended discoverer + prioritised families + rationale), used to pre-fill a Test Plan the
+      operator reviews and runs through the normal flow.
+    - `POST /api/v1/recon {"target"}` → the shared recon: it fingerprints the target once and maps
+      its endpoints (honouring the OpenAPI `servers` base path), and the manager forwards this to
+      every scanner node so they no longer each re-probe blindly.
 
 Both are **multi-provider**: the code depends only on Spring AI's `ChatClient`; the provider is
 pure configuration.
@@ -329,7 +336,7 @@ ORTHRUS_AI_ENABLED=true ORTHRUS_AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... \
   java -jar orthrus-ai-scanner/target/orthrus-ai-scanner-*.jar   # serves :8091
 ```
 
-With Docker Compose the two modules live behind the `ai` profile, so they only start when asked:
+With Docker Compose the two AI modules live behind the `ai` profile, so they only start when asked:
 
 ```bash
 # Base stack only (no AI):
@@ -339,9 +346,28 @@ docker compose --profile ai up -d
 ```
 
 Pick the provider with `ORTHRUS_AI_PROVIDER` (`ollama` | `anthropic` | `openai`) and the model with
-`ORTHRUS_AI_SCANNER_MODEL` / `ORTHRUS_AI_ORCHESTRATOR_MODEL` in your `.env`. To show the **AI Campaign**
-button in the manager UI, also uncomment `ORTHRUS_AI_ORCHESTRATOR_URL` on the manager service. A small
-tool-capable model (e.g. `qwen2.5:7b`) is recommended over large MoE models for the agentic loop.
+`ORTHRUS_AI_SCANNER_MODEL` / `ORTHRUS_AI_ORCHESTRATOR_MODEL` in your `.env`. To surface the AI planning
+switch on the Test Plan editor, also uncomment `ORTHRUS_AI_ORCHESTRATOR_URL` on the manager service. A
+small tool-capable model (e.g. `qwen2.5:7b`) is recommended over large MoE models for the agentic loop.
+
+### Running the deterministic worker and the AI scanner side by side
+
+`docker compose --profile ai up -d` starts **both** node kinds at once — the deterministic
+`orthrus-worker` (`:8081`, not gated by the profile) and the `orthrus-ai-scanner` (`:8091`). They
+register with the manager independently and both stay available.
+
+The manager routes each run to exactly one kind, based on how it was launched from the Test Plan
+views:
+
+- **Play** launches a *deterministic* run — dispatched **only** to `orthrus-worker` (nodes without
+  the `AI-EXECUTOR` capability).
+- **Play AI** launches an *AI* run — dispatched **only** to `orthrus-ai-scanner` (nodes advertising
+  `AI-EXECUTOR`). The **Play AI** button appears only when at least one AI node is online.
+
+A run never crosses over: an AI run is never placed on the plain worker, and a deterministic run is
+never placed on the AI scanner. If no node of the required kind covers a task's family, that task is
+marked unsupported rather than falling back to the other kind — so make sure `ORTHRUS_AI_FAMILIES`
+on the AI scanner covers the families your AI runs will target.
 
 ## Disclaimer
 

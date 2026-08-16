@@ -62,7 +62,8 @@ class AiSlaveControllerTests {
 		when(this.managerClient.sendTaskAttemptsBatch(eq(42L), any())).thenReturn(Mono.empty());
 		when(this.managerClient.completeTask(eq(42L), any(), anyInt(), anyInt())).thenReturn(Mono.empty());
 
-		ScanTaskRequest task = new ScanTaskRequest(42L, 7L, "INJECTION", "openapi", "http://target.example/api", "{}");
+		ScanTaskRequest task = new ScanTaskRequest(42L, 7L, "INJECTION", "openapi", "http://target.example/api", "{}",
+				null);
 
 		this.client.post()
 			.uri("/api/v1/slave/tasks")

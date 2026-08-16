@@ -96,7 +96,8 @@ class OllamaFamilyAgentIT {
 		String url = "http://localhost:" + this.target.port() + "/echo?q=hello";
 		DiscoveredEndpoint endpoint = new DiscoveredEndpoint(url, "GET");
 
-		List<Vulnerability> findings = this.familyAgent.scan("XSS", endpoint);
+		List<Vulnerability> findings = this.familyAgent.scan("XSS", endpoint, null,
+				ch.nexsol.orthrusai.scanner.ai.ProbeConfig.defaults());
 
 		log.info("=== Ollama XSS agent: {} request(s) to target, {} finding(s) ===", this.requestsReceived.get(),
 				findings.size());

@@ -23,11 +23,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
+import ch.nexsol.orthrusai.scanner.ai.ProbeConfig;
 import ch.nexsol.orthrusai.scanner.recon.DiscoveredEndpoint;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
+import ch.nexsol.orthrusai.scanner.wire.AiRecon;
 import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
 import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
 import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
@@ -50,30 +54,87 @@ public class LlmScanExecutor implements ScanExecutor {
 
 	private final FamilyAgent familyAgent;
 
-	public LlmScanExecutor(ReconService reconService, FamilyAgent familyAgent) {
+	private final ObjectMapper objectMapper;
+
+	public LlmScanExecutor(ReconService reconService, FamilyAgent familyAgent, ObjectMapper objectMapper) {
 		this.reconService = reconService;
 		this.familyAgent = familyAgent;
+		this.objectMapper = objectMapper;
 	}
 
 	@Override
 	public Flux<ScanAttempt> execute(ScanTaskRequest request) {
 		String family = request.phase();
-		return this.reconService.discover(request.target()).flatMapMany((endpoints) -> {
-			log.info("AI task {} ({}): probing {} endpoint(s)", request.taskId(), family, endpoints.size());
-			return Flux.fromIterable(endpoints)
-				.flatMap((endpoint) -> scanEndpoint(family, endpoint), ENDPOINT_CONCURRENCY);
+		return recon(request).flatMapMany((recon) -> {
+			log.info("AI task {} ({}): probing {} endpoint(s){}{}", request.taskId(), family, recon.endpoints().size(),
+					recon.shared() ? " from orchestrator recon" : " from local recon",
+					recon.probeConfig().credentials().isEmpty() ? "" : " (authenticated)");
+			return Flux.fromIterable(recon.endpoints())
+				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), recon.probeConfig()),
+						ENDPOINT_CONCURRENCY);
 		});
 	}
 
-	private Flux<ScanAttempt> scanEndpoint(String family, DiscoveredEndpoint endpoint) {
+	/**
+	 * Resolves the endpoints, context and probe config to scan with. Prefers the
+	 * orchestrator's shared recon carried on the task; falls back to this node's own
+	 * recon for the endpoints when it is absent, but still applies the credentials and
+	 * settings the manager resolved, so authenticated probing works with or without an
+	 * orchestrator.
+	 * @param request the task
+	 * @return the endpoints, shared context and probe config
+	 */
+	private Mono<Recon> recon(ScanTaskRequest request) {
+		AiRecon shared = parseSharedRecon(request.aiContextJson());
+		ProbeConfig probeConfig = probeConfigOf(shared);
+		String context = (shared != null) ? shared.context() : null;
+		if (shared != null && shared.endpoints() != null && !shared.endpoints().isEmpty()) {
+			List<DiscoveredEndpoint> endpoints = shared.endpoints()
+				.stream()
+				.map((e) -> new DiscoveredEndpoint(e.url(), e.method()))
+				.toList();
+			return Mono.just(new Recon(endpoints, context, probeConfig, true));
+		}
+		return this.reconService.discover(request.target())
+			.map((endpoints) -> new Recon(endpoints, context, probeConfig, false));
+	}
+
+	private ProbeConfig probeConfigOf(AiRecon shared) {
+		if (shared == null) {
+			return ProbeConfig.defaults();
+		}
+		List<AiRecon.Credential> credentials = (shared.credentials() != null) ? shared.credentials() : List.of();
+		int readTimeout = (shared.readTimeoutMs() > 0) ? shared.readTimeoutMs() : 10000;
+		return new ProbeConfig(credentials, shared.ignoreSslErrors(), readTimeout);
+	}
+
+	private AiRecon parseSharedRecon(String json) {
+		if (json == null || json.isBlank()) {
+			return null;
+		}
+		try {
+			return this.objectMapper.readValue(json, AiRecon.class);
+		}
+		catch (RuntimeException ex) {
+			log.warn("Could not parse the orchestrator's shared recon; falling back to local recon: {}",
+					ex.getMessage());
+			return null;
+		}
+	}
+
+	private Flux<ScanAttempt> scanEndpoint(String family, DiscoveredEndpoint endpoint, String context,
+			ProbeConfig probeConfig) {
 		return Flux.defer(() -> {
-			List<Vulnerability> findings = this.familyAgent.scan(family, endpoint);
+			List<Vulnerability> findings = this.familyAgent.scan(family, endpoint, context, probeConfig);
 			String scannerId = "ai-" + family.toLowerCase();
 			String status = findings.isEmpty() ? "PASSED" : "FAILED";
 			ScanAttempt attempt = new ScanAttempt(scannerId, "AI " + family + " Agent", endpoint.method(),
 					endpoint.url(), status, findings);
 			return Flux.just(attempt);
 		}).subscribeOn(Schedulers.boundedElastic());
+	}
+
+	private record Recon(List<DiscoveredEndpoint> endpoints, String context, ProbeConfig probeConfig, boolean shared) {
 	}
 
 }

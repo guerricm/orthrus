@@ -16,14 +16,22 @@
 
 package ch.nexsol.orthrusai.scanner.ai;
 
+import java.time.Duration;
 import java.util.List;
 
+import javax.net.ssl.SSLException;
+
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusai.scanner.ai.tool.FindingTool;
@@ -55,6 +63,8 @@ public class FamilyAgent {
 
 	private final int maxHttpCallsPerOperation;
 
+	private volatile WebClient insecureWebClient;
+
 	public FamilyAgent(ChatClient scannerChatClient, WebClient.Builder webClientBuilder, ScopeGuard scopeGuard,
 			ObjectMapper objectMapper, AiScannerProperties properties) {
 		this.chatClient = scannerChatClient;
@@ -68,16 +78,25 @@ public class FamilyAgent {
 	 * Probes one endpoint for one family and returns the findings the agent confirmed.
 	 * @param family the scanner family name
 	 * @param endpoint the endpoint to probe
+	 * @param context the orchestrator's shared target fingerprint, given to the agent as
+	 * prior knowledge (may be null or blank)
+	 * @param probeConfig the credentials, TLS leniency and timeout to apply to every
+	 * probe
 	 * @return the confirmed findings (possibly empty)
 	 */
-	public List<Vulnerability> scan(String family, DiscoveredEndpoint endpoint) {
+	public List<Vulnerability> scan(String family, DiscoveredEndpoint endpoint, String context,
+			ProbeConfig probeConfig) {
 		String scannerId = "ai-" + family.toLowerCase();
 		RunContext runContext = new RunContext(endpoint.url(), scannerId, this.maxHttpCallsPerOperation);
-		HttpProbeTool httpProbeTool = new HttpProbeTool(this.probeWebClient, this.scopeGuard, this.objectMapper,
-				runContext);
+		WebClient probeClient = probeConfig.ignoreSslErrors() ? insecureWebClient() : this.probeWebClient;
+		HttpProbeTool httpProbeTool = new HttpProbeTool(probeClient, this.scopeGuard, this.objectMapper, runContext,
+				probeConfig.credentials(), Duration.ofMillis(probeConfig.readTimeoutMs()));
 		FindingTool findingTool = new FindingTool(runContext, endpoint.url(), endpoint.method());
 
 		String userPrompt = "Test this endpoint: " + endpoint.method() + " " + endpoint.url();
+		if (context != null && !context.isBlank()) {
+			userPrompt += "\n\nPrior recon of the target (shared context): " + context;
+		}
 		try {
 			this.chatClient.prompt()
 				.system(FamilyPrompts.forFamily(family))
@@ -89,9 +108,42 @@ public class FamilyAgent {
 		catch (RuntimeException ex) {
 			log.warn("Family agent {} failed on {} {}: {}", family, endpoint.method(), endpoint.url(), ex.getMessage());
 		}
-		log.debug("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
+		log.info("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
 				runContext.httpCallsUsed(), runContext.findings().size());
 		return runContext.findings();
+	}
+
+	/**
+	 * A probe client that trusts any certificate, built once on demand. Used only when
+	 * the operator opted into ignoring SSL errors for the target (e.g. self-signed
+	 * staging).
+	 * @return the insecure web client
+	 */
+	private WebClient insecureWebClient() {
+		WebClient client = this.insecureWebClient;
+		if (client == null) {
+			synchronized (this) {
+				client = this.insecureWebClient;
+				if (client == null) {
+					try {
+						SslContext sslContext = SslContextBuilder.forClient()
+							.trustManager(InsecureTrustManagerFactory.INSTANCE)
+							.build();
+						HttpClient httpClient = HttpClient.create().secure((sslSpec) -> sslSpec.sslContext(sslContext));
+						client = WebClient.builder()
+							.clientConnector(new ReactorClientHttpConnector(httpClient))
+							.build();
+					}
+					catch (SSLException ex) {
+						log.warn("Could not build an SSL-lenient client ({}); using the default probe client",
+								ex.getMessage());
+						client = this.probeWebClient;
+					}
+					this.insecureWebClient = client;
+				}
+			}
+		}
+		return client;
 	}
 
 }

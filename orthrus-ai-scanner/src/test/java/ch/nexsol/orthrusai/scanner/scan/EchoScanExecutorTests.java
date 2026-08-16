@@ -34,7 +34,8 @@ class EchoScanExecutorTests {
 
 	@Test
 	void emitsOneDiagnosticAttempt() {
-		ScanTaskRequest task = new ScanTaskRequest(42L, 7L, "INJECTION", "openapi", "http://target.example/api", "{}");
+		ScanTaskRequest task = new ScanTaskRequest(42L, 7L, "INJECTION", "openapi", "http://target.example/api", "{}",
+				null);
 
 		StepVerifier.create(this.executor.execute(task)).assertNext((attempt) -> {
 			assertThat(attempt.status()).isEqualTo("FAILED");

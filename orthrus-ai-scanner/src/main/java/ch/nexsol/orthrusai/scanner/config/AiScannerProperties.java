@@ -117,7 +117,8 @@ public class AiScannerProperties {
 
 		private boolean enabled = false;
 
-		private List<String> families = List.of("INJECTION", "XSS", "LOGIC");
+		private List<String> families = List.of("INJECTION", "XSS", "LOGIC", "CONFIGURATION", "HTTP", "JWT", "SSL",
+				"BOLA");
 
 		private final Scanner scanner = new Scanner();
 

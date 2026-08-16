@@ -41,6 +41,7 @@ import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiJobReconService;
 
 /**
  * Owns the lifecycle of a scan job: splitting it into per-family tasks, reacting to task
@@ -72,10 +73,12 @@ public class JobOrchestratorService {
 
 	private final ObjectMapper objectMapper;
 
+	private final AiJobReconService aiJobReconService;
+
 	public JobOrchestratorService(ScanJobRepository scanJobRepository, ScanTaskRepository scanTaskRepository,
 			ScanResultService scanResultService, JobEventPublisher jobEventPublisher,
 			SlaveNodeRepository slaveNodeRepository, WebClient.Builder webClientBuilder, ScannerCatalog scannerCatalog,
-			ObjectMapper objectMapper) {
+			ObjectMapper objectMapper, AiJobReconService aiJobReconService) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
 		this.scanResultService = scanResultService;
@@ -84,6 +87,7 @@ public class JobOrchestratorService {
 		this.webClient = webClientBuilder.build();
 		this.scannerCatalog = scannerCatalog;
 		this.objectMapper = objectMapper;
+		this.aiJobReconService = aiJobReconService;
 	}
 
 	public Mono<Void> processPendingJobs() {
@@ -116,11 +120,30 @@ public class JobOrchestratorService {
 				// scan_jobs.result_id is a foreign key onto scan_results.
 				return this.scanResultService.createPlaceholderResult(resultId, job.getTarget(), startedAt)
 					.then(this.scanJobRepository.attachResult(job.getId(), resultId))
+					.then(Mono.defer(() -> reconAiJob(job)))
 					.then(Mono.defer(() -> {
 						this.jobEventPublisher.emit(job.getId(), JobEvent.running(job.getId(), job.getTarget()));
 						return createFamilyTasks(job);
 					}));
 			})
+			.then();
+	}
+
+	/**
+	 * For an AI job, recons the target once through the orchestrator and stores the
+	 * shared result on the job, so every scanner node works from the same endpoint map
+	 * and fingerprint. A no-op for deterministic jobs or when the orchestrator is absent;
+	 * a recon failure is swallowed so the job still runs (each node falls back to its own
+	 * local recon).
+	 * @param job the job being started
+	 * @return completion signal
+	 */
+	private Mono<Void> reconAiJob(ScanJobEntity job) {
+		if (!job.isAiMode()) {
+			return Mono.empty();
+		}
+		return this.aiJobReconService.contextJsonFor(job)
+			.flatMap((json) -> this.scanJobRepository.saveAiContext(job.getId(), json))
 			.then();
 	}
 
