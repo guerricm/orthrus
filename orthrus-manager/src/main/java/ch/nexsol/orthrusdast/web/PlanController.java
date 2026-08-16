@@ -195,6 +195,7 @@ public class PlanController {
 				List<SlaveNodeEntity> slaves = tuple.getT2();
 
 				boolean hasOnlineSlaves = slaves.stream().anyMatch((slave) -> slave.getStatus() != NodeStatus.OFFLINE);
+				boolean aiExecutorAvailable = hasAiExecutor(slaves);
 				int totalScanners = this.scannerCatalog.scanners().size();
 
 				return Flux.fromIterable(plans)
@@ -224,10 +225,21 @@ public class PlanController {
 					.collectList()
 					.map((mappedPlans) -> {
 						model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
+						model.addAttribute("aiExecutorAvailable", aiExecutorAvailable);
 						model.addAttribute("mappedPlans", mappedPlans);
 						return "plans/list";
 					});
 			});
+	}
+
+	/**
+	 * @param slaves the fleet
+	 * @return whether at least one live node advertises the AI executor marker
+	 */
+	private boolean hasAiExecutor(List<SlaveNodeEntity> slaves) {
+		return slaves.stream()
+			.anyMatch((slave) -> slave.getStatus() != NodeStatus.OFFLINE && slave.getCapabilities() != null
+					&& slave.getCapabilities().contains("AI-EXECUTOR"));
 	}
 
 	/**
@@ -298,9 +310,25 @@ public class PlanController {
 
 	@PostMapping("/plans/{id}/run")
 	public Mono<String> runTestPlan(@PathVariable Long id, ServerWebExchange exchange) {
-		return testPlanRepository.findById(id).flatMap((plan) -> {
+		return queuePlan(id, false);
+	}
+
+	/**
+	 * Runs an existing plan with the AI executor nodes instead of the deterministic
+	 * workers. The plan itself is unchanged; only where its tasks run differs.
+	 * @param id the plan to run
+	 * @return a redirect to the scan list
+	 */
+	@PostMapping("/plans/{id}/run-ai")
+	public Mono<String> runTestPlanWithAi(@PathVariable Long id) {
+		return queuePlan(id, true);
+	}
+
+	private Mono<String> queuePlan(Long planId, boolean aiMode) {
+		return testPlanRepository.findById(planId).flatMap((plan) -> {
 			ScanJobEntity job = new ScanJobEntity(plan.getDiscovererId(), plan.getTarget(),
 					plan.getScanConfigurationJson(), JobStatus.PENDING, plan.getId());
+			job.setAiMode(aiMode);
 			return scanJobRepository.save(job)
 				.doOnSuccess((savedJob) -> jobEventPublisher.emit(savedJob.getId(),
 						JobEvent.queued(savedJob.getId(), savedJob.getTarget())))
@@ -399,10 +427,13 @@ public class PlanController {
 
 	@GetMapping("/api/plans/{id}/details")
 	public Mono<String> planDetails(@PathVariable Long id, Model model) {
-		return testPlanRepository.findById(id).map((plan) -> {
-			model.addAttribute("plan", plan);
-			return "fragments/plan-offcanvas :: details";
-		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
+		return testPlanRepository.findById(id)
+			.flatMap((plan) -> slaveNodeRepository.findAll().collectList().map((slaves) -> {
+				model.addAttribute("plan", plan);
+				model.addAttribute("aiExecutorAvailable", hasAiExecutor(slaves));
+				return "fragments/plan-offcanvas :: details";
+			}))
+			.switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
 	}
 
 	@GetMapping("/api/plans/{id}/edit")

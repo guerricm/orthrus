@@ -52,6 +52,12 @@ public class JobDispatcherScheduler {
 
 	private static final int DEFAULT_MAX_CONCURRENT_SCANS = 10;
 
+	/**
+	 * Capability token an AI scanner node advertises. Used to route AI vs deterministic
+	 * runs.
+	 */
+	private static final String AI_EXECUTOR_MARKER = "AI-EXECUTOR";
+
 	private static final Duration GLOBAL_JOB_TIMEOUT = Duration.ofHours(4);
 
 	private final ScanJobRepository scanJobRepository;
@@ -132,28 +138,46 @@ public class JobDispatcherScheduler {
 	 * @return the chosen node, or empty when no node can take it right now
 	 */
 	private Mono<SlaveNodeEntity> selectSlaveFor(ScanTaskEntity task) {
-		return liveSlaves().collectList().flatMap((live) -> {
-			if (live.isEmpty()) {
-				// The fleet is down; leave the task pending and retry on the next tick.
-				return Mono.empty();
-			}
+		return this.scanJobRepository.findById(task.getScanJobId())
+			.flatMap((job) -> liveSlaves().collectList().flatMap((live) -> {
+				if (live.isEmpty()) {
+					// The fleet is down; leave the task pending and retry on the next
+					// tick.
+					return Mono.empty();
+				}
 
-			List<SlaveNodeEntity> capable = live.stream()
-				.filter((slave) -> slave.getCapabilities() != null && slave.getCapabilities().contains(task.getPhase()))
-				.toList();
+				// An AI run goes to AI executor nodes; a deterministic run goes to the
+				// others.
+				List<SlaveNodeEntity> capable = live.stream()
+					.filter((slave) -> slave.getCapabilities() != null
+							&& slave.getCapabilities().contains(task.getPhase()))
+					.filter((slave) -> isAiExecutor(slave) == job.isAiMode())
+					.toList();
 
-			if (capable.isEmpty()) {
-				// No node advertises this phase, so the task can never run.
-				return this.jobOrchestratorService
-					.onTaskUnsupported(task.getId(), "no live node advertises phase " + task.getPhase())
-					.then(Mono.empty());
-			}
+				if (capable.isEmpty()) {
+					// No node of the right kind advertises this phase, so the task can
+					// never run.
+					String kind = job.isAiMode() ? "AI" : "deterministic";
+					return this.jobOrchestratorService
+						.onTaskUnsupported(task.getId(),
+								"no live " + kind + " node advertises phase " + task.getPhase())
+						.then(Mono.empty());
+				}
 
-			return Flux.fromIterable(capable)
-				.filterWhen(this::hasFreeSlot)
-				.collectList()
-				.flatMap((available) -> pickPreferred(task.getScanJobId(), available));
-		});
+				return Flux.fromIterable(capable)
+					.filterWhen(this::hasFreeSlot)
+					.collectList()
+					.flatMap((available) -> pickPreferred(task.getScanJobId(), available));
+			}));
+	}
+
+	/**
+	 * @param slave the node
+	 * @return whether the node runs scans with LLM agents (advertises the AI executor
+	 * marker)
+	 */
+	private boolean isAiExecutor(SlaveNodeEntity slave) {
+		return slave.getCapabilities() != null && slave.getCapabilities().contains(AI_EXECUTOR_MARKER);
 	}
 
 	private Flux<SlaveNodeEntity> liveSlaves() {

@@ -59,6 +59,12 @@ public class ScanJobEntity {
 
 	private Integer retryCount = 0;
 
+	/**
+	 * When true, the job is dispatched to AI executor nodes instead of the deterministic
+	 * workers.
+	 */
+	private boolean aiMode;
+
 	@Transient
 	private String planName;
 
@@ -193,6 +199,14 @@ public class ScanJobEntity {
 
 	public void setRetryCount(Integer retryCount) {
 		this.retryCount = retryCount;
+	}
+
+	public boolean isAiMode() {
+		return aiMode;
+	}
+
+	public void setAiMode(boolean aiMode) {
+		this.aiMode = aiMode;
 	}
 
 	public String getFormattedDuration() {

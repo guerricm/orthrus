@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
     result_id VARCHAR(255),
     vulns_count INT,
     tests_count INT,
+    ai_mode BOOLEAN NOT NULL DEFAULT FALSE,
     FOREIGN KEY (result_id) REFERENCES "scan_results"(id) ON DELETE SET NULL,
     FOREIGN KEY (test_plan_id) REFERENCES "test_plans"(id) ON DELETE SET NULL
 );

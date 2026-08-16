@@ -129,6 +129,47 @@ class JobDispatcherSchedulerTest {
 	}
 
 	@Test
+	void anAiRunIsSentToAnAiExecutorNode() throws Exception {
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(aiJob()));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("ai-1", "AI-EXECUTOR,INJECTION,XSS"));
+		this.worker.enqueue(new MockResponse().setResponseCode(202));
+
+		this.dispatcher.dispatchPendingJobs();
+
+		RecordedRequest dispatched = this.worker.takeRequest(5, TimeUnit.SECONDS);
+		assertThat(dispatched).as("the AI node should have received the AI run").isNotNull();
+		assertThat(dispatched.getPath()).isEqualTo("/api/v1/slave/tasks");
+	}
+
+	@Test
+	void anAiRunIsNotSentToADeterministicNode() {
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(aiJob()));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("worker-1", "openapi,INJECTION,XSS"));
+		when(this.jobOrchestratorService.onTaskUnsupported(anyLong(), anyString())).thenReturn(Mono.empty());
+
+		this.dispatcher.dispatchPendingJobs();
+
+		verify(this.jobOrchestratorService).onTaskUnsupported(eq(1L), anyString());
+		assertThat(noDispatchHappened()).isTrue();
+	}
+
+	@Test
+	void aDeterministicRunIsNotSentToAnAiNode() {
+		// Default job() is not AI mode; only an AI node is live, so the task cannot be
+		// placed.
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("ai-1", "AI-EXECUTOR,INJECTION,XSS"));
+		when(this.jobOrchestratorService.onTaskUnsupported(anyLong(), anyString())).thenReturn(Mono.empty());
+
+		this.dispatcher.dispatchPendingJobs();
+
+		verify(this.jobOrchestratorService).onTaskUnsupported(eq(1L), anyString());
+		assertThat(noDispatchHappened()).isTrue();
+	}
+
+	@Test
 	void aTaskNoNodeAdvertisesIsCompletedRatherThanHangingTheJob() {
 		givenPendingTasks(task(1L, ScannerFamily.LOGIC));
 		givenFleet(node("node-a", "openapi,INJECTION"));
@@ -313,6 +354,12 @@ class JobDispatcherSchedulerTest {
 	private ScanJobEntity job() {
 		ScanJobEntity job = new ScanJobEntity("openapi", "https://target.example", "{}", JobStatus.RUNNING, null);
 		job.setId(JOB_ID);
+		return job;
+	}
+
+	private ScanJobEntity aiJob() {
+		ScanJobEntity job = job();
+		job.setAiMode(true);
 		return job;
 	}
 

@@ -49,6 +49,13 @@ public class ManagerClient {
 
 	private static final String INTERNAL_TOKEN_HEADER = "X-Orthrus-Internal-Token";
 
+	/**
+	 * Capability marker telling the manager this node runs scans with LLM agents. The
+	 * manager routes "AI" runs to nodes advertising it, and deterministic runs to nodes
+	 * that do not.
+	 */
+	private static final String AI_EXECUTOR_MARKER = "AI-EXECUTOR";
+
 	private final WebClient webClient;
 
 	private final String masterUrl;
@@ -65,7 +72,7 @@ public class ManagerClient {
 		this.masterUrl = properties.getMaster().getUrl();
 		this.slaveId = properties.getSlave().getId();
 		this.slaveUrl = properties.getSlave().getAdvertisedUrl();
-		this.capabilities = String.join(",", properties.getAi().getFamilies());
+		this.capabilities = AI_EXECUTOR_MARKER + "," + String.join(",", properties.getAi().getFamilies());
 		this.webClient = webClientBuilder
 			.defaultHeader(INTERNAL_TOKEN_HEADER, properties.getMaster().getInternalToken())
 			.build();
