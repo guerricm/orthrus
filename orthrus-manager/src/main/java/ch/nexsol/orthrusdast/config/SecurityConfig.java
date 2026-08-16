@@ -50,6 +50,7 @@ import org.springframework.security.web.server.DefaultServerRedirectStrategy;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
 import org.springframework.security.web.server.csrf.CsrfWebFilter;
 import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
@@ -95,6 +96,13 @@ public class SecurityConfig {
 			// CSRF protects the session-cookie UI. Internal API uses a shared-secret
 			// filter and /api/v1 uses bearer tokens; neither has a session to ride.
 			.csrf((csrf) -> csrf
+				// Keep the token in a cookie, not the WebSession: it then survives a
+				// session
+				// timeout or a manager restart, so the login page never carries a token
+				// that
+				// is already orphaned (which shows up as a 403 that only clearing cookies
+				// fixes).
+				.csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
 				.requireCsrfProtectionMatcher(new AndServerWebExchangeMatcher(CsrfWebFilter.DEFAULT_CSRF_MATCHER,
 						new NegatedServerWebExchangeMatcher(
 								ServerWebExchangeMatchers.pathMatchers("/api/internal/**", "/api/v1/**")))))
