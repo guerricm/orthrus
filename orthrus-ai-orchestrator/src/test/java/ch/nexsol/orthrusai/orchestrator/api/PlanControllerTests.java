@@ -27,26 +27,25 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusai.orchestrator.campaign.CampaignResult;
-import ch.nexsol.orthrusai.orchestrator.campaign.CampaignService;
 import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrusai.orchestrator.plan.PlanService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
- * The campaign endpoint launches a campaign for a valid target and rejects a blank one.
+ * The plan endpoint returns a plan for a valid target and rejects a blank one.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
 		properties = { "spring.ai.model.chat=none", "orthrus.ai.enabled=false" })
-class CampaignControllerTests {
+class PlanControllerTests {
 
 	@LocalServerPort
 	private int port;
 
 	@MockitoBean
-	private CampaignService campaignService;
+	private PlanService planService;
 
 	private WebTestClient client;
 
@@ -56,29 +55,28 @@ class CampaignControllerTests {
 	}
 
 	@Test
-	void launchesCampaignForValidTarget() {
-		ScanPlan plan = new ScanPlan("openapi", List.of("INJECTION"), 10, false, "focus");
-		when(this.campaignService.runCampaign(eq("http://app.test"), any()))
-			.thenReturn(Mono.just(new CampaignResult(plan, 7L, "http://app.test", "/sse/7")));
+	void returnsPlanForValidTarget() {
+		ScanPlan plan = new ScanPlan("openapi", List.of("INJECTION"), 10, false, "focus on the API");
+		when(this.planService.plan(eq("http://app.test"), any(), any())).thenReturn(Mono.just(plan));
 
 		this.client.post()
-			.uri("/api/v1/campaigns")
+			.uri("/api/v1/plan")
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new CampaignController.CampaignRequest("http://app.test", "find injection"))
+			.bodyValue(new PlanController.PlanRequest("http://app.test", "find injection", List.of("openapi")))
 			.exchange()
 			.expectStatus()
 			.isOk()
 			.expectBody()
-			.jsonPath("$.jobId")
-			.isEqualTo(7);
+			.jsonPath("$.recommendedDiscoverer")
+			.isEqualTo("openapi");
 	}
 
 	@Test
 	void rejectsBlankTarget() {
 		this.client.post()
-			.uri("/api/v1/campaigns")
+			.uri("/api/v1/plan")
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new CampaignController.CampaignRequest("  ", null))
+			.bodyValue(new PlanController.PlanRequest("  ", null, List.of()))
 			.exchange()
 			.expectStatus()
 			.isBadRequest();

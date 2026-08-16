@@ -16,6 +16,8 @@
 
 package ch.nexsol.orthrusai.orchestrator.api;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,38 +25,42 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusai.orchestrator.campaign.CampaignResult;
-import ch.nexsol.orthrusai.orchestrator.campaign.CampaignService;
+import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrusai.orchestrator.plan.PlanService;
 
 /**
- * Entry point of the orchestrator: an operator asks for a campaign against a target, and
- * the orchestrator plans it and launches the corresponding scan on the manager.
+ * The orchestrator's single entry point: given a target and an objective (plus the
+ * caller's available discoverers), it returns a scan plan. It does not launch anything —
+ * the caller applies the plan and runs it through its own flow.
  */
 @RestController
-@RequestMapping("/api/v1/campaigns")
-public class CampaignController {
+@RequestMapping("/api/v1/plan")
+public class PlanController {
 
-	private final CampaignService campaignService;
+	private final PlanService planService;
 
-	public CampaignController(CampaignService campaignService) {
-		this.campaignService = campaignService;
+	public PlanController(PlanService planService) {
+		this.planService = planService;
 	}
 
 	@PostMapping
-	public Mono<ResponseEntity<CampaignResult>> startCampaign(@RequestBody CampaignRequest request) {
+	public Mono<ResponseEntity<ScanPlan>> plan(@RequestBody PlanRequest request) {
 		if (request.target() == null || request.target().isBlank()) {
 			return Mono.just(ResponseEntity.badRequest().build());
 		}
-		return this.campaignService.runCampaign(request.target(), request.objective()).map(ResponseEntity::ok);
+		return this.planService.plan(request.target(), request.objective(), request.availableDiscoverers())
+			.map(ResponseEntity::ok);
 	}
 
 	/**
-	 * The campaign request from an operator.
+	 * A planning request from the caller (the manager UI).
 	 *
 	 * @param target the target to scan
 	 * @param objective the operator's objective in natural language (optional)
+	 * @param availableDiscoverers the discoverers the caller's fleet offers (may be
+	 * empty)
 	 */
-	public record CampaignRequest(String target, String objective) {
+	public record PlanRequest(String target, String objective, List<String> availableDiscoverers) {
 	}
 
 }

@@ -366,5 +366,21 @@
         </script>
     </div>
 
+    <!-- AI suggestion result, swapped into #aiSuggestionResult. Carries the plan as data-* the page JS applies. -->
+    <div th:fragment="aiSuggestion">
+        <div th:if="${aiError}" class="alert alert-danger py-2 mb-0" role="alert" th:text="${aiError}">Error</div>
+        <div th:if="${suggestion}" id="aiSuggestionData" class="alert alert-info py-2 mb-0" role="alert"
+            th:attr="data-discoverer=${suggestion.discovererId()},
+                     data-scanners=${#strings.listJoin(suggestion.scannerIds(), ',')},
+                     data-concurrency=${suggestion.concurrency()},
+                     data-includepassed=${suggestion.includePassed()}">
+            <strong>AI plan applied.</strong>
+            <span th:text="${suggestion.rationale()}">rationale</span>
+            <div class="small text-white-50 mt-1" th:if="${suggestion.families() != null and !suggestion.families().isEmpty()}">
+                Families: <span th:text="${#strings.listJoin(suggestion.families(), ', ')}">INJECTION, XSS</span>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

@@ -17,6 +17,7 @@
 package ch.nexsol.orthrusdast.web.ai;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -26,10 +27,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 /**
- * Thin proxy to the optional AI orchestrator. The manager never depends on the AI module
- * at compile time; it reaches the orchestrator over HTTP only, and only when
- * {@code orthrus.ai.orchestrator.url} is configured. This keeps the AI orchestration a
- * separable add-on.
+ * Thin proxy to the optional AI orchestrator, which is a pure planning service. The
+ * manager asks it for a scan plan and applies the plan itself (pre-fills the Test Plan
+ * form, then saves/runs through the normal flow). Active only when
+ * {@code orthrus.ai.orchestrator.url} is configured, so the AI is a separable add-on.
  */
 @Component
 @ConditionalOnProperty(prefix = "orthrus.ai.orchestrator", name = "url")
@@ -46,18 +47,20 @@ public class AiOrchestratorClient {
 	}
 
 	/**
-	 * Asks the orchestrator to plan and launch a campaign for a target.
+	 * Asks the orchestrator to plan a scan for a target.
 	 * @param target the target to scan
 	 * @param objective the operator's objective (may be null)
-	 * @return the campaign result (plan + launched job)
+	 * @param availableDiscoverers the discoverers this manager offers
+	 * @return the plan
 	 */
-	public Mono<CampaignResult> launchCampaign(String target, String objective) {
-		Map<String, String> body = Map.of("target", target, "objective", (objective != null) ? objective : "");
+	public Mono<ScanPlan> suggestPlan(String target, String objective, List<String> availableDiscoverers) {
+		Map<String, Object> body = Map.of("target", target, "objective", (objective != null) ? objective : "",
+				"availableDiscoverers", (availableDiscoverers != null) ? availableDiscoverers : List.of());
 		return this.webClient.post()
-			.uri(this.orchestratorUrl + "/api/v1/campaigns")
+			.uri(this.orchestratorUrl + "/api/v1/plan")
 			.bodyValue(body)
 			.retrieve()
-			.bodyToMono(CampaignResult.class)
+			.bodyToMono(ScanPlan.class)
 			.timeout(Duration.ofSeconds(120));
 	}
 

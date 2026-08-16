@@ -97,7 +97,8 @@ class JobOrchestratorServiceTest {
 		this.slave.start();
 
 		this.orchestrator = new JobOrchestratorService(this.scanJobRepository, this.scanTaskRepository,
-				this.scanResultService, this.jobEventPublisher, this.slaveNodeRepository, WebClient.builder());
+				this.scanResultService, this.jobEventPublisher, this.slaveNodeRepository, WebClient.builder(),
+				scannerCatalog(), new tools.jackson.databind.ObjectMapper());
 
 		when(this.scanTaskRepository.save(any(ScanTaskEntity.class))).thenAnswer((invocation) -> {
 			ScanTaskEntity task = invocation.getArgument(0);
@@ -134,6 +135,25 @@ class JobOrchestratorServiceTest {
 		assertThat(phases).isEqualTo(expected);
 		assertThat(job.getStatus()).isEqualTo(JobStatus.RUNNING);
 		assertThat(job.getResultId()).isNotBlank();
+	}
+
+	@Test
+	void aJobOnlyCreatesTasksForTheFamiliesItsScannersCover() throws Exception {
+		ScanJobEntity job = job(1L, JobStatus.PENDING);
+		// A full config (as stored in production) whose includeScanners map to INJECTION
+		// + XSS only.
+		ScanConfiguration config = new ScanConfiguration(List.of("sqli", "xss"), List.of(), 10, 5000, 10000, false,
+				"json", null, null, "en", false, ch.nexsol.orthrusdast.model.GatewayType.AUTO, null, null, null, null);
+		job.setScanConfigurationJson(new tools.jackson.databind.ObjectMapper().writeValueAsString(config));
+		when(this.scanJobRepository.findByStatus(JobStatus.PENDING)).thenReturn(Flux.just(job));
+		when(this.scanJobRepository.claimForOrchestration(anyLong(), any())).thenReturn(Mono.just(1));
+		when(this.scanJobRepository.attachResult(anyLong(), anyString())).thenReturn(Mono.just(1));
+		when(this.scanResultService.createPlaceholderResult(anyString(), anyString(), any())).thenReturn(Mono.empty());
+
+		StepVerifier.create(this.orchestrator.processPendingJobs()).verifyComplete();
+
+		List<String> phases = this.savedTasks.stream().map(ScanTaskEntity::getPhase).sorted().toList();
+		assertThat(phases).containsExactly("INJECTION", "XSS");
 	}
 
 	@Test
@@ -363,6 +383,20 @@ class JobOrchestratorServiceTest {
 		job.setId(id);
 		job.setStartedAt(Instant.now());
 		return job;
+	}
+
+	private ScannerCatalog scannerCatalog() {
+		return new ScannerCatalog(List.of(scanner("sqli", ScannerFamily.INJECTION), scanner("xss", ScannerFamily.XSS),
+				scanner("cors", ScannerFamily.CONFIGURATION)));
+	}
+
+	private ch.nexsol.orthrusdast.scanner.SecurityScanner scanner(String id, ScannerFamily family) {
+		ch.nexsol.orthrusdast.scanner.SecurityScanner s = org.mockito.Mockito
+			.mock(ch.nexsol.orthrusdast.scanner.SecurityScanner.class);
+		when(s.getId()).thenReturn(id);
+		when(s.getName()).thenReturn(id);
+		when(s.getFamily()).thenReturn(family);
+		return s;
 	}
 
 	private ScanTaskEntity task(Long id, Long jobId, JobStatus status) {

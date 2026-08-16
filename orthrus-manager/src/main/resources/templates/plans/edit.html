@@ -38,7 +38,7 @@
                     <span class="fs-1 me-3">ℹ️</span>
                     <div>
                         <h5 class="alert-heading mb-1">No Slave Nodes Available</h5>
-                        <p class="mb-0">There are no online slave nodes connected to the master. You can still create the test plan, but you will not be able to execute it until a node is available. Scanner capabilities cannot be fetched right now, so default scanners will be used.</p>
+                        <p class="mb-0">There are no online slave nodes connected to the master. You can still create the test plan, but you will not be able to execute it until a node is available.</p>
                     </div>
                 </div>
 
@@ -59,6 +59,33 @@
 
                         <form hx-post="/web/plans" hx-indicator="#loading" hx-disabled-elt="#saveBtn">
                             <div class="row g-4">
+
+                                <!-- AI-assisted planning (only when an orchestrator is configured) -->
+                                <div class="col-md-12" th:if="${aiEnabled}">
+                                    <div class="card card-body bg-transparent border-info">
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="aiModeToggle">
+                                            <label class="form-check-label text-info" for="aiModeToggle">
+                                                🤖 AI-assisted planning
+                                            </label>
+                                        </div>
+                                        <div id="aiPanel" style="display: none;" class="mt-3">
+                                            <label for="aiObjective" class="form-label">Objective (natural language)</label>
+                                            <textarea class="form-control mb-2" id="aiObjective" name="objective" rows="2"
+                                                placeholder="e.g. Focus on injection and authentication flaws on the public API."></textarea>
+                                            <button type="button" class="btn btn-outline-info" hx-post="/plans/ai-suggest"
+                                                hx-include="[name='target'],[name='objective']"
+                                                hx-target="#aiSuggestionResult" hx-swap="innerHTML" hx-indicator="#aiLoading">
+                                                Suggest &amp; fill the form
+                                            </button>
+                                            <span id="aiLoading" class="htmx-indicator ms-2 text-info">Planning…</span>
+                                            <div id="aiSuggestionResult" class="mt-2"></div>
+                                            <div class="form-text text-white-50">The AI fingerprints the target, picks a
+                                                discoverer and the scanner families to run, and fills the form below. Review,
+                                                then save or run as usual.</div>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <div class="col-md-12">
                                     <label for="name" class="form-label">Plan Name</label>
@@ -237,6 +264,7 @@
                                                             <div class="form-check">
                                                                 <input class="form-check-input" type="checkbox"
                                                                     name="includeScanners" th:value="${scanner.getId()}"
+                                                                    th:attr="data-family=${scanner.getFamily()}"
                                                                     th:id="'scanner_' + ${scanner.getId()}" th:checked="${config == null || config.includeScanners() == null || config.includeScanners().isEmpty() || config.includeScanners().contains(scanner.getId())}">
                                                                 <label class="form-check-label text-light"
                                                                     th:for="'scanner_' + ${scanner.getId()}"
@@ -266,6 +294,15 @@
                                                     <div class="form-text text-white-50">Higher values scan faster but
                                                         generate more traffic on the target server. Reduce this if the
                                                         API drops requests.</div>
+                                                </div>
+                                                <div class="col-md-12">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch"
+                                                            id="includePassed" name="includePassed" value="true"
+                                                            th:checked="${config?.includePassed()}">
+                                                        <label class="form-check-label text-light" for="includePassed">Keep
+                                                            passed attempts in the result (audit log)</label>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -333,6 +370,44 @@
 
                 // Initial call
                 updateVisibility();
+
+                // AI-assisted planning: toggle the panel, and apply the suggestion the server returns.
+                const aiToggle = document.getElementById('aiModeToggle');
+                const aiPanel = document.getElementById('aiPanel');
+                if (aiToggle && aiPanel) {
+                    aiToggle.addEventListener('change', function () {
+                        aiPanel.style.display = aiToggle.checked ? 'block' : 'none';
+                    });
+                }
+
+                document.body.addEventListener('htmx:afterSwap', function (evt) {
+                    if (!evt.detail.target || evt.detail.target.id !== 'aiSuggestionResult') return;
+                    const data = document.getElementById('aiSuggestionData');
+                    if (!data) return;
+
+                    const disc = data.getAttribute('data-discoverer');
+                    if (disc) { discovererSelect.value = disc; updateVisibility(); }
+
+                    const wanted = (data.getAttribute('data-scanners') || '').split(',').filter(Boolean);
+                    if (wanted.length) {
+                        document.querySelectorAll('input[name="includeScanners"]').forEach(function (cb) {
+                            cb.checked = wanted.indexOf(cb.value) !== -1;
+                        });
+                    }
+
+                    const conc = data.getAttribute('data-concurrency');
+                    if (conc) {
+                        const range = document.getElementById('concurrency');
+                        if (range) { range.value = conc; document.getElementById('concurrencyValue').innerText = conc; }
+                    }
+
+                    const ip = document.getElementById('includePassed');
+                    if (ip) { ip.checked = data.getAttribute('data-includepassed') === 'true'; }
+
+                    // Reveal the scanner selection so the user can review what was ticked.
+                    const adv = document.getElementById('advancedOptions');
+                    if (adv && !adv.classList.contains('show')) { new bootstrap.Collapse(adv, { show: true }); }
+                });
 
                 // Clear hidden advanced options on submit to prevent browser autofill issues
                 document.querySelector('form').addEventListener('submit', function () {
