@@ -19,6 +19,7 @@ package ch.nexsol.orthrusai.scanner.client;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -68,6 +69,10 @@ public class ManagerClient {
 
 	private final AtomicInteger activeTasks = new AtomicInteger();
 
+	private final AtomicBoolean registering = new AtomicBoolean();
+
+	private boolean managerDownLogged;
+
 	public ManagerClient(AiScannerProperties properties, WebClient.Builder webClientBuilder) {
 		this.masterUrl = properties.getMaster().getUrl();
 		this.slaveId = properties.getSlave().getId();
@@ -79,11 +84,18 @@ public class ManagerClient {
 	}
 
 	/**
-	 * Registers with the manager once the context is ready, advertising the families this
-	 * node runs.
+	 * Registers with the manager, advertising the families this node runs. Called once
+	 * the context is ready and again whenever a heartbeat is rejected, so the node
+	 * re-appears after the manager restarts or after starting before the manager is up.
+	 * The guard keeps the startup and heartbeat-triggered registrations from running at
+	 * once.
 	 */
 	@EventListener(ApplicationReadyEvent.class)
 	public void registerToManager() {
+		if (!this.registering.compareAndSet(false, true)) {
+			log.debug("Registration already in flight; skipping.");
+			return;
+		}
 		SlaveRegistration registration = new SlaveRegistration(this.slaveId, this.slaveUrl, this.capabilities);
 		this.webClient.post()
 			.uri(this.masterUrl + "/api/internal/slaves/register")
@@ -91,13 +103,25 @@ public class ManagerClient {
 			.retrieve()
 			.bodyToMono(Void.class)
 			.timeout(Duration.ofSeconds(10))
-			.doOnSuccess((v) -> log.info("Registered AI scanner node '{}' with capabilities [{}]", this.slaveId,
-					this.capabilities))
-			.onErrorResume((e) -> {
-				log.warn("Could not register with manager at {}: {}", this.masterUrl, e.getMessage());
-				return Mono.empty();
-			})
-			.subscribe();
+			.doFinally((signal) -> this.registering.set(false))
+			.subscribe((v) -> {
+			}, (e) -> {
+				if (!this.managerDownLogged) {
+					log.warn("Could not register with manager at {}: {}", this.masterUrl, e.getMessage());
+					this.managerDownLogged = true;
+				}
+				else {
+					log.debug("Could not register with manager at {}: {}", this.masterUrl, e.getMessage());
+				}
+			}, () -> {
+				if (this.managerDownLogged) {
+					log.info("Reconnected and registered AI scanner node '{}'", this.slaveId);
+					this.managerDownLogged = false;
+				}
+				else {
+					log.info("Registered AI scanner node '{}' with capabilities [{}]", this.slaveId, this.capabilities);
+				}
+			});
 	}
 
 	/**
@@ -117,11 +141,18 @@ public class ManagerClient {
 			.retrieve()
 			.bodyToMono(Void.class)
 			.timeout(Duration.ofSeconds(5))
-			.onErrorResume((e) -> {
-				log.debug("Heartbeat failed: {}", e.getMessage());
-				return Mono.empty();
-			})
-			.subscribe();
+			.subscribe((v) -> {
+			}, (e) -> {
+				// A rejected heartbeat means the manager does not know this node (it
+				// restarted, or it came up after us): re-register so the node reappears.
+				if (!this.managerDownLogged) {
+					log.warn("Heartbeat failed ({}). Attempting to re-register...", e.getMessage());
+				}
+				else {
+					log.debug("Heartbeat failed ({}). Attempting to re-register...", e.getMessage());
+				}
+				registerToManager();
+			});
 	}
 
 	/**
