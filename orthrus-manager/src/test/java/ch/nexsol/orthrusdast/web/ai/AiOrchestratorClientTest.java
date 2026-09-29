@@ -26,6 +26,7 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
 import ch.nexsol.orthrus.protocol.ai.ScanPlan;
+import ch.nexsol.orthrus.protocol.node.NodeClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,14 +49,13 @@ class AiOrchestratorClientTest {
 	void suggestsPlanAndParsesResult() {
 		String json = "{\"recommendedDiscoverer\":\"openapi\",\"prioritizedFamilies\":[\"INJECTION\",\"XSS\"],"
 				+ "\"concurrency\":8,\"includePassed\":false,\"rationale\":\"focus on the API\"}";
-		this.server = HttpServer.create()
-			.port(0)
-			.handle((request, response) -> response.status(200)
-				.header("Content-Type", "application/json")
-				.sendString(Mono.just(json)))
-			.bindNow();
+		StringBuilder presentedToken = new StringBuilder();
+		this.server = HttpServer.create().port(0).handle((request, response) -> {
+			presentedToken.append(request.requestHeaders().get(NodeClient.INTERNAL_TOKEN_HEADER));
+			return response.status(200).header("Content-Type", "application/json").sendString(Mono.just(json));
+		}).bindNow();
 
-		AiOrchestratorClient client = new AiOrchestratorClient("http://localhost:" + this.server.port(),
+		AiOrchestratorClient client = new AiOrchestratorClient("http://localhost:" + this.server.port(), "s3cret",
 				WebClient.builder());
 
 		ScanPlan plan = client.suggestPlan("http://app.test", "find injection", List.of("openapi", "blackbox")).block();
@@ -64,6 +64,7 @@ class AiOrchestratorClientTest {
 		assertThat(plan.recommendedDiscoverer()).isEqualTo("openapi");
 		assertThat(plan.prioritizedFamilies()).containsExactly("INJECTION", "XSS");
 		assertThat(plan.concurrency()).isEqualTo(8);
+		assertThat(presentedToken.toString()).isEqualTo("s3cret");
 	}
 
 }

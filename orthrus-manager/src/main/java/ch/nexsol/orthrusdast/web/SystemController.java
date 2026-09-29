@@ -170,7 +170,7 @@ public class SystemController {
 			job.setTestsCount(null);
 			// Drop the previous run's shared recon so the replay re-recons the target
 			// fresh.
-			job.setAiContext(null);
+			job.setAiRecon(null);
 			return job;
 		}
 	}

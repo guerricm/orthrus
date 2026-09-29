@@ -112,10 +112,14 @@ services:
     image: nexsoltech/orthrus-ai-orchestrator:1.0.0-SNAPSHOT # Replace with your actual registry/image tag
     container_name: orthrus-ai-orchestrator
     profiles: ["ai"]
-    ports:
-      - "8090:8090"
+    # Reachable from the manager only: its recon endpoint fetches whatever URL it is given, with
+    # whatever credentials it is given, so it is never published on the host.
+    expose:
+      - "8090"
     environment:
       # A pure planning + recon service the manager calls; it never reaches back to the manager.
+      # Every /api call must carry the platform's shared secret.
+      ORTHRUS_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
       ORTHRUS_AI_ENABLED: "true"
       ORTHRUS_AI_PROVIDER: ${ORTHRUS_AI_PROVIDER:-ollama}
       ORTHRUS_AI_ORCHESTRATOR_MODEL: ${ORTHRUS_AI_ORCHESTRATOR_MODEL:-qwen2.5:7b}

@@ -35,17 +35,27 @@ import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
- * Builds the {@link AiScanContext} the manager hands an AI job: it resolves the Test
- * Plan's {@code ScanConfiguration} (auth schemes, TLS leniency, timeouts, scanner
- * selection) and, when the orchestrator is configured, folds in its shared recon
- * (endpoints + fingerprint). The credentials are resolved here so the autonomous node
- * applies them without knowing the auth types. Present even without an orchestrator, so
- * authenticated probing still works.
+ * The two halves of what an AI job needs before its tasks can run on a node.
+ * <p>
+ * {@link #reconJsonFor} asks the orchestrator to fingerprint the target once; the result
+ * is persisted on the job and is the only thing stored, so no credential is written to
+ * the database twice. {@link #contextJsonFor} then assembles, at dispatch time and in
+ * memory, the {@link AiScanContext} a node receives: that stored recon plus the parts of
+ * the Test Plan's {@code ScanConfiguration} the node must honour (credentials resolved to
+ * plain tuples, TLS leniency, timeouts). Both work without an orchestrator, so
+ * authenticated probing still works standalone.
  */
 @Service
 public class AiJobReconService {
 
 	private static final Logger log = LoggerFactory.getLogger(AiJobReconService.class);
+
+	/**
+	 * What the manager stores when no orchestrator recon is available: a settled result
+	 * with no endpoints, so the dispatcher releases the job's tasks and each node falls
+	 * back to its own local recon.
+	 */
+	static final ReconResult NO_RECON = new ReconResult(null, List.of(), "");
 
 	private final ObjectProvider<AiOrchestratorClient> orchestratorClient;
 
@@ -57,47 +67,57 @@ public class AiJobReconService {
 	}
 
 	/**
-	 * Resolves the job's config and (optionally) the orchestrator recon into the JSON the
-	 * dispatcher forwards to the AI node. Empty only when nothing useful could be built.
-	 * @param job the AI job being started
-	 * @return the serialized {@link AiScanContext}, or empty on failure
+	 * Recons the job's target through the orchestrator, sending the Test Plan's
+	 * credentials so a protected OpenAPI document can be read. Never empty and never
+	 * fails: without an orchestrator, or when it cannot be reached, the result is
+	 * {@link #NO_RECON}, so the job is marked as reconned either way and its tasks are
+	 * released.
+	 * @param job the running AI job
+	 * @return the serialized {@link ReconResult} to store on the job
 	 */
-	public Mono<String> contextJsonFor(ScanJobEntity job) {
-		ScanConfiguration config = parseConfig(job.getScanConfigurationJson());
-		List<Credential> credentials = resolveCredentials(config);
-		String selection = describeSelection(config);
-		String host = (config != null) ? config.openapiOverrideHost() : null;
-
+	public Mono<String> reconJsonFor(ScanJobEntity job) {
 		AiOrchestratorClient client = this.orchestratorClient.getIfAvailable();
-		Mono<ReconResult> recon = (client != null)
-				? client.recon(job.getTarget(), host, credentials).onErrorResume((e) -> {
-					log.warn("Orchestrator recon of {} failed ({}); node will use local recon", job.getTarget(),
-							e.getMessage());
-					return Mono.empty();
-				}) : Mono.empty();
-
-		return recon.map((result) -> assemble(result, config, credentials, selection))
-			.defaultIfEmpty(assemble(null, config, credentials, selection))
-			.flatMap((context) -> {
-				try {
-					return Mono.just(this.objectMapper.writeValueAsString(context));
-				}
-				catch (RuntimeException ex) {
-					log.warn("Could not serialize AI context for job {}: {}", job.getId(), ex.getMessage());
-					return Mono.empty();
-				}
-			});
+		if (client == null) {
+			return serialize(NO_RECON);
+		}
+		ScanConfiguration config = parseConfig(job.getScanConfigurationJson());
+		String host = (config != null) ? config.openapiOverrideHost() : null;
+		return client.recon(job.getTarget(), host, resolveCredentials(config)).onErrorResume((e) -> {
+			log.warn("Orchestrator recon of {} failed ({}); nodes will use local recon", job.getTarget(),
+					e.getMessage());
+			return Mono.just(new ReconResult(null, List.of(), "Orchestrator recon unavailable: " + e.getMessage()));
+		}).flatMap(this::serialize);
 	}
 
-	private AiScanContext assemble(ReconResult recon, ScanConfiguration config, List<Credential> credentials,
-			String selection) {
-		String baseUrl = (recon != null) ? recon.baseUrl() : null;
-		List<Endpoint> endpoints = (recon != null && recon.endpoints() != null) ? recon.endpoints() : List.of();
-		String context = joinContext((recon != null) ? recon.context() : null, selection);
+	private Mono<String> serialize(ReconResult recon) {
+		return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(recon))
+			.onErrorResume((e) -> Mono.fromCallable(() -> this.objectMapper.writeValueAsString(NO_RECON)));
+	}
+
+	/**
+	 * Assembles the context a node receives for one of the job's tasks: the stored recon
+	 * plus the credentials, TLS leniency and timeouts resolved from the job's
+	 * configuration. Pure and in-memory; called at dispatch, never persisted.
+	 * @param job the AI job being dispatched
+	 * @return the serialized {@link AiScanContext}, or null when it cannot be built
+	 */
+	public String contextJsonFor(ScanJobEntity job) {
+		ScanConfiguration config = parseConfig(job.getScanConfigurationJson());
+		ReconResult recon = parseRecon(job.getAiRecon());
+		List<Endpoint> endpoints = (recon.endpoints() != null) ? recon.endpoints() : List.of();
+		String context = joinContext(recon.context(), describeSelection(config));
 		boolean ignoreSsl = config != null && config.ignoreSslErrors();
 		int connect = (config != null && config.httpConnectTimeoutMs() > 0) ? config.httpConnectTimeoutMs() : 5000;
 		int read = (config != null && config.httpReadTimeoutMs() > 0) ? config.httpReadTimeoutMs() : 10000;
-		return new AiScanContext(baseUrl, endpoints, context, credentials, ignoreSsl, connect, read);
+		AiScanContext scanContext = new AiScanContext(recon.baseUrl(), endpoints, context, resolveCredentials(config),
+				ignoreSsl, connect, read);
+		try {
+			return this.objectMapper.writeValueAsString(scanContext);
+		}
+		catch (RuntimeException ex) {
+			log.warn("Could not serialize AI context for job {}: {}", job.getId(), ex.getMessage());
+			return null;
+		}
 	}
 
 	private String joinContext(String reconContext, String selection) {
@@ -176,6 +196,19 @@ public class AiJobReconService {
 		catch (RuntimeException ex) {
 			log.debug("Could not parse scan configuration for AI context: {}", ex.getMessage());
 			return null;
+		}
+	}
+
+	private ReconResult parseRecon(String json) {
+		if (json == null || json.isBlank()) {
+			return NO_RECON;
+		}
+		try {
+			return this.objectMapper.readValue(json, ReconResult.class);
+		}
+		catch (RuntimeException ex) {
+			log.warn("Could not parse the stored recon; nodes will use local recon: {}", ex.getMessage());
+			return NO_RECON;
 		}
 	}
 

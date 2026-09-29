@@ -61,12 +61,26 @@ public class AiOrchestratorProperties {
 
 		private String model = "";
 
+		/**
+		 * The shared secret the manager must present on every {@code /api/**} call; the
+		 * platform-wide {@code ORTHRUS_INTERNAL_TOKEN}.
+		 */
+		private String internalToken = "change-me-in-production";
+
 		public String getModel() {
 			return this.model;
 		}
 
 		public void setModel(String model) {
 			this.model = model;
+		}
+
+		public String getInternalToken() {
+			return this.internalToken;
+		}
+
+		public void setInternalToken(String internalToken) {
+			this.internalToken = internalToken;
 		}
 
 	}

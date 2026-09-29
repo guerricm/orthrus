@@ -30,6 +30,7 @@ import ch.nexsol.orthrus.protocol.ai.PlanRequest;
 import ch.nexsol.orthrus.protocol.ai.ReconRequest;
 import ch.nexsol.orthrus.protocol.ai.ReconResult;
 import ch.nexsol.orthrus.protocol.ai.ScanPlan;
+import ch.nexsol.orthrus.protocol.node.NodeClient;
 
 /**
  * Calls the AI orchestrator. Present only when {@code orthrus.ai.orchestrator.url} is
@@ -40,16 +41,33 @@ import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 @ConditionalOnProperty("orthrus.ai.orchestrator.url")
 public class AiOrchestratorClient {
 
-	private static final Duration TIMEOUT = Duration.ofSeconds(120);
+	/**
+	 * Planning involves a model round-trip.
+	 */
+	private static final Duration PLAN_TIMEOUT = Duration.ofSeconds(120);
+
+	/**
+	 * The orchestrator caps its own recon at 10 seconds and falls back on its own, so
+	 * waiting longer only holds the AI job for an orchestrator that is gone.
+	 */
+	private static final Duration RECON_TIMEOUT = Duration.ofSeconds(15);
 
 	private final WebClient webClient;
 
 	private final String orchestratorUrl;
 
+	/**
+	 * @param orchestratorUrl the orchestrator's base URL
+	 * @param internalToken the shared secret the orchestrator expects on every call, the
+	 * same one the nodes present to the manager
+	 * @param webClientBuilder the client builder
+	 */
 	public AiOrchestratorClient(@Value("${orthrus.ai.orchestrator.url}") String orchestratorUrl,
-			WebClient.Builder webClientBuilder) {
+			@Value("${orthrus.master.internal-token}") String internalToken, WebClient.Builder webClientBuilder) {
 		this.orchestratorUrl = orchestratorUrl;
-		this.webClient = webClientBuilder.build();
+		this.webClient = webClientBuilder.clone()
+			.defaultHeader(NodeClient.INTERNAL_TOKEN_HEADER, internalToken)
+			.build();
 	}
 
 	/**
@@ -67,7 +85,7 @@ public class AiOrchestratorClient {
 			.bodyValue(body)
 			.retrieve()
 			.bodyToMono(ScanPlan.class)
-			.timeout(TIMEOUT);
+			.timeout(PLAN_TIMEOUT);
 	}
 
 	/**
@@ -87,7 +105,7 @@ public class AiOrchestratorClient {
 			.bodyValue(body)
 			.retrieve()
 			.bodyToMono(ReconResult.class)
-			.timeout(TIMEOUT);
+			.timeout(RECON_TIMEOUT);
 	}
 
 }

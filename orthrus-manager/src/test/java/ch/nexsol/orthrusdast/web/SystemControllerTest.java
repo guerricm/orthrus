@@ -115,7 +115,7 @@ class SystemControllerTest {
 		ScanJobEntity job = new ScanJobEntity("openapi", "http://app.test", "{}", JobStatus.FAILED, 7L);
 		job.setId(3L);
 		job.setAiMode(true);
-		job.setAiContext("{\"baseUrl\":\"http://app.test\",\"endpoints\":[],\"context\":\"stale\"}");
+		job.setAiRecon("{\"baseUrl\":\"http://app.test\",\"endpoints\":[],\"context\":\"stale\"}");
 		when(this.scanJobRepository.findById(3L)).thenReturn(Mono.just(job));
 		List<ScanJobEntity> saved = captureSavedJobs();
 
@@ -123,7 +123,7 @@ class SystemControllerTest {
 
 		assertThat(saved).hasSize(1);
 		assertThat(saved.get(0).isAiMode()).isTrue();
-		assertThat(saved.get(0).getAiContext()).isNull();
+		assertThat(saved.get(0).getAiRecon()).isNull();
 	}
 
 }

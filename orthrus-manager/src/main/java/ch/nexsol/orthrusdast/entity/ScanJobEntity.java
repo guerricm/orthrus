@@ -66,13 +66,13 @@ public class ScanJobEntity {
 	private boolean aiMode;
 
 	/**
-	 * The orchestrator's shared recon for this job (serialized {@code AiScanContext}:
-	 * base URL, endpoints, target fingerprint). Populated once when an AI job starts and
-	 * forwarded to each scan task, so the scanner nodes work from a common picture
-	 * instead of each re-probing. Null for deterministic jobs or when the orchestrator is
-	 * absent.
+	 * The orchestrator's shared recon for this job (serialized {@code ReconResult}: base
+	 * URL, endpoints, target fingerprint). Null until the recon cycle has settled it,
+	 * which is what releases the job's tasks to the AI nodes; for a job without an
+	 * orchestrator it settles to an empty recon. Never holds credentials: those are
+	 * resolved from the scan configuration at dispatch time.
 	 */
-	private String aiContext;
+	private String aiRecon;
 
 	@Transient
 	private String planName;
@@ -218,12 +218,12 @@ public class ScanJobEntity {
 		this.aiMode = aiMode;
 	}
 
-	public String getAiContext() {
-		return aiContext;
+	public String getAiRecon() {
+		return aiRecon;
 	}
 
-	public void setAiContext(String aiContext) {
-		this.aiContext = aiContext;
+	public void setAiRecon(String aiRecon) {
+		this.aiRecon = aiRecon;
 	}
 
 	public String getFormattedDuration() {

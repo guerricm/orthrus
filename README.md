@@ -308,13 +308,20 @@ and runs without them.
   the task carries the orchestrator's shared recon it works from those endpoints and context; with
   no orchestrator it falls back to its own local recon, so it still runs standalone.
 - **`orthrus-ai-orchestrator`** — the planning **and recon** brain. It never launches a scan; it
-  answers two calls the manager makes:
+  answers two calls the manager makes. Both are guarded by the platform's shared secret
+  (`ORTHRUS_INTERNAL_TOKEN`, sent as `X-Orthrus-Internal-Token`), and in Docker Compose the
+  service is reachable from the manager only, never published on the host: the recon endpoint
+  fetches whatever URL it is given with whatever credentials it is given.
     - `POST /api/v1/plan {"target","objective","availableDiscoverers"}` → a structured plan
       (recommended discoverer + prioritised families + rationale), used to pre-fill a Test Plan the
       operator reviews and runs through the normal flow.
-    - `POST /api/v1/recon {"target"}` → the shared recon: it fingerprints the target once and maps
-      its endpoints (honouring the OpenAPI `servers` base path), and the manager forwards this to
-      every scanner node so they no longer each re-probe blindly.
+    - `POST /api/v1/recon {"target","openapiOverrideHost","credentials"}` → the shared recon: it
+      fingerprints the target once and maps its endpoints (honouring the OpenAPI `servers` base
+      path). The manager runs this in its own scheduler cycle once an AI job starts, stores only
+      the recon on the job (never the credentials), and holds the job's tasks until it is settled;
+      at dispatch it folds the recon and the Test Plan's credentials, TLS and timeouts into the
+      context each scanner node receives. An unreachable orchestrator settles the job with an
+      empty recon, so its nodes fall back to their own local recon and other jobs are never held.
 
 Both are **multi-provider**: the code depends only on Spring AI's `ChatClient`; the provider is
 pure configuration.

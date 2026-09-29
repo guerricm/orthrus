@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.orchestrator.api;
+package ch.nexsol.orthrusai.orchestrator.security;
 
 import java.util.List;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -33,15 +32,14 @@ import ch.nexsol.orthrus.protocol.node.NodeClient;
 import ch.nexsol.orthrusai.orchestrator.plan.PlanService;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
- * The plan endpoint returns a plan for a valid target and rejects a blank one.
+ * Every API call must carry the shared secret; health stays open for probes.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = { "spring.ai.model.chat=none",
-		"orthrus.ai.enabled=false", "orthrus.ai.orchestrator.internal-token=test-token" })
-class PlanControllerTests {
+		"orthrus.ai.enabled=false", "orthrus.ai.orchestrator.internal-token=s3cret" })
+class InternalTokenWebFilterTests {
 
 	@LocalServerPort
 	private int port;
@@ -49,42 +47,51 @@ class PlanControllerTests {
 	@MockitoBean
 	private PlanService planService;
 
-	private WebTestClient client;
-
-	@BeforeEach
-	void setUp() {
-		this.client = WebTestClient.bindToServer()
-			.baseUrl("http://localhost:" + this.port)
-			.defaultHeader(NodeClient.INTERNAL_TOKEN_HEADER, "test-token")
-			.build();
+	private WebTestClient client() {
+		return WebTestClient.bindToServer().baseUrl("http://localhost:" + this.port).build();
 	}
 
 	@Test
-	void returnsPlanForValidTarget() {
-		ScanPlan plan = new ScanPlan("openapi", List.of("INJECTION"), 10, false, "focus on the API");
-		when(this.planService.plan(eq("http://app.test"), any(), any())).thenReturn(Mono.just(plan));
-
-		this.client.post()
-			.uri("/api/v1/plan")
+	void anApiCallWithoutTheTokenIsRejected() {
+		client().post()
+			.uri("/api/v1/recon")
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new PlanRequest("http://app.test", "find injection", List.of("openapi")))
+			.bodyValue("{\"target\":\"http://app.test\"}")
 			.exchange()
 			.expectStatus()
-			.isOk()
-			.expectBody()
-			.jsonPath("$.recommendedDiscoverer")
-			.isEqualTo("openapi");
+			.isUnauthorized();
 	}
 
 	@Test
-	void rejectsBlankTarget() {
-		this.client.post()
+	void anApiCallWithAWrongTokenIsRejected() {
+		client().post()
 			.uri("/api/v1/plan")
+			.header(NodeClient.INTERNAL_TOKEN_HEADER, "guess")
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new PlanRequest("  ", null, List.of()))
+			.bodyValue(new PlanRequest("http://app.test", null, List.of()))
 			.exchange()
 			.expectStatus()
-			.isBadRequest();
+			.isUnauthorized();
+	}
+
+	@Test
+	void anApiCallWithTheTokenGoesThrough() {
+		when(this.planService.plan(any(), any(), any()))
+			.thenReturn(Mono.just(new ScanPlan("openapi", List.of(), 10, false, "ok")));
+
+		client().post()
+			.uri("/api/v1/plan")
+			.header(NodeClient.INTERNAL_TOKEN_HEADER, "s3cret")
+			.contentType(MediaType.APPLICATION_JSON)
+			.bodyValue(new PlanRequest("http://app.test", null, List.of()))
+			.exchange()
+			.expectStatus()
+			.isOk();
+	}
+
+	@Test
+	void healthStaysOpenForProbes() {
+		client().get().uri("/actuator/health").exchange().expectStatus().isOk();
 	}
 
 }

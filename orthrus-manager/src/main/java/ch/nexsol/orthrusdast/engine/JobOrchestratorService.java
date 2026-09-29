@@ -57,6 +57,11 @@ public class JobOrchestratorService {
 	 */
 	static final int MAX_TASK_ATTEMPTS = 3;
 
+	/**
+	 * How many AI jobs are reconned through the orchestrator at once.
+	 */
+	private static final int RECON_CONCURRENCY = 4;
+
 	private final ScanJobRepository scanJobRepository;
 
 	private final ScanTaskRepository scanTaskRepository;
@@ -120,7 +125,6 @@ public class JobOrchestratorService {
 				// scan_jobs.result_id is a foreign key onto scan_results.
 				return this.scanResultService.createPlaceholderResult(resultId, job.getTarget(), startedAt)
 					.then(this.scanJobRepository.attachResult(job.getId(), resultId))
-					.then(Mono.defer(() -> reconAiJob(job)))
 					.then(Mono.defer(() -> {
 						this.jobEventPublisher.emit(job.getId(), JobEvent.running(job.getId(), job.getTarget()));
 						return createFamilyTasks(job);
@@ -130,20 +134,18 @@ public class JobOrchestratorService {
 	}
 
 	/**
-	 * For an AI job, recons the target once through the orchestrator and stores the
-	 * shared result on the job, so every scanner node works from the same endpoint map
-	 * and fingerprint. A no-op for deterministic jobs or when the orchestrator is absent;
-	 * a recon failure is swallowed so the job still runs (each node falls back to its own
-	 * local recon).
-	 * @param job the job being started
+	 * Recons, through the orchestrator, every running AI job that has not been reconned
+	 * yet, and stores the shared result on the job so all its tasks work from the same
+	 * endpoint map and fingerprint. Runs as its own cycle, off the dispatch path: a slow
+	 * or unreachable orchestrator delays the AI job's tasks, never the placement of other
+	 * jobs. A failed recon still settles the job (with an empty recon) so its tasks are
+	 * released and each node falls back to its own local recon.
 	 * @return completion signal
 	 */
-	private Mono<Void> reconAiJob(ScanJobEntity job) {
-		if (!job.isAiMode()) {
-			return Mono.empty();
-		}
-		return this.aiJobReconService.contextJsonFor(job)
-			.flatMap((json) -> this.scanJobRepository.saveAiContext(job.getId(), json))
+	public Mono<Void> reconStartedAiJobs() {
+		return this.scanJobRepository.findRunningAiJobsAwaitingRecon()
+			.flatMap((job) -> this.aiJobReconService.reconJsonFor(job)
+				.flatMap((json) -> this.scanJobRepository.saveAiRecon(job.getId(), json)), RECON_CONCURRENCY)
 			.then();
 	}
 

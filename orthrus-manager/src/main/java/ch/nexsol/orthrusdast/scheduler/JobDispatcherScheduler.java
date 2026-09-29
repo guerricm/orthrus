@@ -44,6 +44,7 @@ import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiJobReconService;
 
 @Component
 @EnableScheduling
@@ -75,14 +76,18 @@ public class JobDispatcherScheduler {
 
 	private final JobOrchestratorService jobOrchestratorService;
 
+	private final AiJobReconService aiJobReconService;
+
 	private final AtomicBoolean dispatchInFlight = new AtomicBoolean();
+
+	private final AtomicBoolean reconInFlight = new AtomicBoolean();
 
 	private final AtomicBoolean healthCheckInFlight = new AtomicBoolean();
 
 	public JobDispatcherScheduler(ScanJobRepository scanJobRepository, ScanTaskRepository scanTaskRepository,
 			SlaveNodeRepository slaveNodeRepository, OrthrusProperties orthrusProperties,
 			JobEventPublisher jobEventPublisher, JobOrchestratorService jobOrchestratorService,
-			WebClient.Builder webClientBuilder) {
+			AiJobReconService aiJobReconService, WebClient.Builder webClientBuilder) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -90,6 +95,7 @@ public class JobDispatcherScheduler {
 		this.orthrusProperties = orthrusProperties;
 		this.jobEventPublisher = jobEventPublisher;
 		this.jobOrchestratorService = jobOrchestratorService;
+		this.aiJobReconService = aiJobReconService;
 	}
 
 	/**
@@ -101,6 +107,15 @@ public class JobDispatcherScheduler {
 	public void dispatchPendingJobs() {
 		runOneAtATime(this.dispatchInFlight, "Dispatch cycle",
 				() -> this.jobOrchestratorService.processPendingJobs().then(Mono.defer(this::placePendingTasks)));
+	}
+
+	/**
+	 * Recons the AI jobs that started since the last tick. Its own cycle, so a slow
+	 * orchestrator never holds up the dispatch of other jobs.
+	 */
+	@Scheduled(fixedDelay = 5000)
+	public void reconAiJobs() {
+		runOneAtATime(this.reconInFlight, "AI recon cycle", this.jobOrchestratorService::reconStartedAiJobs);
 	}
 
 	/**
@@ -140,6 +155,9 @@ public class JobDispatcherScheduler {
 	 */
 	private Mono<SlaveNodeEntity> selectSlaveFor(ScanTaskEntity task) {
 		return this.scanJobRepository.findById(task.getScanJobId())
+			.filter((job) -> !job.isAiMode() || job.getAiRecon() != null)
+			// An AI task waits for the recon cycle to settle its job's shared recon, so
+			// every node of the job starts from the same picture.
 			.flatMap((job) -> liveSlaves().collectList().flatMap((live) -> {
 				if (live.isEmpty()) {
 					// The fleet is down; leave the task pending and retry on the next
@@ -309,8 +327,11 @@ public class JobDispatcherScheduler {
 		task.setStartedAt(startedAt);
 
 		return this.scanJobRepository.findById(task.getScanJobId()).flatMap((job) -> {
+			// The AI context (stored recon + credentials resolved from the configuration)
+			// is assembled here, in memory, so credentials are never persisted twice.
+			String aiContext = job.isAiMode() ? this.aiJobReconService.contextJsonFor(job) : null;
 			ScanTaskRequest payload = new ScanTaskRequest(task.getId(), job.getId(), task.getPhase(),
-					job.getDiscovererId(), job.getTarget(), job.getScanConfigurationJson(), job.getAiContext());
+					job.getDiscovererId(), job.getTarget(), job.getScanConfigurationJson(), aiContext);
 
 			// Column-scoped update: results stream in concurrently and a whole-row write
 			// would roll back the counters.

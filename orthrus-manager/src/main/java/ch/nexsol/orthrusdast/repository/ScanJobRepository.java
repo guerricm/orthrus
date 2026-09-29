@@ -80,16 +80,24 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	Mono<Integer> attachResult(Long id, String resultId);
 
 	/**
+	 * The AI jobs that are running but whose target the orchestrator has not reconned
+	 * yet. Their tasks stay pending until the recon is stored.
+	 * @return the jobs awaiting recon
+	 */
+	@org.springframework.data.r2dbc.repository.Query("SELECT * FROM scan_jobs WHERE status = 'RUNNING' AND ai_mode = TRUE AND ai_recon IS NULL")
+	Flux<ScanJobEntity> findRunningAiJobsAwaitingRecon();
+
+	/**
 	 * Stores the orchestrator's shared recon on an AI job, touching that column only so
-	 * it does not race with the counter updates. Read back at dispatch and forwarded to
-	 * each scan task.
+	 * it does not race with the counter updates. Read back at dispatch and folded into
+	 * the context of each scan task.
 	 * @param id the job
-	 * @param aiContext the serialized recon result
+	 * @param aiRecon the serialized recon result
 	 * @return the number of rows updated
 	 */
 	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET ai_context = :aiContext WHERE id = :id")
-	Mono<Integer> saveAiContext(Long id, String aiContext);
+	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET ai_recon = :aiRecon WHERE id = :id")
+	Mono<Integer> saveAiRecon(Long id, String aiRecon);
 
 	/**
 	 * Moves a running job to its terminal status. Only the caller that gets 1 back should

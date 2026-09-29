@@ -104,8 +104,6 @@ class JobOrchestratorServiceTest {
 				this.scanResultService, this.jobEventPublisher, this.slaveNodeRepository, WebClient.builder(),
 				scannerCatalog(), new tools.jackson.databind.ObjectMapper(), this.aiJobReconService);
 
-		when(this.aiJobReconService.contextJsonFor(any(ScanJobEntity.class))).thenReturn(Mono.empty());
-
 		when(this.scanTaskRepository.save(any(ScanTaskEntity.class))).thenAnswer((invocation) -> {
 			ScanTaskEntity task = invocation.getArgument(0);
 			this.savedTasks.add(task);
@@ -160,6 +158,36 @@ class JobOrchestratorServiceTest {
 
 		List<String> phases = this.savedTasks.stream().map(ScanTaskEntity::getPhase).sorted().toList();
 		assertThat(phases).containsExactly("INJECTION", "XSS");
+	}
+
+	@Test
+	void startingAnAiJobSplitsItWithoutWaitingForTheOrchestratorRecon() {
+		ScanJobEntity job = job(1L, JobStatus.PENDING);
+		job.setAiMode(true);
+		when(this.scanJobRepository.findByStatus(JobStatus.PENDING)).thenReturn(Flux.just(job));
+		when(this.scanJobRepository.claimForOrchestration(anyLong(), any())).thenReturn(Mono.just(1));
+		when(this.scanJobRepository.attachResult(anyLong(), anyString())).thenReturn(Mono.just(1));
+		when(this.scanResultService.createPlaceholderResult(anyString(), anyString(), any())).thenReturn(Mono.empty());
+
+		StepVerifier.create(this.orchestrator.processPendingJobs()).verifyComplete();
+
+		assertThat(this.savedTasks).isNotEmpty();
+		// The recon runs in its own cycle so a slow orchestrator never holds the
+		// dispatch.
+		verify(this.aiJobReconService, never()).reconJsonFor(any(ScanJobEntity.class));
+	}
+
+	@Test
+	void theReconCycleStoresTheOrchestratorReconOnEachRunningAiJob() {
+		ScanJobEntity job = job(1L, JobStatus.RUNNING);
+		job.setAiMode(true);
+		when(this.scanJobRepository.findRunningAiJobsAwaitingRecon()).thenReturn(Flux.just(job));
+		when(this.aiJobReconService.reconJsonFor(job)).thenReturn(Mono.just("{\"endpoints\":[]}"));
+		when(this.scanJobRepository.saveAiRecon(1L, "{\"endpoints\":[]}")).thenReturn(Mono.just(1));
+
+		StepVerifier.create(this.orchestrator.reconStartedAiJobs()).verifyComplete();
+
+		verify(this.scanJobRepository).saveAiRecon(1L, "{\"endpoints\":[]}");
 	}
 
 	@Test
