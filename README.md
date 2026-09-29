@@ -287,8 +287,18 @@ public class MyCustomScanner implements SecurityScanner {
 ## AI Orchestration (optional add-on)
 
 Two optional modules add LLM-driven orchestration on top of the deterministic engine. They are
-**fully autonomous**: they depend on no other orthrus module and integrate purely over the
-documented HTTP contracts, so the base product builds and runs without them.
+**separable**: they share only `orthrus-protocol` (the wire contracts, see below) with the rest of
+the platform and integrate purely over the documented HTTP contracts, so the base product builds
+and runs without them.
+
+### Module layout
+
+| Module | Role |
+| --- | --- |
+| `orthrus-protocol` | The wire contracts every service speaks: the manager ↔ node task protocol (`ScanTaskRequest`, `ScanAttempt`, `Vulnerability`, the CWE/OWASP/risk vocabulary, `NodeClient`) and the manager ↔ orchestrator AI contract (`ScanPlan`, `ReconResult`, `AiScanContext`, `Credential`, the shared OpenAPI reader). Thin by construction: a Maven enforcer rule bans server starters, Spring AI, the scan-engine libraries and every other Orthrus module. A type belongs here only if it is read or written on both sides of an HTTP call. |
+| `orthrus-engine-core` | The deterministic scan engine: discoverers, the 41 scanners, HTTP client, reports. |
+| `orthrus-manager`, `orthrus-worker`, `orthrus-cli` | The platform services and the CLI, built on `engine-core` and `protocol`. |
+| `orthrus-ai-scanner`, `orthrus-ai-orchestrator` | The AI add-on, built on `protocol` only. |
 
 - **`orthrus-ai-scanner`** — a "smart worker". It registers with the manager as a slave node,
   advertises the scanner families it should own (`orthrus.ai.families`), and runs each dispatched

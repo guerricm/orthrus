@@ -25,8 +25,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusai.orchestrator.model.Credential;
-import ch.nexsol.orthrusai.orchestrator.model.ReconResult;
+import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.ReconRequest;
+import ch.nexsol.orthrus.protocol.ai.ReconResult;
 import ch.nexsol.orthrusai.orchestrator.recon.ReconService;
 
 /**
@@ -53,16 +54,6 @@ public class ReconController {
 				? request.openapiOverrideHost() : null;
 		List<Credential> credentials = (request.credentials() != null) ? request.credentials() : List.of();
 		return this.reconService.discover(request.target(), host, credentials).map(ResponseEntity::ok);
-	}
-
-	/**
-	 * A recon request from the caller (the manager).
-	 *
-	 * @param target the target to fingerprint and map
-	 * @param openapiOverrideHost the base host to force on discovered endpoints, or blank
-	 * @param credentials credentials to send while reconning a protected target
-	 */
-	public record ReconRequest(String target, String openapiOverrideHost, List<Credential> credentials) {
 	}
 
 }

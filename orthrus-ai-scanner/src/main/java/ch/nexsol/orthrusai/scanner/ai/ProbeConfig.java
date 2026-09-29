@@ -18,7 +18,7 @@ package ch.nexsol.orthrusai.scanner.ai;
 
 import java.util.List;
 
-import ch.nexsol.orthrusai.scanner.wire.AiRecon;
+import ch.nexsol.orthrus.protocol.ai.Credential;
 
 /**
  * The parts of the operator's scan configuration a family agent must honour when it
@@ -30,7 +30,7 @@ import ch.nexsol.orthrusai.scanner.wire.AiRecon;
  * @param ignoreSslErrors whether to trust untrusted certificates
  * @param readTimeoutMs the read timeout for probes
  */
-public record ProbeConfig(List<AiRecon.Credential> credentials, boolean ignoreSslErrors, int readTimeoutMs) {
+public record ProbeConfig(List<Credential> credentials, boolean ignoreSslErrors, int readTimeoutMs) {
 
 	public static ProbeConfig defaults() {
 		return new ProbeConfig(List.of(), false, 10000);

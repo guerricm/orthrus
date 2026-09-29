@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.scanner.wire;
+package ch.nexsol.orthrus.protocol.node;
 
 /**
- * Registration payload sent to the manager. The manager substring-matches a task's phase
- * against {@code capabilities}, so this flat string must contain the scanner-family names
- * this node claims.
+ * A node reporting that a task could not run to completion.
  *
- * @param id this node's stable id
- * @param url the URL the manager should dispatch tasks to
- * @param capabilities comma-joined capability tokens (family names this node runs)
+ * @param reason a short human-readable cause
  */
-public record SlaveRegistration(String id, String url, String capabilities) {
+public record FailTaskRequest(String reason) {
 }

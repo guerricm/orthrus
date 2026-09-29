@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.orchestrator.model;
+package ch.nexsol.orthrus.protocol.node;
+
+import java.util.List;
 
 /**
- * A credential the caller wants sent while reconning a protected target, already resolved
- * to a plain tuple so this module needs no knowledge of the auth types.
- *
- * @param location where to place it: HEADER, QUERY or COOKIE
- * @param name the header/parameter/cookie name
- * @param value the value to send
+ * Represents a single execution of a specific scanner against a specific operation.
  */
-public record Credential(String location, String name, String value) {
+public record ScanAttempt(String scannerId, String scannerName, String operationMethod, String operationUrl,
+		AttemptStatus status, List<Vulnerability> vulnerabilities) {
+	public boolean passed() {
+		return status == AttemptStatus.PASSED;
+	}
 }

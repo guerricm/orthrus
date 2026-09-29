@@ -32,6 +32,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
@@ -328,10 +329,6 @@ public class JobDispatcherScheduler {
 					return this.jobOrchestratorService.onTaskFailed(task.getId(), "Dispatch failed");
 				}));
 		}).then();
-	}
-
-	record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
-			String scanConfigurationJson, String aiContextJson) {
 	}
 
 }

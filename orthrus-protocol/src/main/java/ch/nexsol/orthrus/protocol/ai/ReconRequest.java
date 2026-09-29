@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.scanner.wire;
+package ch.nexsol.orthrus.protocol.ai;
 
 import java.util.List;
 
 /**
- * One scanner run against one operation. Serialized to the exact JSON the manager
- * records.
+ * The manager asking the orchestrator to fingerprint a target and map its endpoints.
  *
- * @param scannerId id of the scanner
- * @param scannerName human-readable scanner name
- * @param operationMethod the HTTP method tested
- * @param operationUrl the URL tested
- * @param status one of PASSED, FAILED, AUTH_ERROR, ERROR
- * @param vulnerabilities findings produced by this run (empty when none)
+ * @param target the target to recon (an app root or an OpenAPI document)
+ * @param openapiOverrideHost the base host to force on discovered endpoints, or blank
+ * @param credentials credentials to send while reconning a protected target
  */
-public record ScanAttempt(String scannerId, String scannerName, String operationMethod, String operationUrl,
-		String status, List<Vulnerability> vulnerabilities) {
+public record ReconRequest(String target, String openapiOverrideHost, List<Credential> credentials) {
 }

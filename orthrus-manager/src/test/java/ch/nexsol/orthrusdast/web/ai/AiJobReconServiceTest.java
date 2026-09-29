@@ -22,6 +22,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.AiScanContext;
+import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
@@ -54,7 +56,7 @@ class AiJobReconServiceTest {
 
 		AiScanContext context = this.objectMapper.readValue(json, AiScanContext.class);
 		assertThat(context.credentials()).hasSize(1);
-		AiScanContext.Credential credential = context.credentials().get(0);
+		Credential credential = context.credentials().get(0);
 		assertThat(credential.location()).isEqualTo("HEADER");
 		assertThat(credential.name()).isEqualTo("Authorization");
 		assertThat(credential.value()).isEqualTo("Bearer secret-token");

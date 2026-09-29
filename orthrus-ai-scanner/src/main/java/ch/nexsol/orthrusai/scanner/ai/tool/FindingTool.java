@@ -18,7 +18,6 @@ package ch.nexsol.orthrusai.scanner.ai.tool;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -26,8 +25,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
 
 /**
  * The only path from the model's reasoning to a recorded finding. The model supplies
@@ -39,10 +39,6 @@ import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
 public class FindingTool {
 
 	private static final Logger log = LoggerFactory.getLogger(FindingTool.class);
-
-	private static final Set<String> RISK_LEVELS = Set.of("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL");
-
-	private static final Set<String> CONFIDENCES = Set.of("LOW", "MEDIUM", "HIGH", "CONFIRMED");
 
 	private final RunContext runContext;
 
@@ -65,8 +61,9 @@ public class FindingTool {
 			@ToolParam(description = "The request/response evidence that proves the finding") String evidence,
 			@ToolParam(description = "How to fix it") String remediation) {
 
-		String risk = normalise(riskLevel, RISK_LEVELS, "MEDIUM");
-		String conf = normalise(confidence, CONFIDENCES, "MEDIUM");
+		RiskLevel risk = normalise(riskLevel, RiskLevel.class, RiskLevel.MEDIUM);
+		Vulnerability.Confidence conf = normalise(confidence, Vulnerability.Confidence.class,
+				Vulnerability.Confidence.MEDIUM);
 
 		Vulnerability finding = new Vulnerability(UUID.randomUUID().toString(), name, description, risk, conf,
 				this.runContext.scannerId(), this.endpointUrl, this.endpointMethod, null, List.of(), List.of(), null,
@@ -77,12 +74,16 @@ public class FindingTool {
 		return "Recorded finding '" + name + "'. Continue probing or stop if the endpoint is exhausted.";
 	}
 
-	private String normalise(String value, Set<String> allowed, String fallback) {
+	private <E extends Enum<E>> E normalise(String value, Class<E> type, E fallback) {
 		if (value == null) {
 			return fallback;
 		}
-		String upper = value.trim().toUpperCase(Locale.ROOT);
-		return allowed.contains(upper) ? upper : fallback;
+		try {
+			return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
+		}
+		catch (IllegalArgumentException ex) {
+			return fallback;
+		}
 	}
 
 }

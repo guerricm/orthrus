@@ -16,9 +16,14 @@
     <!--
       This module is intentionally independent from the other orthrus modules: it integrates with the
       manager purely over the documented worker<->manager HTTP contract, so it can ship as a separable
-      offering. Do NOT add a dependency on orthrus-engine-core / orthrus-worker / orthrus-manager here.
+      offering. It shares only orthrus-protocol (the wire contracts) with them. Do NOT add a dependency on
+      orthrus-engine-core / orthrus-worker / orthrus-manager here.
     -->
     <dependencies>
+        <dependency>
+            <groupId>ch.nexsol.security</groupId>
+            <artifactId>orthrus-protocol</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>

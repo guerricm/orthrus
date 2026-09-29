@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 
 /**
  * Per-endpoint state shared with the tools an agent calls during one scan. It carries the

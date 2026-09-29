@@ -30,13 +30,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.scanner.oast.InteractshClient;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadLoaderService;
 import ch.nexsol.orthrusdast.scanner.payload.PayloadMutator;

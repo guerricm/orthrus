@@ -39,11 +39,11 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusai.scanner.client.ManagerClient;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
 import ch.nexsol.orthrusai.scanner.scan.ScanExecutor;
-import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
 
 /**
  * Exposes the same worker&lt;-&gt;manager surface a regular worker does, so the manager

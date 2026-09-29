@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>ch.nexsol.security</groupId>
+        <artifactId>orthrus-dast-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    <artifactId>orthrus-protocol</artifactId>
+    <name>Orthrus Protocol</name>
+    <description>The wire contracts shared across the Orthrus services (manager, workers, AI nodes, orchestrator)</description>
+    <!--
+      Admission rule: a type belongs here only if it is read or written on BOTH sides of an HTTP call
+      between two Orthrus services. Scanner logic, persistence, reporting and Spring configuration stay
+      in their own module. The enforcer below keeps this module free of server-side starters, Spring AI,
+      the scan-engine libraries and the other Orthrus modules, so every service can depend on it without
+      dragging the engine in. The parent adds only the WebClient and validation starters, which the
+      contract's NodeClient needs.
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>keep-protocol-thin</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <!-- server-side and engine starters: a contract module never hosts an app -->
+                                        <exclude>org.springframework.boot:spring-boot-starter-webflux</exclude>
+                                        <exclude>org.springframework.boot:spring-boot-starter-web</exclude>
+                                        <exclude>org.springframework.boot:spring-boot-starter-thymeleaf</exclude>
+                                        <exclude>org.springframework.boot:spring-boot-starter-data-*</exclude>
+                                        <exclude>org.springframework.boot:spring-boot-starter-security</exclude>
+                                        <exclude>org.springframework.boot:spring-boot-starter-oauth2-*</exclude>
+                                        <exclude>org.springframework.boot:spring-boot-starter-actuator</exclude>
+                                        <exclude>org.springframework.ai:*</exclude>
+                                        <!-- scan-engine libraries -->
+                                        <exclude>io.swagger.parser.v3:*</exclude>
+                                        <exclude>io.swagger.core.v3:*</exclude>
+                                        <exclude>org.jsoup:*</exclude>
+                                        <exclude>io.github.openhtmltopdf:*</exclude>
+                                        <exclude>io.jsonwebtoken:*</exclude>
+                                        <exclude>net.datafaker:*</exclude>
+                                        <exclude>ch.nexsol.security:orthrus-engine-core</exclude>
+                                        <exclude>ch.nexsol.security:orthrus-worker</exclude>
+                                        <exclude>ch.nexsol.security:orthrus-manager</exclude>
+                                        <exclude>ch.nexsol.security:orthrus-ai-scanner</exclude>
+                                        <exclude>ch.nexsol.security:orthrus-ai-orchestrator</exclude>
+                                    </excludes>
+                                    <message>orthrus-protocol carries wire contracts only: no server or engine starter, no Spring AI, no scan-engine library, no other Orthrus module.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>io.spring.javaformat</groupId>
+                <artifactId>spring-javaformat-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -25,8 +25,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 import ch.nexsol.orthrusai.orchestrator.ai.TargetReconTool;
-import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
 
 /**
  * The LLM planner: it fingerprints the target (through a read-only tool) and reasons

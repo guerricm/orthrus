@@ -18,7 +18,7 @@ package ch.nexsol.orthrusdast.sse;
 
 import java.util.Map;
 
-import ch.nexsol.orthrusdast.model.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanGrade;
 import ch.nexsol.orthrusdast.model.ScanResult;
 

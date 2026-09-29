@@ -18,6 +18,8 @@ package ch.nexsol.orthrusdast.model;
 
 import java.util.List;
 
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+
 public record EndpointAttemptGroup(String endpoint, List<ScanAttempt> attempts, long passed, long failed,
 		long authError, long error) {
 }

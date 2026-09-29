@@ -66,7 +66,7 @@ public class ScanJobEntity {
 	private boolean aiMode;
 
 	/**
-	 * The orchestrator's shared recon for this job (serialized {@code AiReconResult}:
+	 * The orchestrator's shared recon for this job (serialized {@code AiScanContext}:
 	 * base URL, endpoints, target fingerprint). Populated once when an AI job starts and
 	 * forwarded to each scan task, so the scanner nodes work from a common picture
 	 * instead of each re-probing. Null for deterministic jobs or when the orchestrator is

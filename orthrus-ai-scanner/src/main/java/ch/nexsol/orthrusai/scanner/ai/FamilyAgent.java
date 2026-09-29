@@ -34,11 +34,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.tool.FindingTool;
 import ch.nexsol.orthrusai.scanner.ai.tool.HttpProbeTool;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
-import ch.nexsol.orthrusai.scanner.recon.DiscoveredEndpoint;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
 
 /**
  * Runs one family agent against one endpoint. It builds fresh, run-scoped tools (so
@@ -84,8 +84,7 @@ public class FamilyAgent {
 	 * probe
 	 * @return the confirmed findings (possibly empty)
 	 */
-	public List<Vulnerability> scan(String family, DiscoveredEndpoint endpoint, String context,
-			ProbeConfig probeConfig) {
+	public List<Vulnerability> scan(String family, Endpoint endpoint, String context, ProbeConfig probeConfig) {
 		String scannerId = "ai-" + family.toLowerCase();
 		RunContext runContext = new RunContext(endpoint.url(), scannerId, this.maxHttpCallsPerOperation);
 		WebClient probeClient = probeConfig.ignoreSslErrors() ? insecureWebClient() : this.probeWebClient;

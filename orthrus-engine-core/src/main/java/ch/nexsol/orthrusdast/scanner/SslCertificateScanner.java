@@ -40,10 +40,10 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusdast.model.CWEReference;
+import ch.nexsol.orthrus.protocol.node.CWEReference;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Scans the SSL/TLS configuration and certificate of the target. Declared host-scoped so

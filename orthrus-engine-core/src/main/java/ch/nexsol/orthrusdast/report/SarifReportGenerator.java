@@ -27,8 +27,8 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.model.ScanResult;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Generates a report in SARIF (Static Analysis Results Interchange Format) for

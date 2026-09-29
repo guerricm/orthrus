@@ -26,6 +26,10 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.AiScanContext;
+import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.ai.ReconResult;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
@@ -60,12 +64,12 @@ public class AiJobReconService {
 	 */
 	public Mono<String> contextJsonFor(ScanJobEntity job) {
 		ScanConfiguration config = parseConfig(job.getScanConfigurationJson());
-		List<AiScanContext.Credential> credentials = resolveCredentials(config);
+		List<Credential> credentials = resolveCredentials(config);
 		String selection = describeSelection(config);
 		String host = (config != null) ? config.openapiOverrideHost() : null;
 
 		AiOrchestratorClient client = this.orchestratorClient.getIfAvailable();
-		Mono<AiReconResult> recon = (client != null)
+		Mono<ReconResult> recon = (client != null)
 				? client.recon(job.getTarget(), host, credentials).onErrorResume((e) -> {
 					log.warn("Orchestrator recon of {} failed ({}); node will use local recon", job.getTarget(),
 							e.getMessage());
@@ -85,15 +89,10 @@ public class AiJobReconService {
 			});
 	}
 
-	private AiScanContext assemble(AiReconResult recon, ScanConfiguration config,
-			List<AiScanContext.Credential> credentials, String selection) {
+	private AiScanContext assemble(ReconResult recon, ScanConfiguration config, List<Credential> credentials,
+			String selection) {
 		String baseUrl = (recon != null) ? recon.baseUrl() : null;
-		List<AiScanContext.Endpoint> endpoints = new ArrayList<>();
-		if (recon != null && recon.endpoints() != null) {
-			for (AiReconResult.Endpoint e : recon.endpoints()) {
-				endpoints.add(new AiScanContext.Endpoint(e.method(), e.url()));
-			}
-		}
+		List<Endpoint> endpoints = (recon != null && recon.endpoints() != null) ? recon.endpoints() : List.of();
 		String context = joinContext((recon != null) ? recon.context() : null, selection);
 		boolean ignoreSsl = config != null && config.ignoreSslErrors();
 		int connect = (config != null && config.httpConnectTimeoutMs() > 0) ? config.httpConnectTimeoutMs() : 5000;
@@ -132,8 +131,8 @@ public class AiJobReconService {
 	 * @param config the scan configuration, or null
 	 * @return the resolved credentials (possibly empty)
 	 */
-	private List<AiScanContext.Credential> resolveCredentials(ScanConfiguration config) {
-		List<AiScanContext.Credential> credentials = new ArrayList<>();
+	private List<Credential> resolveCredentials(ScanConfiguration config) {
+		List<Credential> credentials = new ArrayList<>();
 		if (config == null) {
 			return credentials;
 		}
@@ -142,7 +141,7 @@ public class AiJobReconService {
 		return credentials;
 	}
 
-	private void addCredential(List<AiScanContext.Credential> credentials, SecurityScheme scheme) {
+	private void addCredential(List<Credential> credentials, SecurityScheme scheme) {
 		if (scheme == null || scheme.value() == null || scheme.value().isBlank()) {
 			return;
 		}
@@ -151,18 +150,18 @@ public class AiJobReconService {
 		switch (location) {
 			case QUERY -> {
 				if (scheme.paramName() != null) {
-					credentials.add(new AiScanContext.Credential("QUERY", scheme.paramName(), scheme.value()));
+					credentials.add(new Credential("QUERY", scheme.paramName(), scheme.value()));
 				}
 			}
 			case COOKIE -> {
 				String name = (scheme.paramName() != null) ? scheme.paramName() : scheme.headerName();
 				if (name != null) {
-					credentials.add(new AiScanContext.Credential("COOKIE", name, scheme.value()));
+					credentials.add(new Credential("COOKIE", name, scheme.value()));
 				}
 			}
 			default -> {
 				String name = (scheme.headerName() != null) ? scheme.headerName() : "Authorization";
-				credentials.add(new AiScanContext.Credential("HEADER", name, scheme.toAuthorizationHeaderValue()));
+				credentials.add(new Credential("HEADER", name, scheme.toAuthorizationHeaderValue()));
 			}
 		}
 	}

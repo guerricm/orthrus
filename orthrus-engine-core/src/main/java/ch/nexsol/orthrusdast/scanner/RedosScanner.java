@@ -30,11 +30,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import ch.nexsol.orthrus.protocol.node.CWEReference;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
-import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Scans for Regular Expression Denial of Service (ReDoS) (CWE-400).

@@ -29,11 +29,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.CompleteTaskRequest;
+import ch.nexsol.orthrus.protocol.node.FailTaskRequest;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.SlaveRegistration;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.NodeStatus;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
@@ -75,7 +78,7 @@ public class MasterInternalApiController {
 	 * @return a mono containing the registered slave node
 	 */
 	@PostMapping("/slaves/register")
-	public Mono<ResponseEntity<SlaveNodeEntity>> registerSlave(@RequestBody SlaveRegistrationRequest request) {
+	public Mono<ResponseEntity<SlaveNodeEntity>> registerSlave(@RequestBody SlaveRegistration request) {
 		SlaveNodeEntity node = new SlaveNodeEntity(request.id(), request.url(), NodeStatus.IDLE,
 				request.capabilities());
 		return upsertNode(node)
@@ -182,15 +185,6 @@ public class MasterInternalApiController {
 	public Mono<ResponseEntity<Void>> postTaskFail(@PathVariable Long id, @RequestBody FailTaskRequest request) {
 		return this.jobOrchestratorService.onTaskFailed(id, request.reason())
 			.thenReturn(ResponseEntity.ok().<Void>build());
-	}
-
-	public record SlaveRegistrationRequest(String id, String url, String capabilities) {
-	}
-
-	record FailTaskRequest(String reason) {
-	}
-
-	public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
 	}
 
 }

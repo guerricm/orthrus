@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.scanner.wire;
+package ch.nexsol.orthrus.protocol.node;
 
-/**
- * Body of the task-fail callback.
- *
- * @param reason why the task failed
- */
-public record FailTaskRequest(String reason) {
+public enum RiskLevel {
+
+	INFO, LOW, MEDIUM, HIGH, CRITICAL
+
 }

@@ -43,10 +43,11 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusdast.client.MasterApiClient;
 import ch.nexsol.orthrusdast.engine.ScanService;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 
@@ -195,10 +196,6 @@ public class SlaveApiController {
 	}
 
 	public record ScannerInfo(String id, String name) {
-	}
-
-	public record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
-			String scanConfigurationJson) {
 	}
 
 }

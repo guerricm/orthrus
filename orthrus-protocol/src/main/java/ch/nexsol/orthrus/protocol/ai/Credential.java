@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.model;
-
-import java.util.List;
+package ch.nexsol.orthrus.protocol.ai;
 
 /**
- * Represents a single execution of a specific scanner against a specific operation.
+ * A credential resolved by the manager to a plain tuple, so the AI services attach it to
+ * their requests without knowing the auth scheme it came from.
+ *
+ * @param location where to place it: HEADER, QUERY or COOKIE
+ * @param name the header, parameter or cookie name
+ * @param value the value to send
  */
-public record ScanAttempt(String scannerId, String scannerName, String operationMethod, String operationUrl,
-		AttemptStatus status, List<Vulnerability> vulnerabilities) {
-	public boolean passed() {
-		return status == AttemptStatus.PASSED;
-	}
+public record Credential(String location, String name, String value) {
 }

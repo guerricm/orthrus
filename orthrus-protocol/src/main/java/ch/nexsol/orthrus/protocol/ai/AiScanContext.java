@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.web.ai;
+package ch.nexsol.orthrus.protocol.ai;
 
 import java.util.List;
 
 /**
  * The resolved picture the manager hands an AI scanner node for a job: the endpoints and
- * fingerprint from the orchestrator's recon, plus the parts of the Test Plan's
- * {@code ScanConfiguration} the node must honour — the credentials to send on every
- * probe, TLS leniency and timeouts. The manager resolves the auth schemes to plain
- * location/name/value tuples so the autonomous node applies them without re-implementing
- * the auth types.
+ * fingerprint from the orchestrator's recon, plus the parts of the Test Plan the node
+ * must honour on every probe (credentials, TLS leniency, timeouts).
  *
  * @param baseUrl the base URL endpoints resolve against
  * @param endpoints the endpoints to scan
@@ -36,24 +33,4 @@ import java.util.List;
  */
 public record AiScanContext(String baseUrl, List<Endpoint> endpoints, String context, List<Credential> credentials,
 		boolean ignoreSslErrors, int connectTimeoutMs, int readTimeoutMs) {
-
-	/**
-	 * One endpoint to scan.
-	 *
-	 * @param method the HTTP method
-	 * @param url the absolute URL
-	 */
-	public record Endpoint(String method, String url) {
-	}
-
-	/**
-	 * A credential to attach to every request, already resolved from an auth scheme.
-	 *
-	 * @param location where to place it: HEADER, QUERY or COOKIE
-	 * @param name the header/parameter/cookie name
-	 * @param value the value to send
-	 */
-	public record Credential(String location, String name, String value) {
-	}
-
 }

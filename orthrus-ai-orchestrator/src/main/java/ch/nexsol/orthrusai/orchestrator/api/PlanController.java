@@ -16,8 +16,6 @@
 
 package ch.nexsol.orthrusai.orchestrator.api;
 
-import java.util.List;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,7 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrus.protocol.ai.PlanRequest;
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 import ch.nexsol.orthrusai.orchestrator.plan.PlanService;
 
 /**
@@ -50,17 +49,6 @@ public class PlanController {
 		}
 		return this.planService.plan(request.target(), request.objective(), request.availableDiscoverers())
 			.map(ResponseEntity::ok);
-	}
-
-	/**
-	 * A planning request from the caller (the manager UI).
-	 *
-	 * @param target the target to scan
-	 * @param objective the operator's objective in natural language (optional)
-	 * @param availableDiscoverers the discoverers the caller's fleet offers (may be
-	 * empty)
-	 */
-	public record PlanRequest(String target, String objective, List<String> availableDiscoverers) {
 	}
 
 }

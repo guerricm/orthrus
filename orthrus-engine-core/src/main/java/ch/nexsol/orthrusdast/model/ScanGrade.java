@@ -18,6 +18,8 @@ package ch.nexsol.orthrusdast.model;
 
 import java.util.Map;
 
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+
 /**
  * Turns a risk breakdown into the single A–F letter shown on scan results.
  */

@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.orchestrator.model;
+package ch.nexsol.orthrus.protocol.ai;
 
 import java.util.List;
 
 /**
- * The campaign plan the orchestrator produces for a target. It is the LLM's structured
- * output: the discoverer to use, the scanner families to prioritise, and the reasoning
- * behind the choice. The campaign service turns this into a concrete scan request for the
- * manager.
+ * The orchestrator's suggested plan for a target.
  *
- * @param recommendedDiscoverer the discoverer id to use (e.g. openapi, blackbox)
- * @param prioritizedFamilies the scanner families to focus on, most important first
- * @param concurrency suggested per-scan concurrency
- * @param includePassed whether passed attempts should be kept in the result
- * @param rationale a short explanation of the plan
+ * @param recommendedDiscoverer the discoverer to map the target with
+ * @param prioritizedFamilies the scanner families to run, most relevant first
+ * @param concurrency the suggested request concurrency
+ * @param includePassed whether passed attempts should be kept in the report
+ * @param rationale why the plan looks like this
  */
 public record ScanPlan(String recommendedDiscoverer, List<String> prioritizedFamilies, Integer concurrency,
 		Boolean includePassed, String rationale) {

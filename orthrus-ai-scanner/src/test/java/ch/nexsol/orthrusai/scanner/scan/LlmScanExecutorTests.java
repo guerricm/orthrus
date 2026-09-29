@@ -22,12 +22,14 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
-import ch.nexsol.orthrusai.scanner.recon.DiscoveredEndpoint;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
-import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,13 +55,13 @@ class LlmScanExecutorTests {
 
 	@Test
 	void mapsFindingsToAttemptStatuses() {
-		DiscoveredEndpoint vulnerable = new DiscoveredEndpoint("http://app.test/api/users/1", "GET");
-		DiscoveredEndpoint clean = new DiscoveredEndpoint("http://app.test/api/health", "GET");
+		Endpoint vulnerable = new Endpoint("GET", "http://app.test/api/users/1");
+		Endpoint clean = new Endpoint("GET", "http://app.test/api/health");
 		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(vulnerable, clean)));
 
-		Vulnerability finding = new Vulnerability("id", "SQLi", "desc", "CRITICAL", "HIGH", "ai-injection",
-				vulnerable.url(), "GET", null, List.of(), List.of(), null, "evidence", "fix", "req", null, "vec",
-				"impact");
+		Vulnerability finding = new Vulnerability("id", "SQLi", "desc", RiskLevel.CRITICAL,
+				Vulnerability.Confidence.HIGH, "ai-injection", vulnerable.url(), "GET", null, List.of(), List.of(),
+				null, "evidence", "fix", "req", null, "vec", "impact");
 		when(this.familyAgent.scan(eq("INJECTION"), eq(vulnerable), any(), any())).thenReturn(List.of(finding));
 		when(this.familyAgent.scan(eq("INJECTION"), eq(clean), any(), any())).thenReturn(List.of());
 
@@ -76,9 +78,9 @@ class LlmScanExecutorTests {
 			.filter((a) -> a.operationUrl().equals(clean.url()))
 			.findFirst()
 			.orElseThrow();
-		assertThat(failed.status()).isEqualTo("FAILED");
+		assertThat(failed.status()).isEqualTo(AttemptStatus.FAILED);
 		assertThat(failed.vulnerabilities()).hasSize(1);
-		assertThat(passed.status()).isEqualTo("PASSED");
+		assertThat(passed.status()).isEqualTo(AttemptStatus.PASSED);
 		assertThat(passed.vulnerabilities()).isEmpty();
 	}
 

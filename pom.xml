@@ -17,6 +17,7 @@
     <description>Orthrus Dynamic Application Security Testing (V2 Multi-Module)</description>
 
     <modules>
+        <module>orthrus-protocol</module>
         <module>orthrus-engine-core</module>
         <module>orthrus-worker</module>
         <module>orthrus-manager</module>
@@ -42,6 +43,7 @@
         <checkstyle.version>12.3.1</checkstyle.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
@@ -57,6 +59,11 @@
             </dependency>
 
             <!-- Modules -->
+            <dependency>
+                <groupId>ch.nexsol.security</groupId>
+                <artifactId>orthrus-protocol</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>ch.nexsol.security</groupId>
                 <artifactId>orthrus-engine-core</artifactId>

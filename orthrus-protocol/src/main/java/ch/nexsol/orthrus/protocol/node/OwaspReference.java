@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.model;
+package ch.nexsol.orthrus.protocol.node;
 
 /**
  * Represents the OWASP Top 10 vulnerability categories. Using the actual OWASP Top

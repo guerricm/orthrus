@@ -26,6 +26,8 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -61,7 +63,7 @@ class ReconServiceTests {
 				{"openapi":"3.0.0","paths":{"/users":{"get":{},"post":{}},"/users/{id}":{"delete":{}}}}""";
 		String target = serve("application/json", spec) + "/openapi.json";
 
-		List<DiscoveredEndpoint> endpoints = this.reconService.discover(target).block();
+		List<Endpoint> endpoints = this.reconService.discover(target).block();
 
 		assertThat(endpoints).hasSize(3);
 		assertThat(endpoints).anyMatch((e) -> e.method().equals("GET") && e.url().endsWith("/users"));
@@ -76,7 +78,7 @@ class ReconServiceTests {
 		String host = serve("application/json", spec);
 		String target = host + "/api/v3/openapi.json";
 
-		List<DiscoveredEndpoint> endpoints = this.reconService.discover(target).block();
+		List<Endpoint> endpoints = this.reconService.discover(target).block();
 
 		assertThat(endpoints).hasSize(1);
 		assertThat(endpoints.get(0).url()).isEqualTo(host + "/api/v3/pet");
@@ -88,7 +90,7 @@ class ReconServiceTests {
 				{"openapi":"3.0.0","servers":[{"url":"https://api.example.com/v2"}],"paths":{"/pet":{"get":{}}}}""";
 		String target = serve("application/json", spec) + "/openapi.json";
 
-		List<DiscoveredEndpoint> endpoints = this.reconService.discover(target).block();
+		List<Endpoint> endpoints = this.reconService.discover(target).block();
 
 		assertThat(endpoints).hasSize(1);
 		assertThat(endpoints.get(0).url()).isEqualTo("https://api.example.com/v2/pet");
@@ -101,7 +103,7 @@ class ReconServiceTests {
 		String host = serve("application/json", spec);
 		String target = host + "/api/v3/openapi.json";
 
-		List<DiscoveredEndpoint> endpoints = this.reconService.discover(target).block();
+		List<Endpoint> endpoints = this.reconService.discover(target).block();
 
 		assertThat(endpoints).hasSize(1);
 		assertThat(endpoints.get(0).url()).isEqualTo(host + "/api/v3/pet");
@@ -111,7 +113,7 @@ class ReconServiceTests {
 	void fallsBackToTargetWhenNotOpenApi() {
 		String target = serve("text/html", "<html>hello</html>") + "/";
 
-		List<DiscoveredEndpoint> endpoints = this.reconService.discover(target).block();
+		List<Endpoint> endpoints = this.reconService.discover(target).block();
 
 		assertThat(endpoints).hasSize(1);
 		assertThat(endpoints.get(0).method()).isEqualTo("GET");

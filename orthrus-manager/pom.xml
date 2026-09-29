@@ -16,6 +16,10 @@
     <dependencies>
         <dependency>
             <groupId>ch.nexsol.security</groupId>
+            <artifactId>orthrus-protocol</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.nexsol.security</groupId>
             <artifactId>orthrus-engine-core</artifactId>
         </dependency>
         

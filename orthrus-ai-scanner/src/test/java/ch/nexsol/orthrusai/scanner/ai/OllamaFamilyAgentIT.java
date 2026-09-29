@@ -36,8 +36,8 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
-import ch.nexsol.orthrusai.scanner.recon.DiscoveredEndpoint;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -94,7 +94,7 @@ class OllamaFamilyAgentIT {
 	@Test
 	void xssAgentProbesTheReflectedEndpoint() {
 		String url = "http://localhost:" + this.target.port() + "/echo?q=hello";
-		DiscoveredEndpoint endpoint = new DiscoveredEndpoint(url, "GET");
+		Endpoint endpoint = new Endpoint("GET", url);
 
 		List<Vulnerability> findings = this.familyAgent.scan("XSS", endpoint, null,
 				ch.nexsol.orthrusai.scanner.ai.ProbeConfig.defaults());

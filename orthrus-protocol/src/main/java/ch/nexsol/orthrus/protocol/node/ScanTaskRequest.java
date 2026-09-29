@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.scanner.wire;
+package ch.nexsol.orthrus.protocol.node;
 
 /**
- * Task the manager dispatches to a slave. Local copy of the manager's dispatch payload so
- * this module stays independent of the other orthrus modules.
+ * A scan task the manager dispatches to a node: one scanner family of one job.
  *
- * @param taskId the task identifier used for callbacks
- * @param jobId the parent job
- * @param phase the scanner family name to run (e.g. INJECTION)
- * @param discovererId the discoverer to use for endpoint discovery
- * @param target the target under test
- * @param scanConfigurationJson the serialized scan configuration
- * @param aiContextJson the orchestrator's shared recon (serialized: base URL, endpoints,
- * target fingerprint), or null to have this node run its own local recon
+ * @param taskId the task to report progress against
+ * @param jobId the job the task belongs to
+ * @param phase the scanner family to run
+ * @param discovererId the discoverer to map the target with
+ * @param target the target URL
+ * @param scanConfigurationJson the job's serialized scan configuration
+ * @param aiContextJson the manager's serialized AI scan context, null for deterministic
+ * runs
  */
 public record ScanTaskRequest(Long taskId, Long jobId, String phase, String discovererId, String target,
 		String scanConfigurationJson, String aiContextJson) {

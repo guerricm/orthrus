@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.scanner.wire;
-
-import java.time.Instant;
+package ch.nexsol.orthrus.protocol.ai;
 
 /**
- * Body of the task-complete callback.
+ * One endpoint a recon found on the target, ready to hand to a scanner agent.
  *
- * @param startTime when the task started
- * @param endTime when the task finished
- * @param testsCount number of tests executed
- * @param vulnsCount number of vulnerabilities found
+ * @param method the HTTP method to exercise it with
+ * @param url the absolute URL
  */
-public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
+public record Endpoint(String method, String url) {
 }

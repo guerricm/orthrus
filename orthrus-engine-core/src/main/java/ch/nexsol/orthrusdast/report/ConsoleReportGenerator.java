@@ -25,8 +25,8 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.model.ScanResult;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Prints a summary report to the console.

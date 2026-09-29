@@ -32,10 +32,10 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusdast.model.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanGrade;
 import ch.nexsol.orthrusdast.model.ScanResult;
 

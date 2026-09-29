@@ -19,7 +19,10 @@ package ch.nexsol.orthrusai.scanner.scan;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,11 +41,11 @@ class EchoScanExecutorTests {
 				null);
 
 		StepVerifier.create(this.executor.execute(task)).assertNext((attempt) -> {
-			assertThat(attempt.status()).isEqualTo("FAILED");
+			assertThat(attempt.status()).isEqualTo(AttemptStatus.FAILED);
 			assertThat(attempt.operationUrl()).isEqualTo("http://target.example/api");
 			assertThat(attempt.vulnerabilities()).hasSize(1);
-			assertThat(attempt.vulnerabilities().get(0).riskLevel()).isEqualTo("INFO");
-			assertThat(attempt.vulnerabilities().get(0).confidence()).isEqualTo("LOW");
+			assertThat(attempt.vulnerabilities().get(0).riskLevel()).isEqualTo(RiskLevel.INFO);
+			assertThat(attempt.vulnerabilities().get(0).confidence()).isEqualTo(Vulnerability.Confidence.LOW);
 		}).verifyComplete();
 	}
 

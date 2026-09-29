@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 
 /**
  * Produces a scan plan for a target. The orchestrator only plans; it never launches — the

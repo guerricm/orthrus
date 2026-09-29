@@ -14,28 +14,18 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.web.ai;
+package ch.nexsol.orthrus.protocol.ai;
 
 import java.util.List;
 
 /**
- * The orchestrator's shared recon, as the manager consumes it. The manager persists this
- * on the AI job and forwards it to each scan task, so every scanner node works from the
- * same endpoint map and target fingerprint.
+ * The orchestrator's shared recon of a target. The manager persists it on the AI job and
+ * forwards it to each scan task, so every scanner node works from the same picture
+ * instead of re-probing blindly.
  *
  * @param baseUrl the base URL the endpoints resolve against
- * @param endpoints the endpoints to scan
+ * @param endpoints the endpoints to scan (never empty; falls back to the target itself)
  * @param context a short natural-language fingerprint of the target
  */
-public record AiReconResult(String baseUrl, List<Endpoint> endpoints, String context) {
-
-	/**
-	 * One endpoint the recon found.
-	 *
-	 * @param method the HTTP method
-	 * @param url the absolute URL
-	 */
-	public record Endpoint(String method, String url) {
-	}
-
+public record ReconResult(String baseUrl, List<Endpoint> endpoints, String context) {
 }

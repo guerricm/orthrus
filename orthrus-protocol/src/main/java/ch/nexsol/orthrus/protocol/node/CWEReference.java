@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.model;
+package ch.nexsol.orthrus.protocol.node;
 
 /**
  * CWE (Common Weakness Enumeration) references for detected vulnerabilities. Extended to

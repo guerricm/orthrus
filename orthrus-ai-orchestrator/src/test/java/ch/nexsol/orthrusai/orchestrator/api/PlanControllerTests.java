@@ -27,7 +27,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrus.protocol.ai.PlanRequest;
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 import ch.nexsol.orthrusai.orchestrator.plan.PlanService;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -62,7 +63,7 @@ class PlanControllerTests {
 		this.client.post()
 			.uri("/api/v1/plan")
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new PlanController.PlanRequest("http://app.test", "find injection", List.of("openapi")))
+			.bodyValue(new PlanRequest("http://app.test", "find injection", List.of("openapi")))
 			.exchange()
 			.expectStatus()
 			.isOk()
@@ -76,7 +77,7 @@ class PlanControllerTests {
 		this.client.post()
 			.uri("/api/v1/plan")
 			.contentType(MediaType.APPLICATION_JSON)
-			.bodyValue(new PlanController.PlanRequest("  ", null, List.of()))
+			.bodyValue(new PlanRequest("  ", null, List.of()))
 			.exchange()
 			.expectStatus()
 			.isBadRequest();

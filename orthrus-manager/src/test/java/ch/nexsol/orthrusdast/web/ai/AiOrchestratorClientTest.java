@@ -25,6 +25,8 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

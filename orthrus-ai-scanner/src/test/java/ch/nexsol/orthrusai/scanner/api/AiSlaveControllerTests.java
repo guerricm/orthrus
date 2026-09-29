@@ -25,8 +25,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusai.scanner.client.ManagerClient;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;

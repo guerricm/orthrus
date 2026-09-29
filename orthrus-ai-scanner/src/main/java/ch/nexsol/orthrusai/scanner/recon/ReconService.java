@@ -16,34 +16,28 @@
 
 package ch.nexsol.orthrusai.scanner.recon;
 
-import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.ai.OpenApiEndpoints;
+
 /**
- * Minimal self-recon for the AI node. If the target serves an OpenAPI document, its paths
- * and methods become the endpoint list; otherwise the target URL itself is the single
- * endpoint. The LLM agents then probe each endpoint. Kept deliberately small: deep
- * crawling can be layered on later.
+ * Minimal self-recon for the AI node, used when a task carries no shared recon from the
+ * orchestrator. If the target serves an OpenAPI document, its paths and methods become
+ * the endpoint list; otherwise the target URL itself is the single endpoint.
  */
 @Service
 public class ReconService {
 
 	private static final Logger log = LoggerFactory.getLogger(ReconService.class);
-
-	private static final int MAX_ENDPOINTS = 50;
-
-	private static final List<String> HTTP_METHODS = List.of("get", "put", "post", "delete", "patch");
 
 	private final WebClient webClient;
 
@@ -59,106 +53,20 @@ public class ReconService {
 	 * @param target the target URL (an app root or an OpenAPI document)
 	 * @return the endpoints found, never empty (falls back to the target itself)
 	 */
-	public Mono<List<DiscoveredEndpoint>> discover(String target) {
+	public Mono<List<Endpoint>> discover(String target) {
 		return this.webClient.get()
 			.uri(target)
 			.retrieve()
 			.bodyToMono(String.class)
 			.timeout(Duration.ofSeconds(10))
-			.map((body) -> parseOpenApi(target, body))
+			.map((body) -> OpenApiEndpoints.parse(this.objectMapper, target, body).endpoints())
+			.doOnNext(
+					(endpoints) -> log.info("Recon parsed {} endpoint(s) from OpenAPI at {}", endpoints.size(), target))
 			.onErrorResume((e) -> {
 				log.debug("Recon fetch of {} failed ({}); using target as single endpoint", target, e.getMessage());
-				return Mono.just(List.<DiscoveredEndpoint>of());
+				return Mono.just(List.<Endpoint>of());
 			})
-			.map((endpoints) -> endpoints.isEmpty() ? List.of(new DiscoveredEndpoint(target, "GET")) : endpoints);
-	}
-
-	private List<DiscoveredEndpoint> parseOpenApi(String target, String body) {
-		if (body == null || body.isBlank()) {
-			return List.of();
-		}
-		try {
-			JsonNode root = this.objectMapper.readTree(body);
-			JsonNode paths = root.get("paths");
-			boolean looksOpenApi = root.has("openapi") || root.has("swagger");
-			if (!looksOpenApi || paths == null || !paths.isObject()) {
-				return List.of();
-			}
-			String base = resolveBase(target, root);
-			List<DiscoveredEndpoint> endpoints = new ArrayList<>();
-			paths.properties().forEach((entry) -> {
-				String path = entry.getKey();
-				JsonNode methods = entry.getValue();
-				for (String method : HTTP_METHODS) {
-					if (methods.has(method) && endpoints.size() < MAX_ENDPOINTS) {
-						endpoints.add(new DiscoveredEndpoint(base + path, method.toUpperCase(Locale.ROOT)));
-					}
-				}
-			});
-			log.info("Recon parsed {} endpoint(s) from OpenAPI at {}", endpoints.size(), target);
-			return endpoints;
-		}
-		catch (RuntimeException ex) {
-			return List.of();
-		}
-	}
-
-	/**
-	 * Resolves the base URL that OpenAPI paths are relative to. Honours the document's
-	 * {@code servers[0].url} (absolute, or relative to the document's origin), and
-	 * otherwise falls back to the document's parent path, so a spec fetched from
-	 * {@code https://host/api/v3/openapi.json} yields {@code https://host/api/v3}, not
-	 * just {@code https://host}. Getting this wrong makes every probe hit a 404.
-	 * @param target the URL the document was fetched from
-	 * @param root the parsed OpenAPI document
-	 * @return the base URL to prefix paths with, without a trailing slash
-	 */
-	private String resolveBase(String target, JsonNode root) {
-		JsonNode servers = root.get("servers");
-		if (servers != null && servers.isArray() && !servers.isEmpty()) {
-			JsonNode first = servers.get(0);
-			String url = (first != null && first.hasNonNull("url")) ? first.get("url").asString().trim() : "";
-			if (!url.isEmpty()) {
-				if (url.startsWith("http://") || url.startsWith("https://")) {
-					return stripTrailingSlash(url);
-				}
-				return origin(target) + stripTrailingSlash(url.startsWith("/") ? url : "/" + url);
-			}
-		}
-		return docBase(target);
-	}
-
-	private String docBase(String target) {
-		try {
-			URI uri = URI.create(target);
-			String path = uri.getRawPath();
-			if (path == null || path.isEmpty() || path.equals("/")) {
-				return origin(target);
-			}
-			int lastSlash = path.lastIndexOf('/');
-			String parent = (lastSlash > 0) ? path.substring(0, lastSlash) : "";
-			return origin(target) + parent;
-		}
-		catch (IllegalArgumentException ex) {
-			return origin(target);
-		}
-	}
-
-	private String stripTrailingSlash(String url) {
-		return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-	}
-
-	private String origin(String target) {
-		try {
-			URI uri = URI.create(target);
-			String scheme = (uri.getScheme() != null) ? uri.getScheme() : "http";
-			int port = uri.getPort();
-			String authority = (port != -1) ? uri.getHost() + ":" + port : uri.getHost();
-			return scheme + "://" + authority;
-		}
-		catch (IllegalArgumentException ex) {
-			return target;
-		}
+			.map((endpoints) -> endpoints.isEmpty() ? List.of(new Endpoint("GET", target)) : endpoints);
 	}
 
 }

@@ -27,14 +27,16 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.AiScanContext;
+import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
 import ch.nexsol.orthrusai.scanner.ai.ProbeConfig;
-import ch.nexsol.orthrusai.scanner.recon.DiscoveredEndpoint;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
-import ch.nexsol.orthrusai.scanner.wire.AiRecon;
-import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
 
 /**
  * The AI executor: recon the target, then run the task's family agent against each
@@ -85,35 +87,31 @@ public class LlmScanExecutor implements ScanExecutor {
 	 * @return the endpoints, shared context and probe config
 	 */
 	private Mono<Recon> recon(ScanTaskRequest request) {
-		AiRecon shared = parseSharedRecon(request.aiContextJson());
+		AiScanContext shared = parseSharedRecon(request.aiContextJson());
 		ProbeConfig probeConfig = probeConfigOf(shared);
 		String context = (shared != null) ? shared.context() : null;
 		if (shared != null && shared.endpoints() != null && !shared.endpoints().isEmpty()) {
-			List<DiscoveredEndpoint> endpoints = shared.endpoints()
-				.stream()
-				.map((e) -> new DiscoveredEndpoint(e.url(), e.method()))
-				.toList();
-			return Mono.just(new Recon(endpoints, context, probeConfig, true));
+			return Mono.just(new Recon(shared.endpoints(), context, probeConfig, true));
 		}
 		return this.reconService.discover(request.target())
 			.map((endpoints) -> new Recon(endpoints, context, probeConfig, false));
 	}
 
-	private ProbeConfig probeConfigOf(AiRecon shared) {
+	private ProbeConfig probeConfigOf(AiScanContext shared) {
 		if (shared == null) {
 			return ProbeConfig.defaults();
 		}
-		List<AiRecon.Credential> credentials = (shared.credentials() != null) ? shared.credentials() : List.of();
+		List<Credential> credentials = (shared.credentials() != null) ? shared.credentials() : List.of();
 		int readTimeout = (shared.readTimeoutMs() > 0) ? shared.readTimeoutMs() : 10000;
 		return new ProbeConfig(credentials, shared.ignoreSslErrors(), readTimeout);
 	}
 
-	private AiRecon parseSharedRecon(String json) {
+	private AiScanContext parseSharedRecon(String json) {
 		if (json == null || json.isBlank()) {
 			return null;
 		}
 		try {
-			return this.objectMapper.readValue(json, AiRecon.class);
+			return this.objectMapper.readValue(json, AiScanContext.class);
 		}
 		catch (RuntimeException ex) {
 			log.warn("Could not parse the orchestrator's shared recon; falling back to local recon: {}",
@@ -122,19 +120,18 @@ public class LlmScanExecutor implements ScanExecutor {
 		}
 	}
 
-	private Flux<ScanAttempt> scanEndpoint(String family, DiscoveredEndpoint endpoint, String context,
-			ProbeConfig probeConfig) {
+	private Flux<ScanAttempt> scanEndpoint(String family, Endpoint endpoint, String context, ProbeConfig probeConfig) {
 		return Flux.defer(() -> {
 			List<Vulnerability> findings = this.familyAgent.scan(family, endpoint, context, probeConfig);
 			String scannerId = "ai-" + family.toLowerCase();
-			String status = findings.isEmpty() ? "PASSED" : "FAILED";
+			AttemptStatus status = findings.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED;
 			ScanAttempt attempt = new ScanAttempt(scannerId, "AI " + family + " Agent", endpoint.method(),
 					endpoint.url(), status, findings);
 			return Flux.just(attempt);
 		}).subscribeOn(Schedulers.boundedElastic());
 	}
 
-	private record Recon(List<DiscoveredEndpoint> endpoints, String context, ProbeConfig probeConfig, boolean shared) {
+	private record Recon(List<Endpoint> endpoints, String context, ProbeConfig probeConfig, boolean shared) {
 	}
 
 }

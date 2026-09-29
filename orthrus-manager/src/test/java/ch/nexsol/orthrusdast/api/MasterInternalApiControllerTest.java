@@ -31,6 +31,7 @@ import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import ch.nexsol.orthrus.protocol.node.SlaveRegistration;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
@@ -153,9 +154,8 @@ class MasterInternalApiControllerTest {
 						: Mono.empty());
 	}
 
-	private MasterInternalApiController.SlaveRegistrationRequest registration() {
-		return new MasterInternalApiController.SlaveRegistrationRequest(NODE_ID, "http://node-a:8081",
-				"openapi,INJECTION");
+	private SlaveRegistration registration() {
+		return new SlaveRegistration(NODE_ID, "http://node-a:8081", "openapi,INJECTION");
 	}
 
 }

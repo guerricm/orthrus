@@ -14,10 +14,17 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.model;
+package ch.nexsol.orthrus.protocol.node;
 
-public enum AttemptStatus {
+import java.time.Instant;
 
-	PASSED, FAILED, AUTH_ERROR, ERROR
-
+/**
+ * A node reporting that a task ran to completion.
+ *
+ * @param startTime when the node started the task
+ * @param endTime when the node finished it
+ * @param testsCount the number of attempts executed
+ * @param vulnsCount the number of vulnerabilities found
+ */
+public record CompleteTaskRequest(Instant startTime, Instant endTime, int testsCount, int vulnsCount) {
 }

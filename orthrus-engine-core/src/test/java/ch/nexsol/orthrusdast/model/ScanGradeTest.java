@@ -20,6 +20,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ScanGradeTest {

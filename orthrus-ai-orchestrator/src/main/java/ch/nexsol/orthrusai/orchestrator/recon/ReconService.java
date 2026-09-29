@@ -16,11 +16,8 @@
 
 package ch.nexsol.orthrusai.orchestrator.recon;
 
-import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,12 +26,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import ch.nexsol.orthrusai.orchestrator.model.Credential;
-import ch.nexsol.orthrusai.orchestrator.model.Endpoint;
-import ch.nexsol.orthrusai.orchestrator.model.ReconResult;
+import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.Credentials;
+import ch.nexsol.orthrus.protocol.ai.Endpoint;
+import ch.nexsol.orthrus.protocol.ai.OpenApiEndpoints;
+import ch.nexsol.orthrus.protocol.ai.ReconResult;
 
 /**
  * The orchestrator's recon: fingerprint the target once and map its endpoints. If the
@@ -47,10 +45,6 @@ import ch.nexsol.orthrusai.orchestrator.model.ReconResult;
 public class ReconService {
 
 	private static final Logger log = LoggerFactory.getLogger(ReconService.class);
-
-	private static final int MAX_ENDPOINTS = 50;
-
-	private static final List<String> HTTP_METHODS = List.of("get", "put", "post", "delete", "patch");
 
 	private final WebClient webClient;
 
@@ -80,8 +74,9 @@ public class ReconService {
 	 * @return the recon result, never empty (falls back to the target itself)
 	 */
 	public Mono<ReconResult> discover(String target, String overrideHost, List<Credential> credentials) {
-		WebClient.RequestHeadersSpec<?> request = this.webClient.get().uri(applyQueryCredentials(target, credentials));
-		applyHeaderAndCookieCredentials(request, credentials);
+		WebClient.RequestHeadersSpec<?> request = this.webClient.get()
+			.uri(Credentials.withQueryCredentials(target, credentials));
+		Credentials.applyHeaderAndCookie(request, credentials);
 		return request
 			.exchangeToMono((response) -> response.bodyToMono(String.class)
 				.defaultIfEmpty("")
@@ -89,72 +84,24 @@ public class ReconService {
 			.timeout(Duration.ofSeconds(10))
 			.onErrorResume((e) -> {
 				log.debug("Recon of {} failed ({}); using target as single endpoint", target, e.getMessage());
-				return Mono.just(new ReconResult(origin(target), List.of(new Endpoint("GET", target)),
+				return Mono.just(new ReconResult(OpenApiEndpoints.origin(target), List.of(new Endpoint("GET", target)),
 						"Target could not be fingerprinted: " + e.getMessage()));
 			});
 	}
 
 	private ReconResult build(String target, String overrideHost, ClientResponse response, String body) {
-		Parsed parsed = parseOpenApi(target, body);
+		OpenApiEndpoints parsed = OpenApiEndpoints.parse(this.objectMapper, target, body);
 		List<Endpoint> endpoints = parsed.endpoints().isEmpty() ? List.of(new Endpoint("GET", target))
 				: parsed.endpoints();
-		String base = parsed.base();
+		String base = parsed.baseUrl();
 		if (overrideHost != null && !overrideHost.isBlank()) {
-			base = rewriteHost(base, overrideHost);
-			List<Endpoint> rewritten = new ArrayList<>();
-			for (Endpoint e : endpoints) {
-				rewritten.add(new Endpoint(e.method(), rewriteHost(e.url(), overrideHost)));
-			}
-			endpoints = rewritten;
+			base = OpenApiEndpoints.rewriteHost(base, overrideHost);
+			endpoints = endpoints.stream()
+				.map((e) -> new Endpoint(e.method(), OpenApiEndpoints.rewriteHost(e.url(), overrideHost)))
+				.toList();
 		}
-		String context = fingerprint(target, response, endpoints.size());
-		return new ReconResult(base, endpoints, context);
-	}
-
-	private void applyHeaderAndCookieCredentials(WebClient.RequestHeadersSpec<?> request,
-			List<Credential> credentials) {
-		for (Credential c : credentials) {
-			if (c == null || c.name() == null || c.value() == null) {
-				continue;
-			}
-			String location = (c.location() != null) ? c.location().toUpperCase(Locale.ROOT) : "HEADER";
-			if ("COOKIE".equals(location)) {
-				request.cookie(c.name(), c.value());
-			}
-			else if (!"QUERY".equals(location)) {
-				request.header(c.name(), c.value().replaceAll("[\\r\\n]", ""));
-			}
-		}
-	}
-
-	private String applyQueryCredentials(String target, List<Credential> credentials) {
-		StringBuilder url = new StringBuilder(target);
-		boolean hasQuery = target.contains("?");
-		for (Credential c : credentials) {
-			if (c == null || c.name() == null || c.value() == null) {
-				continue;
-			}
-			if ("QUERY".equalsIgnoreCase(c.location())) {
-				url.append(hasQuery ? '&' : '?').append(c.name()).append('=').append(c.value());
-				hasQuery = true;
-			}
-		}
-		return url.toString();
-	}
-
-	private String rewriteHost(String url, String overrideHost) {
-		try {
-			URI original = URI.create(url);
-			String origin = overrideHost.contains("://") ? overrideHost
-					: ((original.getScheme() != null) ? original.getScheme() : "https") + "://" + overrideHost;
-			origin = stripTrailingSlash(origin);
-			String path = (original.getRawPath() != null) ? original.getRawPath() : "";
-			String query = (original.getRawQuery() != null) ? "?" + original.getRawQuery() : "";
-			return origin + path + query;
-		}
-		catch (IllegalArgumentException ex) {
-			return url;
-		}
+		log.info("Recon of {} found {} endpoint(s)", target, endpoints.size());
+		return new ReconResult(base, endpoints, fingerprint(target, response, endpoints.size()));
 	}
 
 	private String fingerprint(String target, ClientResponse response, int endpointCount) {
@@ -177,97 +124,6 @@ public class ReconService {
 		if (value != null && !value.isBlank()) {
 			sb.append(name).append("=").append(value).append("; ");
 		}
-	}
-
-	private Parsed parseOpenApi(String target, String body) {
-		if (body == null || body.isBlank()) {
-			return new Parsed(origin(target), List.of());
-		}
-		try {
-			JsonNode root = this.objectMapper.readTree(body);
-			JsonNode paths = root.get("paths");
-			boolean looksOpenApi = root.has("openapi") || root.has("swagger");
-			if (!looksOpenApi || paths == null || !paths.isObject()) {
-				return new Parsed(origin(target), List.of());
-			}
-			String base = resolveBase(target, root);
-			List<Endpoint> endpoints = new ArrayList<>();
-			paths.properties().forEach((entry) -> {
-				String path = entry.getKey();
-				JsonNode methods = entry.getValue();
-				for (String method : HTTP_METHODS) {
-					if (methods.has(method) && endpoints.size() < MAX_ENDPOINTS) {
-						endpoints.add(new Endpoint(method.toUpperCase(Locale.ROOT), base + path));
-					}
-				}
-			});
-			log.info("Recon parsed {} endpoint(s) from OpenAPI at {}", endpoints.size(), target);
-			return new Parsed(base, endpoints);
-		}
-		catch (RuntimeException ex) {
-			return new Parsed(origin(target), List.of());
-		}
-	}
-
-	/**
-	 * Resolves the base URL that OpenAPI paths are relative to. Honours the document's
-	 * {@code servers[0].url} (absolute, or relative to the document's origin), and
-	 * otherwise falls back to the document's parent path, so a spec fetched from
-	 * {@code https://host/api/v3/openapi.json} yields {@code https://host/api/v3}, not
-	 * just {@code https://host}. Getting this wrong makes every probe hit a 404.
-	 * @param target the URL the document was fetched from
-	 * @param root the parsed OpenAPI document
-	 * @return the base URL to prefix paths with, without a trailing slash
-	 */
-	private String resolveBase(String target, JsonNode root) {
-		JsonNode servers = root.get("servers");
-		if (servers != null && servers.isArray() && !servers.isEmpty()) {
-			JsonNode first = servers.get(0);
-			String url = (first != null && first.hasNonNull("url")) ? first.get("url").asString().trim() : "";
-			if (!url.isEmpty()) {
-				if (url.startsWith("http://") || url.startsWith("https://")) {
-					return stripTrailingSlash(url);
-				}
-				return origin(target) + stripTrailingSlash(url.startsWith("/") ? url : "/" + url);
-			}
-		}
-		return docBase(target);
-	}
-
-	private String docBase(String target) {
-		try {
-			URI uri = URI.create(target);
-			String path = uri.getRawPath();
-			if (path == null || path.isEmpty() || path.equals("/")) {
-				return origin(target);
-			}
-			int lastSlash = path.lastIndexOf('/');
-			String parent = (lastSlash > 0) ? path.substring(0, lastSlash) : "";
-			return origin(target) + parent;
-		}
-		catch (IllegalArgumentException ex) {
-			return origin(target);
-		}
-	}
-
-	private String stripTrailingSlash(String url) {
-		return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-	}
-
-	private String origin(String target) {
-		try {
-			URI uri = URI.create(target);
-			String scheme = (uri.getScheme() != null) ? uri.getScheme() : "http";
-			int port = uri.getPort();
-			String authority = (port != -1) ? uri.getHost() + ":" + port : uri.getHost();
-			return scheme + "://" + authority;
-		}
-		catch (IllegalArgumentException ex) {
-			return target;
-		}
-	}
-
-	private record Parsed(String base, List<Endpoint> endpoints) {
 	}
 
 }

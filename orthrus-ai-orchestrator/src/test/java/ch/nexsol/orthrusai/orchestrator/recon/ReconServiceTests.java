@@ -24,7 +24,7 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 import tools.jackson.databind.ObjectMapper;
 
-import ch.nexsol.orthrusai.orchestrator.model.ReconResult;
+import ch.nexsol.orthrus.protocol.ai.ReconResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

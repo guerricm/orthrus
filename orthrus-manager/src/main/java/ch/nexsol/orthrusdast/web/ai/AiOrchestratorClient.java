@@ -18,7 +18,6 @@ package ch.nexsol.orthrusdast.web.ai;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,15 +25,22 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.PlanRequest;
+import ch.nexsol.orthrus.protocol.ai.ReconRequest;
+import ch.nexsol.orthrus.protocol.ai.ReconResult;
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
+
 /**
- * Thin proxy to the optional AI orchestrator, which is a pure planning service. The
- * manager asks it for a scan plan and applies the plan itself (pre-fills the Test Plan
- * form, then saves/runs through the normal flow). Active only when
- * {@code orthrus.ai.orchestrator.url} is configured, so the AI is a separable add-on.
+ * Calls the AI orchestrator. Present only when {@code orthrus.ai.orchestrator.url} is
+ * set, so a manager without an orchestrator still starts and simply offers no AI
+ * assistance.
  */
 @Component
-@ConditionalOnProperty(prefix = "orthrus.ai.orchestrator", name = "url")
+@ConditionalOnProperty("orthrus.ai.orchestrator.url")
 public class AiOrchestratorClient {
+
+	private static final Duration TIMEOUT = Duration.ofSeconds(120);
 
 	private final WebClient webClient;
 
@@ -54,14 +60,14 @@ public class AiOrchestratorClient {
 	 * @return the plan
 	 */
 	public Mono<ScanPlan> suggestPlan(String target, String objective, List<String> availableDiscoverers) {
-		Map<String, Object> body = Map.of("target", target, "objective", (objective != null) ? objective : "",
-				"availableDiscoverers", (availableDiscoverers != null) ? availableDiscoverers : List.of());
+		PlanRequest body = new PlanRequest(target, (objective != null) ? objective : "",
+				(availableDiscoverers != null) ? availableDiscoverers : List.of());
 		return this.webClient.post()
 			.uri(this.orchestratorUrl + "/api/v1/plan")
 			.bodyValue(body)
 			.retrieve()
 			.bodyToMono(ScanPlan.class)
-			.timeout(Duration.ofSeconds(120));
+			.timeout(TIMEOUT);
 	}
 
 	/**
@@ -73,17 +79,15 @@ public class AiOrchestratorClient {
 	 * @param credentials the credentials to send while reconning, may be empty
 	 * @return the shared recon result
 	 */
-	public Mono<AiReconResult> recon(String target, String openapiOverrideHost,
-			List<AiScanContext.Credential> credentials) {
-		Map<String, Object> body = Map.of("target", target, "openapiOverrideHost",
-				(openapiOverrideHost != null) ? openapiOverrideHost : "", "credentials",
+	public Mono<ReconResult> recon(String target, String openapiOverrideHost, List<Credential> credentials) {
+		ReconRequest body = new ReconRequest(target, (openapiOverrideHost != null) ? openapiOverrideHost : "",
 				(credentials != null) ? credentials : List.of());
 		return this.webClient.post()
 			.uri(this.orchestratorUrl + "/api/v1/recon")
 			.bodyValue(body)
 			.retrieve()
-			.bodyToMono(AiReconResult.class)
-			.timeout(Duration.ofSeconds(120));
+			.bodyToMono(ReconResult.class)
+			.timeout(TIMEOUT);
 	}
 
 }

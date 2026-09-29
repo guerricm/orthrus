@@ -14,10 +14,16 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusdast.model;
+package ch.nexsol.orthrus.protocol.ai;
 
-public enum RiskLevel {
+import java.util.List;
 
-	INFO, LOW, MEDIUM, HIGH, CRITICAL
-
+/**
+ * The manager asking the orchestrator to plan a scan.
+ *
+ * @param target the target to scan
+ * @param objective the operator's objective, may be blank
+ * @param availableDiscoverers the discoverers the manager offers
+ */
+public record PlanRequest(String target, String objective, List<String> availableDiscoverers) {
 }

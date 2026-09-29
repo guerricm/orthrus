@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.scanner.recon;
+package ch.nexsol.orthrus.protocol.node;
 
-/**
- * A single endpoint the AI node found on the target. The AI scanner does its own recon
- * because it does not share the deterministic workers' discovery cache.
- *
- * @param url absolute URL of the endpoint
- * @param method HTTP method to exercise it with
- */
-public record DiscoveredEndpoint(String url, String method) {
+public enum AttemptStatus {
+
+	PASSED, FAILED, AUTH_ERROR, ERROR
+
 }

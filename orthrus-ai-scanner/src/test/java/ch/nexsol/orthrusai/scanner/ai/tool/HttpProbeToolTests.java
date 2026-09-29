@@ -28,9 +28,9 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
-import ch.nexsol.orthrusai.scanner.wire.AiRecon;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -102,9 +102,8 @@ class HttpProbeToolTests {
 		String echoTarget = "http://localhost:" + echo.port() + "/api";
 		try {
 			RunContext ctx = new RunContext(echoTarget, "ai-injection", 5);
-			List<AiRecon.Credential> credentials = List.of(
-					new AiRecon.Credential("HEADER", "Authorization", "Bearer secret-token"),
-					new AiRecon.Credential("QUERY", "api_key", "k123"));
+			List<Credential> credentials = List.of(new Credential("HEADER", "Authorization", "Bearer secret-token"),
+					new Credential("QUERY", "api_key", "k123"));
 			HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx, credentials,
 					Duration.ofSeconds(10));
 

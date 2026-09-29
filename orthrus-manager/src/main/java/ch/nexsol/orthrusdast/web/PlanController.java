@@ -45,6 +45,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.engine.ScannerCatalog;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
@@ -66,7 +67,6 @@ import ch.nexsol.orthrusdast.repository.TestPlanRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
 import ch.nexsol.orthrusdast.web.ai.AiOrchestratorClient;
-import ch.nexsol.orthrusdast.web.ai.ScanPlan;
 
 /**
  * Test-plan pages: listing, creation, edition and execution.

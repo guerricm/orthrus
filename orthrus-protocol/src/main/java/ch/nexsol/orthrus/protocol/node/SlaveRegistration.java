@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package ch.nexsol.orthrusai.orchestrator.model;
+package ch.nexsol.orthrus.protocol.node;
 
 /**
- * One endpoint the orchestrator's recon found on the target, ready to hand to a scanner.
+ * A node announcing itself to the manager.
  *
- * @param method the HTTP method to exercise it with
- * @param url the absolute URL of the endpoint
+ * @param id the node's stable identifier
+ * @param url the URL the manager dispatches tasks to
+ * @param capabilities comma-separated discoverers, scanner ids, families and markers
  */
-public record Endpoint(String method, String url) {
+public record SlaveRegistration(String id, String url, String capabilities) {
 }
