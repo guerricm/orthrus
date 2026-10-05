@@ -24,8 +24,9 @@ orthrus:
     enabled: ${ORTHRUS_AI_ENABLED:false}
     orchestrator:
       model: ${ORTHRUS_AI_ORCHESTRATOR_MODEL:}
-      # Shared secret the manager presents on /api/**; the same ORTHRUS_INTERNAL_TOKEN as the nodes.
-      internal-token: ${ORTHRUS_INTERNAL_TOKEN:change-me-in-production}
+      # Shared secret the manager presents on /api/**; the same ORTHRUS_MASTER_INTERNAL_TOKEN as the
+      # manager and the nodes.
+      internal-token: ${ORTHRUS_MASTER_INTERNAL_TOKEN:change-me-in-production}
 
 management:
   endpoints:

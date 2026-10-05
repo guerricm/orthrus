@@ -63,7 +63,7 @@ public class AiOrchestratorProperties {
 
 		/**
 		 * The shared secret the manager must present on every {@code /api/**} call; the
-		 * platform-wide {@code ORTHRUS_INTERNAL_TOKEN}.
+		 * platform-wide {@code ORTHRUS_MASTER_INTERNAL_TOKEN}.
 		 */
 		private String internalToken = "change-me-in-production";
 

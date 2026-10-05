@@ -34,7 +34,7 @@ services:
       SPRING_R2DBC_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       # Shared secret between the manager and its workers. The prod profile refuses to
       # start while this, or the admin password below, is still the shipped default.
-      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_MASTER_INTERNAL_TOKEN:?set ORTHRUS_MASTER_INTERNAL_TOKEN in .env}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-superadmin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       # Points the manager at the orchestrator for AI planning (Test Plan "AI-assisted" switch) and
@@ -72,7 +72,7 @@ services:
       THC_PATH: /actuator/health
       SPRING_PROFILES_ACTIVE: prod
       ORTHRUS_MASTER_URL: http://orthrus-manager:8080
-      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_MASTER_INTERNAL_TOKEN:?set ORTHRUS_MASTER_INTERNAL_TOKEN in .env}
       ORTHRUS_SLAVE_ID: slave-docker-node-1
       ORTHRUS_SLAVE_ADVERTISED_URL: http://orthrus-worker:8081
     healthcheck:
@@ -105,7 +105,7 @@ services:
       THC_PATH: /actuator/health
       # Registers with the manager as an AI "smart worker" for the families it advertises.
       ORTHRUS_MASTER_URL: http://orthrus-manager:8080
-      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_MASTER_INTERNAL_TOKEN:?set ORTHRUS_MASTER_INTERNAL_TOKEN in .env}
       ORTHRUS_SLAVE_ID: ai-scanner-node-1
       ORTHRUS_SLAVE_ADVERTISED_URL: http://orthrus-ai-scanner:8091
       ORTHRUS_AI_ENABLED: "true"
@@ -145,7 +145,7 @@ services:
       THC_PATH: /actuator/health
       # A pure planning + recon service the manager calls; it never reaches back to the manager.
       # Every /api call must carry the platform's shared secret.
-      ORTHRUS_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
+      ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_MASTER_INTERNAL_TOKEN:?set ORTHRUS_MASTER_INTERNAL_TOKEN in .env}
       ORTHRUS_AI_ENABLED: "true"
       ORTHRUS_AI_PROVIDER: ${ORTHRUS_AI_PROVIDER:-ollama}
       ORTHRUS_AI_ORCHESTRATOR_MODEL: ${ORTHRUS_AI_ORCHESTRATOR_MODEL:-qwen2.5:7b}

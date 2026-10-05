@@ -92,7 +92,7 @@ Every credential is mandatory: on the `prod` profile the Master refuses to start
 ```bash
 cp .env.example .env
 # edit .env and set at least:
-#   POSTGRES_PASSWORD, ORTHRUS_INTERNAL_TOKEN, ADMIN_PASSWORD
+#   POSTGRES_PASSWORD, ORTHRUS_MASTER_INTERNAL_TOKEN, ADMIN_PASSWORD
 ```
 
 ### 2. Start the stack
@@ -315,7 +315,7 @@ and runs without them.
   no orchestrator it falls back to its own local recon, so it still runs standalone.
 - **`orthrus-ai-orchestrator`** — the planning **and recon** brain. It never launches a scan; it
   answers two calls the manager makes. Both are guarded by the platform's shared secret
-  (`ORTHRUS_INTERNAL_TOKEN`, sent as `X-Orthrus-Internal-Token`), and in Docker Compose the
+  (`ORTHRUS_MASTER_INTERNAL_TOKEN`, sent as `X-Orthrus-Internal-Token`), and in Docker Compose the
   service is reachable from the manager only, never published on the host: the recon endpoint
   fetches whatever URL it is given with whatever credentials it is given.
     - `POST /api/v1/plan {"target","objective","availableDiscoverers"}` → a structured plan
