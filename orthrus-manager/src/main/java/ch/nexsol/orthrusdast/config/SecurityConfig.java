@@ -79,6 +79,10 @@ public class SecurityConfig {
 			.pathMatchers("/css/**", "/js/**", "/images/**", "/vendor/**", "/webjars/**", "/favicon.ico", "/login**",
 					"/error/**")
 			.permitAll()
+			// Liveness probe for the container health check; exposes the status only,
+			// never the component details
+			.pathMatchers("/actuator/health", "/actuator/health/**")
+			.permitAll()
 			// Swagger/OpenAPI
 			.pathMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/swagger-ui/**")
 			.permitAll()
