@@ -49,7 +49,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small">Created At</label>
-                            <div class="form-control-readonly" th:text="${#temporals.format(plan.createdAt, 'yyyy-MM-dd HH:mm')}"></div>
+                            <div class="form-control-readonly"><time th:attr="datetime=${plan.createdAt}" data-local-format="yyyy-MM-dd HH:mm" th:text="${#temporals.format(plan.createdAt, 'yyyy-MM-dd HH:mm')}"></time></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small">Last Modified By</label>
@@ -57,7 +57,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small">Last Modified At</label>
-                            <div class="form-control-readonly" th:text="${#temporals.format(plan.lastModifiedAt, 'yyyy-MM-dd HH:mm')}"></div>
+                            <div class="form-control-readonly"><time th:attr="datetime=${plan.lastModifiedAt}" data-local-format="yyyy-MM-dd HH:mm" th:text="${#temporals.format(plan.lastModifiedAt, 'yyyy-MM-dd HH:mm')}"></time></div>
                         </div>
                     </div>
                 </div>

@@ -10,7 +10,7 @@
             <span th:text="${scan.planName ?: '-'}">Plan Name</span>
             <span th:if="${scan.aiMode}" class="badge bg-info text-dark ms-1" title="Ran on the AI scanner nodes">AI</span>
         </td>
-        <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${#temporals.format(scan.createdAt, 'HH:mm:ss dd/MM/yyyy')}">10:00 01/01/2026</td>
+        <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;"><time th:attr="datetime=${scan.createdAt}" data-local-format="HH:mm:ss dd/MM/yyyy" th:text="${#temporals.format(scan.createdAt, 'HH:mm:ss dd/MM/yyyy')}">10:00 01/01/2026</time></td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle; word-break: break-all;"><code class="text-info" th:text="${scan.target}">https://api.example.com</code></td>
         <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;">
             <span th:id="'job-status-' + ${scan.id}" th:class="'badge ' + (${scan.status.name() == 'PENDING'} ? 'bg-secondary' : (${scan.status.name() == 'RUNNING'} ? 'bg-primary' : (${scan.status.name() == 'COMPLETED'} ? 'bg-success' : (${scan.status.name() == 'CANCELLED'} ? 'bg-secondary' : 'bg-danger'))))" th:text="${scan.status}">COMPLETED</span>

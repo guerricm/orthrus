@@ -89,7 +89,7 @@
                                 </td>
                                 <td class="bg-transparent border-secondary text-truncate" style="padding: 1rem; vertical-align: middle; max-width: 300px;" th:title="${mappedPlan['plan'].description}" th:text="${mappedPlan['plan'].description}">Description</td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;"><code class="text-info" th:text="${mappedPlan['plan'].target}">http://example.com</code></td>
-                                <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;" th:text="${#temporals.format(mappedPlan['plan'].createdAt, 'yyyy-MM-dd HH:mm')}">Date</td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem; vertical-align: middle;"><time th:attr="datetime=${mappedPlan['plan'].createdAt}" data-local-format="yyyy-MM-dd HH:mm" th:text="${#temporals.format(mappedPlan['plan'].createdAt, 'yyyy-MM-dd HH:mm')}">Date</time></td>
                                 <td class="bg-transparent border-secondary text-end" style="padding: 1rem; vertical-align: middle;">
                                     <span class="badge bg-secondary text-light text-uppercase me-1" th:text="${mappedPlan['plan'].discovererId}">openapi</span>
                                     <span class="badge bg-info text-dark" th:title="'Scanners enabled / total available'" data-bs-toggle="tooltip">

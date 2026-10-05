@@ -234,6 +234,26 @@
             }
         });
 
+        // The server renders dates in UTC; rewrite each <time data-local-format> in the
+        // browser's time zone, on page load and whenever HTMX injects content.
+        function localizeTimes(root) {
+            root.querySelectorAll('time[data-local-format]').forEach(function (el) {
+                const date = new Date(el.getAttribute('datetime'));
+                if (isNaN(date.getTime())) {
+                    return;
+                }
+                const pad = (n) => String(n).padStart(2, '0');
+                const parts = {
+                    yyyy: date.getFullYear(), MM: pad(date.getMonth() + 1), dd: pad(date.getDate()),
+                    HH: pad(date.getHours()), mm: pad(date.getMinutes()), ss: pad(date.getSeconds())
+                };
+                el.textContent = el.dataset.localFormat.replace(/yyyy|MM|dd|HH|mm|ss/g, (token) => parts[token]);
+                el.title = date.toString();
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => localizeTimes(document));
+        document.addEventListener('htmx:load', (evt) => localizeTimes(evt.detail.elt));
+
         // Re-initialize tooltips after HTMX injects content
         document.addEventListener('htmx:load', function (evt) {
             const tooltipTriggerList = evt.detail.elt.querySelectorAll('[data-bs-toggle="tooltip"]');

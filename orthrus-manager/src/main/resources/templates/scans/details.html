@@ -19,7 +19,7 @@
                 <div class="row">
                     <div class="col-md-12">
                         <p class="mb-1"><strong>Target:</strong> <span th:text="${targetUrl}"></span></p>
-                        <p class="mb-0"><strong>Date:</strong> <span th:text="${scanDate}"></span></p>
+                        <p class="mb-0"><strong>Date:</strong> <time th:attr="datetime=${scanStartTime}" data-local-format="dd.MM.yyyy HH:mm" th:text="${scanDate}"></time></p>
                     </div>
                 </div>
                 

@@ -66,7 +66,7 @@
                                         </button>
                                     </form>
                                 </td>
-                                <td class="bg-transparent border-secondary" style="padding: 1rem;" th:text="${#temporals.format(slave.lastSeenAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                                <td class="bg-transparent border-secondary" style="padding: 1rem;"><time th:attr="datetime=${slave.lastSeenAt}" data-local-format="yyyy-MM-dd HH:mm:ss" th:text="${#temporals.format(slave.lastSeenAt, 'yyyy-MM-dd HH:mm:ss')}"></time></td>
                             </tr>
                             <tr th:if="${slaves.isEmpty()}">
                                 <td colspan="6" class="text-center text-muted py-4 bg-transparent border-secondary" style="padding: 1rem;">No slaves are currently registered.

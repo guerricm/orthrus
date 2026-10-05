@@ -132,6 +132,7 @@ public class ScanViewController {
 							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 								.withZone(ZoneId.systemDefault());
 							model.addAttribute("scanDate", formatter.format(result.scanStartTime()));
+							model.addAttribute("scanStartTime", result.scanStartTime());
 
 							long critical = result.riskSummary().getOrDefault(RiskLevel.CRITICAL, 0L);
 							long high = result.riskSummary().getOrDefault(RiskLevel.HIGH, 0L);

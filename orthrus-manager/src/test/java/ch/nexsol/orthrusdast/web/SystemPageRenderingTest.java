@@ -72,4 +72,29 @@ class SystemPageRenderingTest {
 		assertThat(body).as("only the AI node carries an agent badge").containsOnlyOnce("agent(s)");
 	}
 
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	void datesAreHandedToTheBrowserAsUtcInstantsToShowInItsTimeZone() {
+		StepVerifier
+			.create(this.slaveNodeRepository.insertSlaveNode("tz-node", "http://tz-node:8081", NodeStatus.IDLE,
+					"openapi", Instant.parse("2026-10-05T13:55:29Z")))
+			.verifyComplete();
+
+		String body = this.webTestClient.get()
+			.uri("/system")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+
+		// The fallback text follows the server's zone (UTC in the images), so only the
+		// machine-readable part is pinned.
+		assertThat(body).as("UTC instant handed to the browser")
+			.containsPattern("<time (?=[^>]*datetime=\"2026-10-05T13:55:29Z\")"
+					+ "(?=[^>]*data-local-format=\"yyyy-MM-dd HH:mm:ss\")[^>]*>");
+		assertThat(body).as("the layout script that rewrites them").contains("function localizeTimes(root)");
+	}
+
 }
