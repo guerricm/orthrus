@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 
@@ -71,14 +72,20 @@ public class SlaveApiController {
 	private final Map<Long, Disposable> activeTasks = new ConcurrentHashMap<>();
 
 	/**
+	 * The job each running task belongs to, so cancelling a job's last task can stop the
+	 * discovery its tasks share.
+	 */
+	private final Map<Long, Long> jobOfTask = new ConcurrentHashMap<>();
+
+	/**
 	 * Discovery result shared by every family task of the same job, so a target is
 	 * crawled once per job rather than once per scanner family. Bounded by age and by
 	 * count, since a job's tasks do not necessarily overlap in time.
 	 */
-	private final Map<Long, Mono<List<Operation>>> discoveryByJob = Collections
-		.synchronizedMap(new LinkedHashMap<Long, Mono<List<Operation>>>(16, 0.75f, true) {
+	private final Map<Long, JobDiscovery> discoveryByJob = Collections
+		.synchronizedMap(new LinkedHashMap<Long, JobDiscovery>(16, 0.75f, true) {
 			@Override
-			protected boolean removeEldestEntry(Map.Entry<Long, Mono<List<Operation>>> eldest) {
+			protected boolean removeEldestEntry(Map.Entry<Long, JobDiscovery> eldest) {
 				return size() > MAX_CACHED_DISCOVERIES;
 			}
 		});
@@ -101,6 +108,8 @@ public class SlaveApiController {
 			}
 		}
 		activeTasks.clear();
+		jobOfTask.clear();
+		discoveryByJob.values().forEach(JobDiscovery::stop);
 		discoveryByJob.clear();
 	}
 
@@ -141,6 +150,7 @@ public class SlaveApiController {
 					.subscribe();
 
 				activeTasks.put(request.taskId(), disposable);
+				jobOfTask.put(request.taskId(), request.jobId());
 				masterApiClient.reportLoad(activeTasks.size());
 
 				return Mono.just(ResponseEntity.accepted().<Void>build());
@@ -158,16 +168,38 @@ public class SlaveApiController {
 	 * @return the operations discovered for the job's target
 	 */
 	private Mono<List<Operation>> discoverOnce(ScanTaskRequest request, ScanConfiguration config) {
-		return this.discoveryByJob.computeIfAbsent(request.jobId(),
-				(jobId) -> this.scanService.executeDiscovery(request.discovererId(), request.target(), config)
-					.doOnSubscribe(
-							(s) -> log.info("Running discovery for job {} on target {}", jobId, request.target()))
-					.cache(DISCOVERY_CACHE_TTL));
+		return this.discoveryByJob.computeIfAbsent(request.jobId(), (jobId) -> {
+			// A cached Mono keeps running when its subscribers cancel, so the discovery
+			// also listens to a stop signal fired once no task of the job needs it.
+			Sinks.One<Boolean> stop = Sinks.one();
+			Mono<List<Operation>> result = this.scanService
+				.executeDiscovery(request.discovererId(), request.target(), config)
+				.doOnSubscribe((s) -> log.info("Running discovery for job {} on target {}", jobId, request.target()))
+				.takeUntilOther(stop.asMono())
+				.cache(DISCOVERY_CACHE_TTL);
+			return new JobDiscovery(result, stop);
+		}).result();
 	}
 
 	private void taskFinished(Long taskId) {
 		this.activeTasks.remove(taskId);
+		this.jobOfTask.remove(taskId);
 		this.masterApiClient.reportLoad(this.activeTasks.size());
+	}
+
+	/**
+	 * Stops and forgets a job's discovery once none of its tasks is running any more.
+	 * @param jobId the job whose task was just cancelled
+	 */
+	private void stopDiscoveryIfUnused(Long jobId) {
+		if (jobId == null || this.jobOfTask.containsValue(jobId)) {
+			return;
+		}
+		JobDiscovery discovery = this.discoveryByJob.remove(jobId);
+		if (discovery != null) {
+			log.info("Stopping discovery for job {}: all its tasks were cancelled", jobId);
+			discovery.stop();
+		}
 	}
 
 	@DeleteMapping("/tasks/{id}")
@@ -177,7 +209,9 @@ public class SlaveApiController {
 			return Mono.just(ResponseEntity.notFound().build());
 		}
 		log.info("Cancelling task {} on operator request", id);
+		Long jobId = this.jobOfTask.remove(id);
 		disposable.dispose();
+		stopDiscoveryIfUnused(jobId);
 		this.masterApiClient.reportLoad(this.activeTasks.size());
 		return Mono.just(ResponseEntity.ok().<Void>build());
 	}
@@ -196,6 +230,20 @@ public class SlaveApiController {
 	}
 
 	public record ScannerInfo(String id, String name) {
+	}
+
+	/**
+	 * A job's shared discovery and the signal that stops it.
+	 *
+	 * @param result the cached discovery result every task of the job subscribes to
+	 * @param stopSignal fired to cancel the discovery while it is still running
+	 */
+	private record JobDiscovery(Mono<List<Operation>> result, Sinks.One<Boolean> stopSignal) {
+
+		void stop() {
+			this.stopSignal.tryEmitValue(true);
+		}
+
 	}
 
 }

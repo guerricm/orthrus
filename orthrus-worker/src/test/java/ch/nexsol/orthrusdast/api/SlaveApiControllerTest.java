@@ -16,7 +16,9 @@
 
 package ch.nexsol.orthrusdast.api;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +32,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
@@ -40,11 +43,14 @@ import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -142,6 +148,37 @@ class SlaveApiControllerTest {
 		HttpStatus status = HttpStatus.valueOf(this.controller.cancelScanTask(999L).block().getStatusCode().value());
 
 		assertThat(status).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void cancellingEveryTaskOfAJobStopsItsSharedDiscovery() {
+		AtomicBoolean discoveryCancelled = new AtomicBoolean();
+		when(this.scanService.executeDiscovery(anyString(), anyString(), any(ScanConfiguration.class)))
+			.thenReturn(Mono.<List<Operation>>never().doOnCancel(() -> discoveryCancelled.set(true)));
+		accept(1L, JOB_ID, ScannerFamily.INJECTION);
+		accept(2L, JOB_ID, ScannerFamily.XSS);
+
+		this.controller.cancelScanTask(1L).block();
+		assertThat(discoveryCancelled).as("another task of the job still needs it").isFalse();
+
+		this.controller.cancelScanTask(2L).block();
+		await().atMost(Duration.ofSeconds(5)).untilTrue(discoveryCancelled);
+	}
+
+	@Test
+	void aJobRestartedAfterACancellationDiscoversAfresh() {
+		Sinks.One<List<Operation>> firstDiscovery = Sinks.one();
+		List<Operation> discovered = List.of(Operation.simple("https://target.example/users", HttpMethod.GET));
+		when(this.scanService.executeDiscovery(anyString(), anyString(), any(ScanConfiguration.class)))
+			.thenReturn(firstDiscovery.asMono())
+			.thenReturn(Mono.just(discovered));
+		accept(1L, JOB_ID, ScannerFamily.INJECTION);
+		this.controller.cancelScanTask(1L).block();
+
+		accept(2L, JOB_ID, ScannerFamily.INJECTION);
+
+		verify(this.masterApiClient, timeout(5000)).completeTask(eq(2L), any(), anyInt(), anyInt());
+		verify(this.scanService, times(2)).executeDiscovery(anyString(), anyString(), any(ScanConfiguration.class));
 	}
 
 	private HttpStatus accept(long taskId, long jobId, ScannerFamily family) {
