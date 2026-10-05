@@ -346,8 +346,10 @@ deterministic fallback (an echo executor / a static planner), so the wiring is t
 model credentials. Guard-rails: the agents' only network access is a tool restricted to the target
 host, capped by a per-endpoint HTTP-call budget and a per-task timeout
 (`ORTHRUS_AI_BUDGET_TASK_TIMEOUT_SECONDS`, 900 by default) that bounds the whole task: once it is
-spent the task fails and no further endpoint is started (an agent already mid-loop finishes its
-current LLM call).
+spent, no further endpoint is started, the agents still running are interrupted, and the task
+completes with the findings gathered so far (it is not failed, so the manager does not requeue it
+to start over). Size it to the target: with a large local model an agent can take minutes per
+endpoint.
 
 An AI task runs several endpoint agents in parallel, so the task count understates an AI node's
 load. The System page shows the node's running LLM agents, reported on every heartbeat, next to

@@ -16,13 +16,14 @@
 
 package ch.nexsol.orthrusai.scanner.ai;
 
+import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.List;
 
 import javax.net.ssl.SSLException;
 
-import io.netty.handler.ssl.SslContext;
 import io.micrometer.observation.ObservationRegistry;
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.slf4j.Logger;
@@ -112,7 +113,14 @@ public class FamilyAgent {
 				.content();
 		}
 		catch (RuntimeException ex) {
-			log.warn("Family agent {} failed on {} {}: {}", family, endpoint.method(), endpoint.url(), ex.getMessage());
+			if (isInterruption(ex)) {
+				log.info("Family agent {} on {} {} interrupted (task cancelled or budget spent)", family,
+						endpoint.method(), endpoint.url());
+			}
+			else {
+				log.warn("Family agent {} failed on {} {}: {}", family, endpoint.method(), endpoint.url(),
+						ex.getMessage());
+			}
 		}
 		finally {
 			this.agentActivity.finished();
@@ -120,6 +128,25 @@ public class FamilyAgent {
 		log.info("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
 				runContext.httpCallsUsed(), runContext.findings().size());
 		return runContext.findings();
+	}
+
+	/**
+	 * Whether the agent stopped because its thread was interrupted: the task was
+	 * cancelled or spent its budget, and Reactor interrupts the agents still running. The
+	 * blocking call surfaces that as an exception whose message is usually empty.
+	 * @param ex the exception the agent loop ended with
+	 * @return true when it is an interruption rather than a failure
+	 */
+	private static boolean isInterruption(Throwable ex) {
+		if (Thread.currentThread().isInterrupted()) {
+			return true;
+		}
+		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			if (cause instanceof InterruptedException || cause instanceof InterruptedIOException) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

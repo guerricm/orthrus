@@ -19,7 +19,10 @@ package ch.nexsol.orthrusai.scanner.ai;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.web.reactive.function.client.WebClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -37,6 +40,7 @@ import static org.mockito.Mockito.when;
  * An agent counts as active for exactly the duration of its LLM loop, whether the loop
  * returns or fails, so the node never reports agents that are gone.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class FamilyAgentActivityTests {
 
 	private final ChatClient chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
@@ -71,6 +75,27 @@ class FamilyAgentActivityTests {
 		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
 
 		assertThat(this.activity.active()).isZero();
+	}
+
+	@Test
+	void anInterruptedAgentIsReportedAsInterruptedNotAsAFailure(CapturedOutput output) {
+		when(this.chatClient.prompt().system(anyString()).user(anyString()).tools(any(), any()).call().content())
+			.thenThrow(new IllegalStateException(new InterruptedException()));
+
+		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
+
+		assertThat(output).contains("interrupted (task cancelled or budget spent)").doesNotContain("failed on");
+		assertThat(this.activity.active()).isZero();
+	}
+
+	@Test
+	void aRealFailureIsStillReportedWithItsCause(CapturedOutput output) {
+		when(this.chatClient.prompt().system(anyString()).user(anyString()).tools(any(), any()).call().content())
+			.thenThrow(new IllegalStateException("model 'mistral' not found"));
+
+		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
+
+		assertThat(output).contains("failed on GET").contains("model 'mistral' not found");
 	}
 
 }

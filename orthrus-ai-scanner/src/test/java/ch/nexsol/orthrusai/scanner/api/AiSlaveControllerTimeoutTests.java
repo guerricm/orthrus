@@ -35,8 +35,9 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.intThat;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -46,7 +47,9 @@ import static org.mockito.Mockito.when;
 /**
  * The task timeout bounds the whole task, not the gap between two attempts: an agent run
  * that keeps producing attempts must still be stopped once the budget is spent, and no
- * further endpoint may be started.
+ * further endpoint may be started. Spending the budget is not a failure: the task
+ * completes with what it found, so the manager keeps the results instead of requeueing
+ * the task to start over.
  */
 class AiSlaveControllerTimeoutTests {
 
@@ -70,7 +73,7 @@ class AiSlaveControllerTimeoutTests {
 	}
 
 	@Test
-	void aTaskThatKeepsProducingAttemptsIsStoppedOnceTheBudgetIsSpent() {
+	void aTaskThatKeepsProducingAttemptsIsStoppedAndCompletedOnceTheBudgetIsSpent() {
 		AtomicBoolean cancelled = new AtomicBoolean();
 		ScanExecutor endless = (request) -> Flux.interval(Duration.ofMillis(200))
 			.map((tick) -> attempt())
@@ -78,8 +81,9 @@ class AiSlaveControllerTimeoutTests {
 
 		controller(endless, 1).receiveScanTask(this.task).block();
 
-		verify(this.managerClient, timeout(4000)).failTask(eq(42L), contains("timed out"));
-		verify(this.managerClient, never()).completeTask(anyLong(), any(), anyInt(), anyInt());
+		verify(this.managerClient, timeout(4000)).completeTask(eq(42L), any(), intThat((tests) -> tests > 0), eq(0));
+		verify(this.managerClient, never()).failTask(anyLong(), any());
+		verify(this.managerClient, atLeastOnce()).sendTaskAttemptsBatch(eq(42L), any());
 		await().atMost(Duration.ofSeconds(2)).untilTrue(cancelled);
 	}
 

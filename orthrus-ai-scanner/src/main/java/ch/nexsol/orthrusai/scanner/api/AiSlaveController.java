@@ -21,7 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -92,14 +92,14 @@ public class AiSlaveController {
 		AtomicInteger testsCount = new AtomicInteger();
 		AtomicInteger vulnsCount = new AtomicInteger();
 
-		Instant deadline = startTime.plusSeconds(this.taskTimeoutSeconds);
+		AtomicBoolean budgetSpent = new AtomicBoolean();
 
 		Disposable disposable = this.scanExecutor.execute(request)
-			// Flux.timeout(Duration) only bounds the gap between two attempts; the budget
-			// covers the whole task, so every timeout window ends at the same deadline.
-			.timeout(untilDeadline(deadline), (attempt) -> untilDeadline(deadline))
-			.onErrorMap(TimeoutException.class,
-					(e) -> new TimeoutException("task timed out after " + this.taskTimeoutSeconds + " s"))
+			// The budget bounds the whole task. Spending it is not a failure: the agents
+			// still running are stopped and the task completes with what it found, so the
+			// manager keeps the results instead of requeueing the task to start over.
+			.takeUntilOther(
+					Mono.delay(Duration.ofSeconds(this.taskTimeoutSeconds)).doOnNext((tick) -> budgetSpent.set(true)))
 			.bufferTimeout(10, Duration.ofSeconds(1))
 			.flatMap((batch) -> {
 				testsCount.addAndGet(batch.size());
@@ -111,8 +111,15 @@ public class AiSlaveController {
 				return this.managerClient.sendTaskAttemptsBatch(request.taskId(), batch);
 			})
 			.then(Mono.defer(() -> {
-				log.info("Task {} ({}) completed: {} tests, {} vulnerabilities", request.taskId(), request.phase(),
-						testsCount.get(), vulnsCount.get());
+				if (budgetSpent.get()) {
+					log.warn("Task {} ({}) spent its {} s budget; completing with {} tests, {} vulnerabilities",
+							request.taskId(), request.phase(), this.taskTimeoutSeconds, testsCount.get(),
+							vulnsCount.get());
+				}
+				else {
+					log.info("Task {} ({}) completed: {} tests, {} vulnerabilities", request.taskId(), request.phase(),
+							testsCount.get(), vulnsCount.get());
+				}
 				return this.managerClient.completeTask(request.taskId(), startTime, testsCount.get(), vulnsCount.get());
 			}))
 			.doOnError((e) -> {
@@ -143,19 +150,6 @@ public class AiSlaveController {
 	@GetMapping("/capabilities")
 	public Mono<ResponseEntity<CapabilitiesResponse>> getCapabilities() {
 		return Mono.just(ResponseEntity.ok(new CapabilitiesResponse(List.of(), List.of())));
-	}
-
-	/**
-	 * A signal firing at the deadline, computed on subscription so each timeout window
-	 * only covers what is left of the task budget.
-	 * @param deadline when the task budget runs out
-	 * @return a signal emitting once the deadline is reached
-	 */
-	private static Mono<Long> untilDeadline(Instant deadline) {
-		return Mono.defer(() -> {
-			Duration remaining = Duration.between(Instant.now(), deadline);
-			return Mono.delay(remaining.isNegative() ? Duration.ZERO : remaining);
-		});
 	}
 
 	private void taskFinished(Long taskId) {
