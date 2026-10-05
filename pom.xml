@@ -208,7 +208,19 @@
                             <enabled>true</enabled>
                         </layers>
                         <image>
+                            <!-- Declaring buildpacks replaces the builder's default order, so the
+                                 Java buildpack is listed first; the health checker adds a tiny,
+                                 localhost-only HTTP probe (thc) at /workspace/health-check, since
+                                 the images ship neither curl nor a shell. -->
+                            <buildpacks>
+                                <buildpack>urn:cnb:builder:paketo-buildpacks/java</buildpack>
+                                <buildpack>docker://docker.io/paketobuildpacks/health-checker:2</buildpack>
+                            </buildpacks>
                             <env>
+                                <!-- thc reads THC_PORT / THC_PATH from the container environment
+                                     only (it runs outside the buildpack launcher), so they are set
+                                     where the container is run, e.g. in docker-compose.yml. -->
+                                <BP_HEALTH_CHECKER_ENABLED>true</BP_HEALTH_CHECKER_ENABLED>
                                 <BP_JVM_VERSION>25.*</BP_JVM_VERSION>
                                 <BP_SPRING_CLOUD_BINDINGS_DISABLED>true</BP_SPRING_CLOUD_BINDINGS_DISABLED>
                                 <BPE_DELIM_JAVA_TOOL_OPTIONS xml:space="preserve"> </BPE_DELIM_JAVA_TOOL_OPTIONS>
