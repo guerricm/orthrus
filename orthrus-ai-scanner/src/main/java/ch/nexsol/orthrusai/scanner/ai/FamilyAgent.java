@@ -22,6 +22,7 @@ import java.util.List;
 import javax.net.ssl.SSLException;
 
 import io.netty.handler.ssl.SslContext;
+import io.micrometer.observation.ObservationRegistry;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.slf4j.Logger;
@@ -71,7 +72,9 @@ public class FamilyAgent {
 			ObjectMapper objectMapper, AiScannerProperties properties, AgentActivity agentActivity) {
 		this.chatClient = scannerChatClient;
 		this.agentActivity = agentActivity;
-		this.probeWebClient = webClientBuilder.build();
+		// Each forged probe has its own URL: observing them would mint one metric tag per
+		// payload, so the probe client keeps Boot's settings but not its instrumentation.
+		this.probeWebClient = webClientBuilder.observationRegistry(ObservationRegistry.NOOP).build();
 		this.scopeGuard = scopeGuard;
 		this.objectMapper = objectMapper;
 		this.maxHttpCallsPerOperation = properties.getAi().getBudget().getMaxHttpCallsPerOperation();
