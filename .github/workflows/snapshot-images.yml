@@ -1,0 +1,65 @@
+name: Snapshot Images
+
+# Builds and pushes test images from any branch without releasing: no POM change, no
+# commit, no tag. The images are versioned <current revision>-<run number>, e.g.
+# 1.1.0-SNAPSHOT-42, so each run is distinct and traceable to its workflow run.
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip the tests (faster, for a quick deploy check)'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  snapshot:
+    name: Build and Push Snapshot Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'liberica'
+          cache: 'maven'
+
+      - name: Compute Snapshot Version
+        run: |
+          REVISION=$(mvn help:evaluate -Dexpression=revision -q -DforceStdout --no-transfer-progress)
+          SNAPSHOT_VERSION="${REVISION}-${{ github.run_number }}"
+          echo "SNAPSHOT_VERSION=$SNAPSHOT_VERSION" >> $GITHUB_ENV
+          echo "Building images $SNAPSHOT_VERSION from ${{ github.ref_name }} (${{ github.sha }})"
+
+      - name: Build and Push Docker Images
+        run: |
+          # The version is overridden on the command line only (CI-friendly ${revision}),
+          # so the repository is left untouched.
+          mvn clean package spring-boot:build-image \
+            -Drevision=${{ env.SNAPSHOT_VERSION }} \
+            -DskipTests=${{ inputs.skip_tests }} \
+            -Dcheckstyle.failOnViolation=false \
+            -Dspring-javaformat.failOnViolation=false \
+            -Dspring-boot.build-image.publish=true \
+            -DCI_REGISTRY_USER=${{ secrets.DOCKERHUB_USER }} \
+            -DCI_REGISTRY_PASSWORD=${{ secrets.DOCKERHUB_PASSWORD }} \
+            -Ddockerhub.user=${{ secrets.DOCKERHUB_USER }} \
+            --no-transfer-progress
+
+      - name: Summary
+        run: |
+          {
+            echo "### Snapshot images \`${{ env.SNAPSHOT_VERSION }}\`"
+            echo ""
+            echo "Branch \`${{ github.ref_name }}\`, commit \`${{ github.sha }}\`"
+            echo ""
+            for image in orthrus-manager orthrus-worker orthrus-cli orthrus-ai-scanner orthrus-ai-orchestrator; do
+              echo "- \`<dockerhub-user>/${image}:${{ env.SNAPSHOT_VERSION }}\`"
+            done
+          } >> $GITHUB_STEP_SUMMARY

@@ -120,6 +120,8 @@ mvn spring-boot:build-image -pl orthrus-worker
 mvn spring-boot:build-image -pl orthrus-cli
 ```
 
+To test a branch on a real deployment without cutting a release, run the **Snapshot Images** GitHub Actions workflow (*Actions → Snapshot Images → Run workflow*, pick the branch). It pushes every service image to Docker Hub tagged `<current revision>-<run number>` (e.g. `1.1.0-SNAPSHOT-42`), overriding the version on the Maven command line only: no POM change, commit or tag.
+
 
 ### Security & Authentication
 > **Note**: The Web UI and API are secured. The admin account is configured through `.env`:
