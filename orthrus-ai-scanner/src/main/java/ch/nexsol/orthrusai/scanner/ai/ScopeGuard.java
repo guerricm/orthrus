@@ -16,14 +16,16 @@
 
 package ch.nexsol.orthrusai.scanner.ai;
 
-import java.net.URI;
-
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponents;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Confines the LLM's HTTP tool to the target under test. An agent that is free to forge
  * requests must never reach a host outside the engagement scope, so every candidate URL
- * is checked against the task's target host and port before it is sent.
+ * is checked against the task's target host and port before it is sent. URLs are parsed
+ * the way WebClient parses them, so the host checked is the host contacted, and a target
+ * given as an OpenAPI path template ({@code /pet/{petId}}) is accepted.
  */
 @Component
 public class ScopeGuard {
@@ -46,7 +48,7 @@ public class ScopeGuard {
 			return null;
 		}
 		try {
-			URI uri = URI.create(url.trim());
+			UriComponents uri = UriComponentsBuilder.fromUriString(url.trim()).build();
 			String host = uri.getHost();
 			if (host == null) {
 				return null;

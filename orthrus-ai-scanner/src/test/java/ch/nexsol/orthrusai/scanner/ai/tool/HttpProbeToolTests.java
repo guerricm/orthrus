@@ -79,6 +79,17 @@ class HttpProbeToolTests {
 	}
 
 	@Test
+	void probesConcreteUrlWhenTargetIsAPathTemplate() {
+		RunContext ctx = new RunContext(this.target + "/pet/{petId}", "ai-injection", 5);
+		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
+
+		String result = tool.sendRequest(this.target + "/pet/42", "GET", null, null);
+
+		assertThat(result).contains("HTTP 200");
+		assertThat(ctx.httpCallsUsed()).isEqualTo(1);
+	}
+
+	@Test
 	void refusesOutOfScopeWithoutConsumingBudget() {
 		RunContext ctx = new RunContext(this.target, "ai-injection", 5);
 		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);

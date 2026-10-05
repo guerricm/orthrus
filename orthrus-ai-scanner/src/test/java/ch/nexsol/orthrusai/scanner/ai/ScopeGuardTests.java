@@ -39,6 +39,16 @@ class ScopeGuardTests {
 	}
 
 	@Test
+	void templatedTargetPathIsInScope() {
+		assertThat(this.guard.inScope("https://app.test/api/pet/42", "https://app.test/api/pet/{petId}")).isTrue();
+	}
+
+	@Test
+	void templatedTargetDoesNotWidenScope() {
+		assertThat(this.guard.inScope("https://evil.test/api/pet/42", "https://app.test/api/pet/{petId}")).isFalse();
+	}
+
+	@Test
 	void otherHostIsOutOfScope() {
 		assertThat(this.guard.inScope("http://evil.test/steal", "http://app.test/api")).isFalse();
 	}
