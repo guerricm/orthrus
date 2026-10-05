@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -91,8 +92,14 @@ public class AiSlaveController {
 		AtomicInteger testsCount = new AtomicInteger();
 		AtomicInteger vulnsCount = new AtomicInteger();
 
+		Instant deadline = startTime.plusSeconds(this.taskTimeoutSeconds);
+
 		Disposable disposable = this.scanExecutor.execute(request)
-			.timeout(Duration.ofSeconds(this.taskTimeoutSeconds))
+			// Flux.timeout(Duration) only bounds the gap between two attempts; the budget
+			// covers the whole task, so every timeout window ends at the same deadline.
+			.timeout(untilDeadline(deadline), (attempt) -> untilDeadline(deadline))
+			.onErrorMap(TimeoutException.class,
+					(e) -> new TimeoutException("task timed out after " + this.taskTimeoutSeconds + " s"))
 			.bufferTimeout(10, Duration.ofSeconds(1))
 			.flatMap((batch) -> {
 				testsCount.addAndGet(batch.size());
@@ -136,6 +143,19 @@ public class AiSlaveController {
 	@GetMapping("/capabilities")
 	public Mono<ResponseEntity<CapabilitiesResponse>> getCapabilities() {
 		return Mono.just(ResponseEntity.ok(new CapabilitiesResponse(List.of(), List.of())));
+	}
+
+	/**
+	 * A signal firing at the deadline, computed on subscription so each timeout window
+	 * only covers what is left of the task budget.
+	 * @param deadline when the task budget runs out
+	 * @return a signal emitting once the deadline is reached
+	 */
+	private static Mono<Long> untilDeadline(Instant deadline) {
+		return Mono.defer(() -> {
+			Duration remaining = Duration.between(Instant.now(), deadline);
+			return Mono.delay(remaining.isNegative() ? Duration.ZERO : remaining);
+		});
 	}
 
 	private void taskFinished(Long taskId) {
