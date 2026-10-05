@@ -41,7 +41,10 @@
                                 </td>
                                 <td class="bg-transparent border-secondary" style="padding: 1rem;">
                                     <div class="d-flex align-items-center gap-2">
-                                        <span class="badge bg-secondary" th:text="${activeJobsCount.get(slave.id) + ' / ' + slave.maxConcurrentScans}"></span>
+                                        <span class="badge bg-secondary" title="Running tasks / max concurrent tasks" th:text="${activeJobsCount.get(slave.id) + ' / ' + slave.maxConcurrentScans}"></span>
+                                        <span class="badge bg-info text-dark" title="LLM agents running right now (each task runs several endpoints in parallel)"
+                                            th:if="${slave.capabilities != null and slave.capabilities.contains('AI-EXECUTOR') and slave.status != null and slave.status.name() != 'OFFLINE'}"
+                                            th:text="${(slave.activeAgents != null ? slave.activeAgents : 0) + ' agent(s)'}"></span>
                                         <form th:action="@{'/system/slaves/' + ${slave.id} + '/concurrency'}" method="post" class="d-inline m-0 p-0">
                                             <input th:replace="~{fragments/layout :: csrf}"/>
                                             <input type="hidden" name="maxConcurrentScans" th:value="${slave.maxConcurrentScans - 1}">

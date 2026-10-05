@@ -63,11 +63,14 @@ public class FamilyAgent {
 
 	private final int maxHttpCallsPerOperation;
 
+	private final AgentActivity agentActivity;
+
 	private volatile WebClient insecureWebClient;
 
 	public FamilyAgent(ChatClient scannerChatClient, WebClient.Builder webClientBuilder, ScopeGuard scopeGuard,
-			ObjectMapper objectMapper, AiScannerProperties properties) {
+			ObjectMapper objectMapper, AiScannerProperties properties, AgentActivity agentActivity) {
 		this.chatClient = scannerChatClient;
+		this.agentActivity = agentActivity;
 		this.probeWebClient = webClientBuilder.build();
 		this.scopeGuard = scopeGuard;
 		this.objectMapper = objectMapper;
@@ -96,6 +99,7 @@ public class FamilyAgent {
 		if (context != null && !context.isBlank()) {
 			userPrompt += "\n\nPrior recon of the target (shared context): " + context;
 		}
+		this.agentActivity.started();
 		try {
 			this.chatClient.prompt()
 				.system(FamilyPrompts.forFamily(family))
@@ -106,6 +110,9 @@ public class FamilyAgent {
 		}
 		catch (RuntimeException ex) {
 			log.warn("Family agent {} failed on {} {}: {}", family, endpoint.method(), endpoint.url(), ex.getMessage());
+		}
+		finally {
+			this.agentActivity.finished();
 		}
 		log.info("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
 				runContext.httpCallsUsed(), runContext.findings().size());

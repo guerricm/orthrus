@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntSupplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +60,8 @@ public class NodeClient {
 
 	private final String capabilities;
 
+	private final IntSupplier activeAgents;
+
 	private final AtomicInteger activeTasks = new AtomicInteger();
 
 	private final AtomicBoolean registering = new AtomicBoolean();
@@ -75,6 +78,22 @@ public class NodeClient {
 	 */
 	public NodeClient(WebClient.Builder webClientBuilder, String managerUrl, String internalToken, String nodeId,
 			String advertisedUrl, String capabilities) {
+		this(webClientBuilder, managerUrl, internalToken, nodeId, advertisedUrl, capabilities, () -> 0);
+	}
+
+	/**
+	 * @param webClientBuilder the client builder to derive the manager client from
+	 * @param managerUrl the manager's base URL
+	 * @param internalToken the shared secret sent on every call
+	 * @param nodeId this node's stable identifier
+	 * @param advertisedUrl the URL the manager should dispatch tasks to
+	 * @param capabilities the comma-separated capabilities to advertise
+	 * @param activeAgents the number of LLM agents running right now, read at every
+	 * heartbeat (always 0 on a deterministic worker)
+	 */
+	public NodeClient(WebClient.Builder webClientBuilder, String managerUrl, String internalToken, String nodeId,
+			String advertisedUrl, String capabilities, IntSupplier activeAgents) {
+		this.activeAgents = activeAgents;
 		this.webClient = webClientBuilder.clone().defaultHeader(INTERNAL_TOKEN_HEADER, internalToken).build();
 		this.managerUrl = managerUrl;
 		this.nodeId = nodeId;
@@ -142,8 +161,8 @@ public class NodeClient {
 	 */
 	public void heartbeat() {
 		this.webClient.post()
-			.uri(this.managerUrl + "/api/internal/slaves/{id}/heartbeat?activeTasks={n}&url={url}", this.nodeId,
-					this.activeTasks.get(), this.advertisedUrl)
+			.uri(this.managerUrl + "/api/internal/slaves/{id}/heartbeat?activeTasks={n}&activeAgents={a}&url={url}",
+					this.nodeId, this.activeTasks.get(), this.activeAgents.getAsInt(), this.advertisedUrl)
 			.retrieve()
 			.bodyToMono(Void.class)
 			.timeout(HEARTBEAT_TIMEOUT)

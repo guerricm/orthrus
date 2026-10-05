@@ -42,6 +42,7 @@ import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -126,7 +127,7 @@ class MasterInternalApiControllerTest {
 	void aHeartbeatFromAnUnknownNodeIsRejectedSoTheWorkerReRegisters() {
 		when(this.slaveNodeRepository.findById(NODE_ID)).thenReturn(Mono.empty());
 
-		ResponseEntity<Void> response = this.controller.slaveHeartbeat(NODE_ID, 0, null).block();
+		ResponseEntity<Void> response = this.controller.slaveHeartbeat(NODE_ID, 0, 0, null).block();
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
@@ -136,13 +137,30 @@ class MasterInternalApiControllerTest {
 		SlaveNodeEntity node = new SlaveNodeEntity(NODE_ID, "http://node-a:8081", NodeStatus.IDLE, "openapi");
 		node.setMaxConcurrentScans(4);
 		when(this.slaveNodeRepository.findById(NODE_ID)).thenReturn(Mono.just(node));
-		when(this.slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(anyString(), anyString(), any()))
+		when(this.slaveNodeRepository.updateSlaveNodeStatusActiveAgentsAndLastSeenAt(anyString(), anyString(), anyInt(),
+				any()))
 			.thenReturn(Mono.just(1));
 
-		this.controller.slaveHeartbeat(NODE_ID, 4, null).block();
+		this.controller.slaveHeartbeat(NODE_ID, 4, 0, null).block();
 
-		verify(this.slaveNodeRepository).updateSlaveNodeStatusAndLastSeenAt(eq(NODE_ID), eq(NodeStatus.BUSY.name()),
-				any(Instant.class));
+		verify(this.slaveNodeRepository).updateSlaveNodeStatusActiveAgentsAndLastSeenAt(eq(NODE_ID),
+				eq(NodeStatus.BUSY.name()), eq(0), any(Instant.class));
+	}
+
+	@Test
+	void aHeartbeatRecordsTheAgentsTheNodeReportsRunning() {
+		SlaveNodeEntity node = new SlaveNodeEntity(NODE_ID, "http://node-a:8091", NodeStatus.IDLE,
+				"AI-EXECUTOR,INJECTION");
+		when(this.slaveNodeRepository.findById(NODE_ID)).thenReturn(Mono.just(node));
+		when(this.slaveNodeRepository.updateSlaveNodeUrlStatusActiveAgentsAndLastSeenAt(anyString(), anyString(),
+				anyString(), anyInt(), any()))
+			.thenReturn(Mono.just(1));
+
+		ResponseEntity<Void> response = this.controller.slaveHeartbeat(NODE_ID, 4, 12, "http://node-a:8091").block();
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		verify(this.slaveNodeRepository).updateSlaveNodeUrlStatusActiveAgentsAndLastSeenAt(eq(NODE_ID),
+				eq("http://node-a:8091"), eq(NodeStatus.IDLE.name()), eq(12), any(Instant.class));
 	}
 
 	private void givenUpdateAffects(int rows) {

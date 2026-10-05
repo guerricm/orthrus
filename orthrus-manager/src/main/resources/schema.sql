@@ -99,6 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_scanjobs_test_plan ON "scan_jobs"(test_plan_id);
 -- Add the AI orchestration columns safely if they do not exist
 ALTER TABLE "scan_jobs" ADD COLUMN IF NOT EXISTS ai_mode BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE "scan_jobs" ADD COLUMN IF NOT EXISTS ai_recon TEXT;
+ALTER TABLE "slave_nodes" ADD COLUMN IF NOT EXISTS active_agents INT NOT NULL DEFAULT 0;
 
 -- Add auditing columns safely if they do not exist
 ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;

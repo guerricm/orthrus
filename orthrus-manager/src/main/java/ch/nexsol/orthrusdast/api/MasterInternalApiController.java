@@ -115,12 +115,15 @@ public class MasterInternalApiController {
 	 * master alone turns it into a {@link NodeStatus}.
 	 * @param id the slave ID
 	 * @param activeTasks the number of tasks currently running on that node
+	 * @param activeAgents the number of LLM agents running on that node (0 on a
+	 * deterministic worker, and from nodes that predate the figure)
 	 * @param url the url the node wants to be reached on
 	 * @return a mono of response entity
 	 */
 	@PostMapping("/slaves/{id}/heartbeat")
 	public Mono<ResponseEntity<Void>> slaveHeartbeat(@PathVariable String id,
-			@RequestParam(defaultValue = "0") int activeTasks, @RequestParam(required = false) String url) {
+			@RequestParam(defaultValue = "0") int activeTasks, @RequestParam(defaultValue = "0") int activeAgents,
+			@RequestParam(required = false) String url) {
 
 		return this.slaveNodeRepository.findById(id).flatMap((slave) -> {
 			int maxScans = (slave.getMaxConcurrentScans() != null && slave.getMaxConcurrentScans() > 0)
@@ -128,10 +131,11 @@ public class MasterInternalApiController {
 			NodeStatus status = (activeTasks >= maxScans) ? NodeStatus.BUSY : NodeStatus.IDLE;
 
 			if (url != null && !url.trim().isEmpty()) {
-				return this.slaveNodeRepository.updateSlaveNodeUrlStatusAndLastSeenAt(id, url, status.name(),
-						Instant.now());
+				return this.slaveNodeRepository.updateSlaveNodeUrlStatusActiveAgentsAndLastSeenAt(id, url,
+						status.name(), activeAgents, Instant.now());
 			}
-			return this.slaveNodeRepository.updateSlaveNodeStatusAndLastSeenAt(id, status.name(), Instant.now());
+			return this.slaveNodeRepository.updateSlaveNodeStatusActiveAgentsAndLastSeenAt(id, status.name(),
+					activeAgents, Instant.now());
 		})
 			.map((rows) -> (rows == 0) ? ResponseEntity.notFound().<Void>build() : ResponseEntity.ok().<Void>build())
 			.defaultIfEmpty(ResponseEntity.notFound().build());

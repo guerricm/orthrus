@@ -342,7 +342,14 @@ spring:
 When `orthrus.ai.enabled` is `false` (the default), each module still boots and runs a
 deterministic fallback (an echo executor / a static planner), so the wiring is testable without any
 model credentials. Guard-rails: the agents' only network access is a tool restricted to the target
-host, capped by a per-endpoint HTTP-call budget and a per-task timeout.
+host, capped by a per-endpoint HTTP-call budget and a per-task timeout
+(`ORTHRUS_AI_BUDGET_TASK_TIMEOUT_SECONDS`, 900 by default) that bounds the whole task: once it is
+spent the task fails and no further endpoint is started (an agent already mid-loop finishes its
+current LLM call).
+
+An AI task runs several endpoint agents in parallel, so the task count understates an AI node's
+load. The System page shows the node's running LLM agents, reported on every heartbeat, next to
+its `tasks / capacity` badge.
 
 ```bash
 # Build just the AI modules

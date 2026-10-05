@@ -30,6 +30,7 @@ import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrus.protocol.node.NodeClient;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrusai.scanner.ai.AgentActivity;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
 
 /**
@@ -52,11 +53,12 @@ public class ManagerClient {
 
 	private final NodeClient nodeClient;
 
-	public ManagerClient(AiScannerProperties properties, WebClient.Builder webClientBuilder) {
+	public ManagerClient(AiScannerProperties properties, WebClient.Builder webClientBuilder,
+			AgentActivity agentActivity) {
 		String capabilities = AI_EXECUTOR_MARKER + "," + String.join(",", properties.getAi().getFamilies());
 		this.nodeClient = new NodeClient(webClientBuilder, properties.getMaster().getUrl(),
 				properties.getMaster().getInternalToken(), properties.getSlave().getId(),
-				properties.getSlave().getAdvertisedUrl(), capabilities);
+				properties.getSlave().getAdvertisedUrl(), capabilities, agentActivity::active);
 	}
 
 	/**

@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
@@ -93,6 +94,35 @@ class NodeClientTests {
 			.atMost(Duration.ofSeconds(2))
 			.until(() -> this.requests.stream().noneMatch((uri) -> uri.contains("/slaves/register")));
 		assertThat(this.requests).anyMatch((uri) -> uri.contains("activeTasks=3"));
+	}
+
+	@Test
+	void theHeartbeatCarriesTheActiveAgentCountReadAtSendTime() {
+		this.server = HttpServer.create().port(0).handle((request, response) -> {
+			this.requests.add(request.uri());
+			return response.status(200).send();
+		}).bindNow();
+		AtomicInteger agents = new AtomicInteger(12);
+		NodeClient client = new NodeClient(WebClient.builder(), "http://localhost:" + this.server.port(), "secret",
+				"node-1", "http://node-1:8081", "AI-EXECUTOR,INJECTION", agents::get);
+
+		client.reportLoad(4);
+		agents.set(3);
+		client.heartbeat();
+
+		Awaitility.await().atMost(Duration.ofSeconds(5)).until(() -> this.requests.size() == 2);
+		assertThat(this.requests).anyMatch((uri) -> uri.contains("activeTasks=4&activeAgents=12"))
+			.anyMatch((uri) -> uri.contains("activeTasks=4&activeAgents=3"));
+	}
+
+	@Test
+	void aWorkerReportsNoActiveAgents() {
+		NodeClient client = startManager(200, 200);
+
+		client.heartbeat();
+
+		Awaitility.await().atMost(Duration.ofSeconds(5)).until(() -> !this.requests.isEmpty());
+		assertThat(this.requests).anyMatch((uri) -> uri.contains("activeAgents=0"));
 	}
 
 	@Test

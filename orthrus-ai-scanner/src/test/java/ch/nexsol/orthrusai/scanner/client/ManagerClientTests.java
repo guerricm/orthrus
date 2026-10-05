@@ -27,6 +27,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import ch.nexsol.orthrusai.scanner.ai.AgentActivity;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,12 +68,14 @@ class ManagerClientTests {
 		this.baseUrl = "http://localhost:" + this.server.port();
 	}
 
+	private final AgentActivity agentActivity = new AgentActivity();
+
 	private ManagerClient managerClient() {
 		AiScannerProperties properties = new AiScannerProperties();
 		properties.getMaster().setUrl(this.baseUrl);
 		properties.getSlave().setId("ai-scanner-test");
 		properties.getSlave().setAdvertisedUrl("http://localhost:8091");
-		return new ManagerClient(properties, WebClient.builder());
+		return new ManagerClient(properties, WebClient.builder(), this.agentActivity);
 	}
 
 	@Test
@@ -100,6 +103,20 @@ class ManagerClientTests {
 			.during(Duration.ofSeconds(1))
 			.atMost(Duration.ofSeconds(2))
 			.until(() -> this.requests.stream().noneMatch((uri) -> uri.contains("/slaves/register")));
+	}
+
+	@Test
+	void theHeartbeatReportsTheAgentsRunningOnThisNode() {
+		startManager(200);
+		ManagerClient client = managerClient();
+		this.agentActivity.started();
+		this.agentActivity.started();
+
+		client.sendHeartbeat();
+
+		Awaitility.await()
+			.atMost(Duration.ofSeconds(5))
+			.until(() -> this.requests.stream().anyMatch((uri) -> uri.contains("activeAgents=2")));
 	}
 
 }

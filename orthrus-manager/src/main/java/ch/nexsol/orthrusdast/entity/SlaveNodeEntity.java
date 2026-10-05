@@ -40,6 +40,12 @@ public class SlaveNodeEntity implements Persistable<String> {
 
 	private Integer maxConcurrentScans = 10;
 
+	/**
+	 * LLM agents the node reported running at its last heartbeat (always 0 on a
+	 * deterministic worker).
+	 */
+	private Integer activeAgents = 0;
+
 	private String capabilities;
 
 	private Boolean isActive = true;
@@ -81,6 +87,14 @@ public class SlaveNodeEntity implements Persistable<String> {
 
 	public void setStatus(NodeStatus status) {
 		this.status = status;
+	}
+
+	public Integer getActiveAgents() {
+		return this.activeAgents;
+	}
+
+	public void setActiveAgents(Integer activeAgents) {
+		this.activeAgents = activeAgents;
 	}
 
 	public String getCapabilities() {

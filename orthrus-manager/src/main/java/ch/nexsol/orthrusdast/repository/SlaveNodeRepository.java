@@ -47,8 +47,14 @@ public interface SlaveNodeRepository extends R2dbcRepository<SlaveNodeEntity, St
 			String capabilities, Instant lastSeenAt);
 
 	@Modifying
-	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, last_seen_at = :lastSeenAt WHERE id = :id")
-	Mono<Integer> updateSlaveNodeUrlStatusAndLastSeenAt(String id, String url, String status, Instant lastSeenAt);
+	@Query("UPDATE \"slave_nodes\" SET url = :url, status = :status, active_agents = :activeAgents, last_seen_at = :lastSeenAt WHERE id = :id")
+	Mono<Integer> updateSlaveNodeUrlStatusActiveAgentsAndLastSeenAt(String id, String url, String status,
+			int activeAgents, Instant lastSeenAt);
+
+	@Modifying
+	@Query("UPDATE \"slave_nodes\" SET status = :status, active_agents = :activeAgents, last_seen_at = :lastSeenAt WHERE id = :id")
+	Mono<Integer> updateSlaveNodeStatusActiveAgentsAndLastSeenAt(String id, String status, int activeAgents,
+			Instant lastSeenAt);
 
 	@Modifying
 	@Query("UPDATE \"slave_nodes\" SET max_concurrent_scans = :maxConcurrentScans WHERE id = :id")
