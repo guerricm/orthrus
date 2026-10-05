@@ -33,6 +33,15 @@ spring:
     url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:45432/orthrus}
     username: ${SPRING_R2DBC_USERNAME:orthrus}
     password: ${SPRING_R2DBC_PASSWORD:orthrus}
+    pool:
+      # Docker Swarm's overlay network (IPVS) silently drops TCP connections idle for 15
+      # minutes, and NAT/firewalls often do the same. Retire idle connections well before
+      # that, cap their lifetime, and check each one with a round trip on acquire, so the
+      # pool never hands out a connection the network has already killed.
+      max-idle-time: 5m
+      max-life-time: 30m
+      validation-depth: remote
+      acquire-retry: 3
   sql:
     init:
       mode: always
