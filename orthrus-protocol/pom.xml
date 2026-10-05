@@ -19,6 +19,10 @@
       dragging the engine in. The parent adds only the WebClient and validation starters, which the
       contract's NodeClient needs.
     -->
+    <properties>
+        <!-- A library: no main class, so no container image. -->
+        <spring-boot.build-image.skip>true</spring-boot.build-image.skip>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.springframework</groupId>
