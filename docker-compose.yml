@@ -26,6 +26,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health
       SPRING_PROFILES_ACTIVE: prod
       SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/${POSTGRES_DB:-orthrus}
       SPRING_R2DBC_USERNAME: ${POSTGRES_USER:-orthrus}
@@ -47,6 +49,12 @@ services:
       # SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI: https://your-idp.example.com/realms/master
       # Enable Resource Server to accept JWT Bearer tokens on the API:
       # SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://your-idp.example.com/realms/master
+    healthcheck:
+      test: ["CMD", "/workspace/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,14 +68,22 @@ services:
     ports:
       - "8081:8081"
     environment:
+      THC_PORT: "8081"
+      THC_PATH: /actuator/health
       SPRING_PROFILES_ACTIVE: prod
       ORTHRUS_MASTER_URL: http://orthrus-manager:8080
       ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
       ORTHRUS_SLAVE_ID: slave-docker-node-1
       ORTHRUS_SLAVE_ADVERTISED_URL: http://orthrus-worker:8081
+    healthcheck:
+      test: ["CMD", "/workspace/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       orthrus-manager:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - orthrus-network
@@ -85,6 +101,8 @@ services:
     ports:
       - "8091:8091"
     environment:
+      THC_PORT: "8091"
+      THC_PATH: /actuator/health
       # Registers with the manager as an AI "smart worker" for the families it advertises.
       ORTHRUS_MASTER_URL: http://orthrus-manager:8080
       ORTHRUS_MASTER_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
@@ -101,9 +119,15 @@ services:
     extra_hosts:
       # Lets the container reach an Ollama running on the Docker host.
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "/workspace/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       orthrus-manager:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - orthrus-network
@@ -117,6 +141,8 @@ services:
     expose:
       - "8090"
     environment:
+      THC_PORT: "8090"
+      THC_PATH: /actuator/health
       # A pure planning + recon service the manager calls; it never reaches back to the manager.
       # Every /api call must carry the platform's shared secret.
       ORTHRUS_INTERNAL_TOKEN: ${ORTHRUS_INTERNAL_TOKEN:?set ORTHRUS_INTERNAL_TOKEN in .env}
@@ -128,9 +154,15 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "/workspace/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       orthrus-manager:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - orthrus-network
