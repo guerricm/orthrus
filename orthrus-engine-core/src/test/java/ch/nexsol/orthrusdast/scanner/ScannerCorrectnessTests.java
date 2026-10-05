@@ -223,7 +223,7 @@ class ScannerCorrectnessTests {
 		SecurityScheme userA = SecurityScheme.bearer("TOKEN_A");
 		SecurityScheme userB = SecurityScheme.bearer("TOKEN_B");
 		ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false,
-				"json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null);
+				"json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null, null);
 
 		Operation op = new Operation(baseUrl + "/invoices/123", HttpMethod.GET, Map.<String, String>of(),
 				Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);
@@ -247,7 +247,7 @@ class ScannerCorrectnessTests {
 		SecurityScheme userA = SecurityScheme.bearer("TOKEN_A");
 		SecurityScheme userB = SecurityScheme.bearer("TOKEN_B");
 		ScanConfiguration config = new ScanConfiguration(List.<String>of(), List.<String>of(), 10, 5000, 10000, false,
-				"json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null);
+				"json", userA, userB, "en", false, GatewayType.AUTO, null, null, null, null, null);
 
 		Operation op = new Operation(baseUrl + "/invoices/123", HttpMethod.GET, Map.<String, String>of(),
 				Map.<String, String>of(), null, List.of("bearerAuth"), List.<String>of(), userA);

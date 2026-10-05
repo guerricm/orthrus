@@ -32,6 +32,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
+import ch.nexsol.orthrusdast.model.GatewayExclusions;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
@@ -81,7 +82,7 @@ class ApiGatewayDiscovererTest {
 		});
 
 		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null,
-				null, "en", false, GatewayType.KONG, null, null, null, null);
+				null, "en", false, GatewayType.KONG, null, null, null, null, null);
 
 		StepVerifier.create(discoverer.discover(url, config)).assertNext((operations) -> {
 			assertThat(operations).hasSize(1);
@@ -106,7 +107,7 @@ class ApiGatewayDiscovererTest {
 		});
 
 		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null,
-				null, "en", false, GatewayType.TRAEFIK, "api.traefik.internal", null, null, null);
+				null, "en", false, GatewayType.TRAEFIK, "api.traefik.internal", null, null, null, null);
 
 		StepVerifier.create(discoverer.discover(url, config)).assertNext((operations) -> {
 			assertThat(operations).isNotEmpty();
@@ -139,12 +140,96 @@ class ApiGatewayDiscovererTest {
 		});
 
 		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null,
-				null, "en", false, GatewayType.K8S, null, "test-k8s-token", null, null);
+				null, "en", false, GatewayType.K8S, null, "test-k8s-token", null, null, null);
 
 		StepVerifier.create(discoverer.discover(url, config)).assertNext((operations) -> {
 			assertThat(operations).hasSize(1);
 			assertThat(operations.get(0).url().endsWith("/login")).isTrue();
 		}).verifyComplete();
+	}
+
+	@Test
+	void springCloudGatewayRoutesAreFilteredByRouteIdAndPath() {
+		String url = this.mockWebServer.url("/").toString();
+		this.mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getPath().equals("/actuator/gateway/routes")) {
+					return new MockResponse().setResponseCode(200)
+						.setHeader("Content-Type", "application/json")
+						.setBody("[" + scgRoute("users", "/api/users/**") + "," + scgRoute("admin", "/admin/**") + ","
+								+ scgRoute("shop", "/api/orders/**, /api/carts/**") + "]");
+				}
+				return new MockResponse().setResponseCode(404);
+			}
+		});
+		ScanConfiguration config = gatewayConfig(GatewayType.SPRING_CLOUD_GATEWAY,
+				new GatewayExclusions(List.of("admin"), List.of("/api/carts")));
+
+		StepVerifier.create(this.discoverer.discover(url, config))
+			.assertNext((operations) -> assertThat(operations).extracting(Operation::url)
+				.containsExactlyInAnyOrder(url + "api/users", url + "api/orders"))
+			.verifyComplete();
+	}
+
+	@Test
+	void endpointsFoundBelowAnExcludedPathAreDropped() {
+		String url = this.mockWebServer.url("/").toString();
+		this.mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getPath().equals("/actuator/gateway/routes")) {
+					return new MockResponse().setResponseCode(200)
+						.setHeader("Content-Type", "application/json")
+						.setBody("[" + scgRoute("api", "/api/**") + "]");
+				}
+				return new MockResponse().setResponseCode(404);
+			}
+		});
+		BlackboxDiscoverer crawler = new BlackboxDiscoverer(new OrthrusProperties()) {
+			@Override
+			public Mono<List<Operation>> discover(String target, ScanConfiguration config) {
+				return Mono.just(List.of(Operation.simple(target + "/users", HttpMethod.GET),
+						Operation.simple(target + "/internal/debug", HttpMethod.GET)));
+			}
+		};
+		ScanConfiguration config = gatewayConfig(GatewayType.SPRING_CLOUD_GATEWAY,
+				new GatewayExclusions(List.of(), List.of("/api/internal/**")));
+
+		StepVerifier.create(new ApiGatewayDiscoverer(crawler).discover(url, config))
+			.assertNext((operations) -> assertThat(operations).extracting(Operation::url)
+				.containsExactly(url + "api/users"))
+			.verifyComplete();
+	}
+
+	@Test
+	void aPlanWithoutExclusionsScansEveryRoute() {
+		String url = this.mockWebServer.url("/").toString();
+		this.mockWebServer.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getPath().equals("/actuator/gateway/routes")) {
+					return new MockResponse().setResponseCode(200)
+						.setHeader("Content-Type", "application/json")
+						.setBody("[" + scgRoute("users", "/api/users/**") + "," + scgRoute("admin", "/admin/**") + "]");
+				}
+				return new MockResponse().setResponseCode(404);
+			}
+		});
+
+		StepVerifier.create(this.discoverer.discover(url, gatewayConfig(GatewayType.SPRING_CLOUD_GATEWAY, null)))
+			.assertNext((operations) -> assertThat(operations).hasSize(2))
+			.verifyComplete();
+	}
+
+	private static String scgRoute(String id, String paths) {
+		return "{\"route_id\":\"" + id + "\",\"predicate\":\"Paths: [" + paths
+				+ "], match trailing slash: true\",\"uri\":\"lb://" + id + "\",\"order\":0}";
+	}
+
+	private static ScanConfiguration gatewayConfig(GatewayType type, GatewayExclusions exclusions) {
+		return new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false,
+				type, null, null, null, null, exclusions);
 	}
 
 }

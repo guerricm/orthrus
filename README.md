@@ -27,6 +27,10 @@ The `gateway` mode probes the Gateway's Admin API to read its actual routing tab
 - HAProxy (`/v2/services/haproxy/configuration/acls`)
 - Kubernetes Ingress (`/apis/networking.k8s.io/v1/ingresses`)
 
+The plan's **Target URL** is the gateway's admin base (the discoverer appends the path above), and **Public App URL** is where the routes are served when it differs (e.g. actuator on `:8088`, application on `:8080`).
+
+**Exclusions** (*Advanced Options → Gateway Exclusions*, shown in `gateway` mode): routes can be left out by Spring Cloud Gateway `route_id`, and paths by Ant-style pattern (`/actuator/**`, `/api/*/internal/**`; a plain `/admin` also covers everything below it). Excluded routes are not fuzzed, and endpoints discovered below an excluded path are dropped. Path exclusions apply to every gateway type.
+
 ### 41 Specialized Scanners
 
 | Scanner ID | Description | Associated CWE |

@@ -25,10 +25,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 
+import ch.nexsol.orthrusdast.model.GatewayExclusions;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
@@ -63,6 +65,7 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 
 		WebClient client = WebClient.builder().build();
 		final String finalAppUrl = appUrl;
+		GatewayExclusions exclusions = config.gatewayExclusionsOrNone();
 
 		Mono<List<String>> routesMono;
 
@@ -70,7 +73,7 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 			routesMono = extractTraefik(client, target);
 		}
 		else if (GatewayType.SPRING_CLOUD_GATEWAY == gatewayType) {
-			routesMono = extractSpringCloudGateway(client, target);
+			routesMono = extractSpringCloudGateway(client, target, exclusions);
 		}
 		else if (GatewayType.KONG == gatewayType) {
 			routesMono = extractKong(client, target);
@@ -83,7 +86,8 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 		}
 		else {
 			// Auto detect
-			routesMono = extractTraefik(client, target).onErrorResume((e) -> extractSpringCloudGateway(client, target))
+			routesMono = extractTraefik(client, target)
+				.onErrorResume((e) -> extractSpringCloudGateway(client, target, exclusions))
 				.onErrorResume((e) -> extractKong(client, target))
 				.onErrorResume((e) -> extractHaproxy(client, target))
 				.onErrorResume((e) -> {
@@ -104,16 +108,21 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 				if (!cleanPrefix.startsWith("/")) {
 					cleanPrefix = "/" + cleanPrefix;
 				}
+				if (exclusions.excludesPath(cleanPrefix)) {
+					log.info("Skipping excluded gateway path {}", cleanPrefix);
+					continue;
+				}
 				fullUrlsToFuzz.add(finalAppUrl + cleanPrefix);
 			}
 
-			if (fullUrlsToFuzz.isEmpty()) {
+			if (fullUrlsToFuzz.isEmpty() && prefixes.isEmpty()) {
 				fullUrlsToFuzz.add(finalAppUrl);
 			}
 
 			return Flux.fromIterable(fullUrlsToFuzz)
 				.flatMap((url) -> blackboxDiscoverer.discover(url, config))
 				.flatMapIterable((ops) -> ops)
+				.filter((op) -> !exclusions.excludesPath(pathOf(op.url())))
 				.collectList()
 				.map((allOps) -> {
 					// Deduplicate
@@ -157,22 +166,39 @@ public class ApiGatewayDiscoverer implements EndpointDiscoverer {
 		return "";
 	}
 
-	private Mono<List<String>> extractSpringCloudGateway(WebClient client, String target) {
+	private Mono<List<String>> extractSpringCloudGateway(WebClient client, String target,
+			GatewayExclusions exclusions) {
 		String url = target.endsWith("/") ? target + "actuator/gateway/routes" : target + "/actuator/gateway/routes";
-		return client.get().uri(url).retrieve().bodyToFlux(java.util.Map.class).map((node) -> {
+		return client.get().uri(url).retrieve().bodyToFlux(java.util.Map.class).filter((node) -> {
+			Object routeId = node.get("route_id");
+			if (routeId != null && exclusions.excludesRoute(routeId.toString())) {
+				log.info("Skipping excluded gateway route {}", routeId);
+				return false;
+			}
+			return true;
+		}).flatMapIterable((node) -> {
 			Object predicateObj = node.get("predicate");
-			return (predicateObj != null) ? predicateObj.toString() : "";
-		}).map((predicate) -> {
-			// E.g. Paths: [/api/**], match trailing slash: true
+			String predicate = (predicateObj != null) ? predicateObj.toString() : "";
+			// E.g. "Paths: [/api/**, /v2/**], match trailing slash: true"
+			List<String> paths = new ArrayList<>();
 			if (predicate.contains("Paths: [")) {
 				int start = predicate.indexOf("Paths: [") + 8;
 				int end = predicate.indexOf("]", start);
 				if (end > start) {
-					return predicate.substring(start, end);
+					for (String path : predicate.substring(start, end).split(",")) {
+						if (!path.isBlank()) {
+							paths.add(path.trim());
+						}
+					}
 				}
 			}
-			return "";
-		}).filter((s) -> !s.isEmpty()).collectList();
+			return paths;
+		}).collectList();
+	}
+
+	private static String pathOf(String url) {
+		String path = UriComponentsBuilder.fromUriString(url).build().getPath();
+		return (path != null) ? path : "";
 	}
 
 	private Mono<List<String>> extractKong(WebClient client, String target) {

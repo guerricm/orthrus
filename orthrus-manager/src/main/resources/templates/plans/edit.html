@@ -184,6 +184,26 @@
 
                                     <div class="collapse mt-3" id="advancedOptions">
                                         <div class="card card-body bg-transparent border-secondary text-light">
+                                            <div id="gateway-exclusions" style="display: none;">
+                                                <h5 class="mb-3 text-primary">Gateway Exclusions</h5>
+                                                <div class="row g-3 mb-4">
+                                                    <div class="col-md-6">
+                                                        <label for="gatewayExcludedRouteIds" class="form-label">Excluded route IDs</label>
+                                                        <textarea class="form-control" id="gatewayExcludedRouteIds" name="gatewayExcludedRouteIds" rows="3"
+                                                            placeholder="admin-route&#10;internal-metrics"
+                                                            th:text="${config?.gatewayExclusions() != null ? #strings.listJoin(config.gatewayExclusions().routeIds(), ', ') : ''}"></textarea>
+                                                        <div class="form-text">Spring Cloud Gateway <code>route_id</code> values, one per line or comma-separated. Their routes are not scanned.</div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label for="gatewayExcludedPaths" class="form-label">Excluded paths</label>
+                                                        <textarea class="form-control" id="gatewayExcludedPaths" name="gatewayExcludedPaths" rows="3"
+                                                            placeholder="/actuator/**&#10;/admin"
+                                                            th:text="${config?.gatewayExclusions() != null ? #strings.listJoin(config.gatewayExclusions().paths(), ', ') : ''}"></textarea>
+                                                        <div class="form-text">Ant-style patterns (<code>/api/*/internal/**</code>); a plain path also excludes everything below it. Applies to every gateway type.</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <h5 class="mb-3 text-primary">Authentication</h5>
 
                                             <h6 class="text-light border-bottom border-secondary pb-2 mb-3 mt-2">Option
@@ -342,7 +362,10 @@
                 const gatewayTypeSelect = document.getElementById('gatewayType');
                 const k8sTokenContainer = document.getElementById('k8s-token-container');
 
+                const gatewayExclusions = document.getElementById('gateway-exclusions');
+
                 function updateVisibility() {
+                    gatewayExclusions.style.display = (discovererSelect.value === 'gateway') ? 'block' : 'none';
                     if (discovererSelect.value === 'gateway') {
                         gatewayOptions.style.display = 'block';
                         if (gatewayTypeSelect.value === 'k8s') {

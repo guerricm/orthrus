@@ -147,7 +147,8 @@ class JobOrchestratorServiceTest {
 		// A full config (as stored in production) whose includeScanners map to INJECTION
 		// + XSS only.
 		ScanConfiguration config = new ScanConfiguration(List.of("sqli", "xss"), List.of(), 10, 5000, 10000, false,
-				"json", null, null, "en", false, ch.nexsol.orthrusdast.model.GatewayType.AUTO, null, null, null, null);
+				"json", null, null, "en", false, ch.nexsol.orthrusdast.model.GatewayType.AUTO, null, null, null, null,
+				null);
 		job.setScanConfigurationJson(new tools.jackson.databind.ObjectMapper().writeValueAsString(config));
 		when(this.scanJobRepository.findByStatus(JobStatus.PENDING)).thenReturn(Flux.just(job));
 		when(this.scanJobRepository.claimForOrchestration(anyLong(), any())).thenReturn(Mono.just(1));

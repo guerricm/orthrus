@@ -52,6 +52,7 @@ import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.entity.TestPlanEntity;
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
+import ch.nexsol.orthrusdast.model.GatewayExclusions;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
@@ -349,6 +350,8 @@ public class PlanController {
 			String appUrl = formData.getFirst("appUrl");
 			String k8sToken = formData.getFirst("k8sToken");
 			String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
+			GatewayExclusions gatewayExclusions = WebFormUtils.gatewayExclusions(
+					formData.getFirst("gatewayExcludedRouteIds"), formData.getFirst("gatewayExcludedPaths"));
 
 			List<String> rawIncludeScanners = formData.get("includeScanners");
 			final List<String> includeScanners = (rawIncludeScanners != null) ? rawIncludeScanners : List.of();
@@ -400,7 +403,7 @@ public class PlanController {
 					ScanConfiguration scanConfig = new ScanConfiguration(includeScanners, excludeScanners, concurrency,
 							5000, 10000, false, "html", authScheme, secondaryAuthScheme, "en", includePassed,
 							GatewayType.fromString(gatewayType), appUrl, k8sToken, finalOauth2Config,
-							openapiOverrideHost);
+							openapiOverrideHost, gatewayExclusions);
 
 					return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig))
 						.flatMap((configJson) -> {
@@ -531,6 +534,11 @@ public class PlanController {
 				String appUrl = formData.getFirst("appUrl");
 				String k8sToken = formData.getFirst("k8sToken");
 				String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
+				// Absent from the form (e.g. an older client): keep what the plan had.
+				boolean exclusionsSubmitted = formData.containsKey("gatewayExcludedRouteIds")
+						|| formData.containsKey("gatewayExcludedPaths");
+				GatewayExclusions submittedExclusions = WebFormUtils.gatewayExclusions(
+						formData.getFirst("gatewayExcludedRouteIds"), formData.getFirst("gatewayExcludedPaths"));
 				List<String> rawIncludeScanners = formData.get("includeScanners");
 				final List<String> includeScanners = (rawIncludeScanners != null) ? rawIncludeScanners : List.of();
 				final int concurrency = WebFormUtils.parseIntOrDefault(formData.getFirst("concurrency"), 10);
@@ -578,7 +586,8 @@ public class PlanController {
 								oldConfig.httpReadTimeoutMs(), oldConfig.ignoreSslErrors(), oldConfig.reportFormat(),
 								authScheme, secondaryAuthScheme, oldConfig.language(), oldConfig.includePassed(),
 								(gatewayType != null) ? GatewayType.fromString(gatewayType) : oldConfig.gatewayType(),
-								appUrl, k8sToken, oauth2Config, openapiOverrideHost);
+								appUrl, k8sToken, oauth2Config, openapiOverrideHost,
+								exclusionsSubmitted ? submittedExclusions : oldConfig.gatewayExclusions());
 
 						return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig));
 					})

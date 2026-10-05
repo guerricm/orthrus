@@ -171,7 +171,7 @@ public class ScanCommand implements Callable<Integer> {
 		ScanConfiguration config = new ScanConfiguration((includeScanners != null) ? includeScanners : List.of(),
 				(excludeScanners != null) ? excludeScanners : List.of(), concurrency, 5000, 10000, false, format,
 				authScheme, secondaryAuthScheme, language, includePassed, GatewayType.fromString(gatewayType), appUrl,
-				k8sToken, oauth2Config, null);
+				k8sToken, oauth2Config, null, null);
 
 		try {
 			// Block until scan is complete because this is a CLI command

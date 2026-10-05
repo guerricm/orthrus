@@ -207,7 +207,7 @@ class TestPlanPortabilityServiceTest {
 				"en", false, GatewayType.AUTO, "https://app.example", "k8s-token",
 				new OAuth2Config("https://idp.example/token", "orthrus-client", SECRET, "password",
 						List.of("alice:alice-pw", "bob:bob-pw")),
-				null);
+				null, null);
 	}
 
 }

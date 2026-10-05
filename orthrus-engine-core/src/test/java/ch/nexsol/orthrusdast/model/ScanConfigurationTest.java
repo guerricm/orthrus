@@ -48,21 +48,21 @@ class ScanConfigurationTest {
 	@Test
 	void testShouldRunScanner() {
 		ScanConfiguration configWithIncludes = new ScanConfiguration(List.of("sql-injection", "xss"), List.of(), 10,
-				5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null, null);
+				5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null, null, null);
 
 		assertThat(configWithIncludes.shouldRunScanner("sql-injection")).isTrue();
 		assertThat(configWithIncludes.shouldRunScanner("xss")).isTrue();
 		assertThat(configWithIncludes.shouldRunScanner("csrf")).isFalse();
 
 		ScanConfiguration configWithExcludes = new ScanConfiguration(List.of(), List.of("csrf", "ssti"), 10, 5000,
-				10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null, null);
+				10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null, null, null);
 
 		assertThat(configWithExcludes.shouldRunScanner("sql-injection")).isTrue();
 		assertThat(configWithExcludes.shouldRunScanner("csrf")).isFalse();
 		assertThat(configWithExcludes.shouldRunScanner("ssti")).isFalse();
 
 		ScanConfiguration configWithBoth = new ScanConfiguration(List.of("sql-injection", "csrf"), List.of("csrf"), 10,
-				5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null, null);
+				5000, 10000, false, "json", null, null, "en", false, GatewayType.AUTO, null, null, null, null, null);
 
 		// Excludes take precedence over includes
 		assertThat(configWithBoth.shouldRunScanner("csrf")).isFalse();

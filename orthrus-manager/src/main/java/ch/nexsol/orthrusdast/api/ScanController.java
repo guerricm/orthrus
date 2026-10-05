@@ -128,7 +128,7 @@ public class ScanController {
 						request.ignoreSslErrors(), "json", authScheme, secondaryAuthScheme,
 						(request.language() != null) ? request.language() : "en",
 						(request.includePassed() != null) ? request.includePassed() : false, GatewayType.AUTO, null,
-						null, request.oauth2(), request.overrideHost());
+						null, request.oauth2(), request.overrideHost(), null);
 
 				return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(config)).flatMap((configJson) -> {
 					ScanJobEntity job = new ScanJobEntity(request.discovererId(), request.target(), configJson,

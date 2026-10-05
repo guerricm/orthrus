@@ -146,7 +146,8 @@ public class TestPlanPortabilityService {
 				config.httpConnectTimeoutMs(), config.httpReadTimeoutMs(), config.ignoreSslErrors(),
 				config.reportFormat(), maskScheme(config.authScheme()), maskScheme(config.secondaryAuthScheme()),
 				config.language(), config.includePassed(), config.gatewayType(), config.appUrl(),
-				maskSecret(config.k8sToken()), maskOauth(config.oauth2Config()), config.openapiOverrideHost());
+				maskSecret(config.k8sToken()), maskOauth(config.oauth2Config()), config.openapiOverrideHost(),
+				config.gatewayExclusions());
 	}
 
 	private String maskSecret(String secret) {
@@ -216,7 +217,7 @@ public class TestPlanPortabilityService {
 				config.ignoreSslErrors(), config.reportFormat(), stripScheme(config.authScheme()),
 				stripScheme(config.secondaryAuthScheme()), config.language(), config.includePassed(),
 				config.gatewayType(), config.appUrl(), stripMask(config.k8sToken()), strippedOauth,
-				config.openapiOverrideHost());
+				config.openapiOverrideHost(), config.gatewayExclusions());
 
 		return new StrippedConfiguration(stripped, masked);
 	}

@@ -24,12 +24,12 @@ import java.util.List;
 public record ScanConfiguration(List<String> includeScanners, List<String> excludeScanners, int concurrency,
 		int httpConnectTimeoutMs, int httpReadTimeoutMs, boolean ignoreSslErrors, String reportFormat,
 		SecurityScheme authScheme, SecurityScheme secondaryAuthScheme, String language, boolean includePassed,
-		GatewayType gatewayType, String appUrl, String k8sToken, OAuth2Config oauth2Config,
-		String openapiOverrideHost) {
+		GatewayType gatewayType, String appUrl, String k8sToken, OAuth2Config oauth2Config, String openapiOverrideHost,
+		GatewayExclusions gatewayExclusions) {
 
 	public static ScanConfiguration defaults() {
 		return new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", null, null, "en", false,
-				GatewayType.AUTO, null, null, null, null);
+				GatewayType.AUTO, null, null, null, null, null);
 	}
 
 	/**
@@ -38,7 +38,14 @@ public record ScanConfiguration(List<String> includeScanners, List<String> exclu
 	public ScanConfiguration withAuthSchemes(SecurityScheme authScheme, SecurityScheme secondaryAuthScheme) {
 		return new ScanConfiguration(includeScanners, excludeScanners, concurrency, httpConnectTimeoutMs,
 				httpReadTimeoutMs, ignoreSslErrors, reportFormat, authScheme, secondaryAuthScheme, language,
-				includePassed, gatewayType, appUrl, k8sToken, oauth2Config, openapiOverrideHost);
+				includePassed, gatewayType, appUrl, k8sToken, oauth2Config, openapiOverrideHost, gatewayExclusions);
+	}
+
+	/**
+	 * The gateway exclusions, never null (plans saved before they existed have none).
+	 */
+	public GatewayExclusions gatewayExclusionsOrNone() {
+		return (this.gatewayExclusions != null) ? this.gatewayExclusions : GatewayExclusions.none();
 	}
 
 	/**

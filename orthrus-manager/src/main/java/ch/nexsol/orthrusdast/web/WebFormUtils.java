@@ -16,6 +16,11 @@
 
 package ch.nexsol.orthrusdast.web;
 
+import java.util.Arrays;
+import java.util.List;
+
+import ch.nexsol.orthrusdast.model.GatewayExclusions;
+
 /**
  * Small helpers shared by the UI controllers.
  */
@@ -34,6 +39,30 @@ final class WebFormUtils {
 		catch (NumberFormatException ex) {
 			return defaultValue;
 		}
+	}
+
+	/**
+	 * Splits a free-text list (one entry per line, or comma-separated) into its trimmed,
+	 * non-blank entries.
+	 * @param value the text typed in the form, possibly null
+	 * @return the entries, empty when there are none
+	 */
+	static List<String> parseList(String value) {
+		if (value == null || value.isBlank()) {
+			return List.of();
+		}
+		return Arrays.stream(value.split("[,\\r\\n]+")).map(String::trim).filter((entry) -> !entry.isEmpty()).toList();
+	}
+
+	/**
+	 * The gateway exclusions entered in the plan form.
+	 * @param routeIds the excluded route ids, as typed
+	 * @param paths the excluded path patterns, as typed
+	 * @return the exclusions, or null when both fields are empty
+	 */
+	static GatewayExclusions gatewayExclusions(String routeIds, String paths) {
+		GatewayExclusions exclusions = new GatewayExclusions(parseList(routeIds), parseList(paths));
+		return exclusions.isEmpty() ? null : exclusions;
 	}
 
 }
