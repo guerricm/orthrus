@@ -18,7 +18,7 @@ package ch.nexsol.orthrusai.orchestrator.plan;
 
 import java.util.List;
 
-import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 
 /**
  * Produces a campaign plan for a target. The static implementation gives a sensible

@@ -15,9 +15,14 @@
 
     <!--
       Independent from the other orthrus modules: integrates only through the manager's public REST
-      API. Do NOT add a dependency on orthrus-engine-core / orthrus-worker / orthrus-manager here.
+      API. It shares only orthrus-protocol (the wire contracts) with them. Do NOT add a dependency on
+      orthrus-engine-core / orthrus-worker / orthrus-manager here.
     -->
     <dependencies>
+        <dependency>
+            <groupId>ch.nexsol.security</groupId>
+            <artifactId>orthrus-protocol</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>

@@ -18,16 +18,17 @@ package ch.nexsol.orthrusdast.scanner;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import reactor.core.publisher.Flux;
 
+import ch.nexsol.orthrus.protocol.node.CWEReference;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpResponse;
-import ch.nexsol.orthrusdast.model.CWEReference;
 import ch.nexsol.orthrusdast.model.Operation;
-import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 
 /**
  * Interface for all security scanners.
@@ -111,8 +112,10 @@ public interface SecurityScanner {
 		String reqDetails = formatRequest(testOp);
 		String resDetails = (response != null) ? formatResponse(response) : "No Response";
 
-		return Vulnerability.createWithDetails(name, description, riskLevel, confidence, getId(), originalOp, cwe,
-				capecs, cvssScore, evidence, remediation, reqDetails, resDetails, attackVector, technicalImpact);
+		return new Vulnerability(UUID.randomUUID().toString(), name, description, riskLevel, confidence, getId(),
+				originalOp.templateUrl(), originalOp.method().name(), cwe, List.of(),
+				(capecs != null) ? capecs : List.of(), cvssScore, evidence, remediation, reqDetails, resDetails,
+				attackVector, technicalImpact);
 	}
 
 	private String formatRequest(Operation op) {

@@ -23,9 +23,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
-import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 
 /**
  * Deterministic executor used until the LLM agents are enabled. It emits a single
@@ -42,13 +44,13 @@ public class EchoScanExecutor implements ScanExecutor {
 		String scannerId = "ai-echo-" + request.phase().toLowerCase();
 		Vulnerability marker = new Vulnerability(UUID.randomUUID().toString(),
 				"AI scanner reachable (" + request.phase() + ")",
-				"Echo executor confirming the AI scanner node received and ran the dispatched task.", "INFO", "LOW",
-				scannerId, request.target(), "GET", null, List.of(), List.of(), 0.0,
+				"Echo executor confirming the AI scanner node received and ran the dispatched task.", RiskLevel.INFO,
+				Vulnerability.Confidence.LOW, scannerId, request.target(), "GET", null, List.of(), List.of(), 0.0,
 				"Task " + request.taskId() + " of job " + request.jobId() + " was routed to the AI scanner node.",
 				"No action required; this is a wiring probe.", "N/A", "N/A", "Diagnostic", "None");
 
 		ScanAttempt attempt = new ScanAttempt(scannerId, "AI Echo Scanner (" + request.phase() + ")", "GET",
-				request.target(), "FAILED", List.of(marker));
+				request.target(), AttemptStatus.FAILED, List.of(marker));
 		return Flux.just(attempt);
 	}
 

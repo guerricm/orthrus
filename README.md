@@ -287,17 +287,41 @@ public class MyCustomScanner implements SecurityScanner {
 ## AI Orchestration (optional add-on)
 
 Two optional modules add LLM-driven orchestration on top of the deterministic engine. They are
-**fully autonomous**: they depend on no other orthrus module and integrate purely over the
-documented HTTP contracts, so the base product builds and runs without them.
+**separable**: they share only `orthrus-protocol` (the wire contracts, see below) with the rest of
+the platform and integrate purely over the documented HTTP contracts, so the base product builds
+and runs without them.
+
+### Module layout
+
+| Module | Role |
+| --- | --- |
+| `orthrus-protocol` | The wire contracts every service speaks: the manager ↔ node task protocol (`ScanTaskRequest`, `ScanAttempt`, `Vulnerability`, the CWE/OWASP/risk vocabulary, `NodeClient`) and the manager ↔ orchestrator AI contract (`ScanPlan`, `ReconResult`, `AiScanContext`, `Credential`, the shared OpenAPI reader). Thin by construction: a Maven enforcer rule bans server starters, Spring AI, the scan-engine libraries and every other Orthrus module. A type belongs here only if it is read or written on both sides of an HTTP call. |
+| `orthrus-engine-core` | The deterministic scan engine: discoverers, the 41 scanners, HTTP client, reports. |
+| `orthrus-manager`, `orthrus-worker`, `orthrus-cli` | The platform services and the CLI, built on `engine-core` and `protocol`. |
+| `orthrus-ai-scanner`, `orthrus-ai-orchestrator` | The AI add-on, built on `protocol` only. |
 
 - **`orthrus-ai-scanner`** — a "smart worker". It registers with the manager as a slave node,
   advertises the scanner families it should own (`orthrus.ai.families`), and runs each dispatched
   family task with an LLM agent that **generates its own payloads** (no static payload lists),
   forges requests through a scope-guarded, budget-capped HTTP tool, and records only confirmed
-  findings. The manager routes tasks to it exactly like any worker — no manager change required.
-- **`orthrus-ai-orchestrator`** — the campaign brain. `POST /api/v1/campaigns {"target","objective"}`
-  makes it fingerprint the target, produce a structured plan (discoverer + prioritised families),
-  and launch the corresponding scan through the manager's public API.
+  findings. It advertises an `AI-EXECUTOR` capability so the manager can route AI runs to it. When
+  the task carries the orchestrator's shared recon it works from those endpoints and context; with
+  no orchestrator it falls back to its own local recon, so it still runs standalone.
+- **`orthrus-ai-orchestrator`** — the planning **and recon** brain. It never launches a scan; it
+  answers two calls the manager makes. Both are guarded by the platform's shared secret
+  (`ORTHRUS_INTERNAL_TOKEN`, sent as `X-Orthrus-Internal-Token`), and in Docker Compose the
+  service is reachable from the manager only, never published on the host: the recon endpoint
+  fetches whatever URL it is given with whatever credentials it is given.
+    - `POST /api/v1/plan {"target","objective","availableDiscoverers"}` → a structured plan
+      (recommended discoverer + prioritised families + rationale), used to pre-fill a Test Plan the
+      operator reviews and runs through the normal flow.
+    - `POST /api/v1/recon {"target","openapiOverrideHost","credentials"}` → the shared recon: it
+      fingerprints the target once and maps its endpoints (honouring the OpenAPI `servers` base
+      path). The manager runs this in its own scheduler cycle once an AI job starts, stores only
+      the recon on the job (never the credentials), and holds the job's tasks until it is settled;
+      at dispatch it folds the recon and the Test Plan's credentials, TLS and timeouts into the
+      context each scanner node receives. An unreachable orchestrator settles the job with an
+      empty recon, so its nodes fall back to their own local recon and other jobs are never held.
 
 Both are **multi-provider**: the code depends only on Spring AI's `ChatClient`; the provider is
 pure configuration.
@@ -329,7 +353,7 @@ ORTHRUS_AI_ENABLED=true ORTHRUS_AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... \
   java -jar orthrus-ai-scanner/target/orthrus-ai-scanner-*.jar   # serves :8091
 ```
 
-With Docker Compose the two modules live behind the `ai` profile, so they only start when asked:
+With Docker Compose the two AI modules live behind the `ai` profile, so they only start when asked:
 
 ```bash
 # Base stack only (no AI):
@@ -339,9 +363,28 @@ docker compose --profile ai up -d
 ```
 
 Pick the provider with `ORTHRUS_AI_PROVIDER` (`ollama` | `anthropic` | `openai`) and the model with
-`ORTHRUS_AI_SCANNER_MODEL` / `ORTHRUS_AI_ORCHESTRATOR_MODEL` in your `.env`. To show the **AI Campaign**
-button in the manager UI, also uncomment `ORTHRUS_AI_ORCHESTRATOR_URL` on the manager service. A small
-tool-capable model (e.g. `qwen2.5:7b`) is recommended over large MoE models for the agentic loop.
+`ORTHRUS_AI_SCANNER_MODEL` / `ORTHRUS_AI_ORCHESTRATOR_MODEL` in your `.env`. To surface the AI planning
+switch on the Test Plan editor, also uncomment `ORTHRUS_AI_ORCHESTRATOR_URL` on the manager service. A
+small tool-capable model (e.g. `qwen2.5:7b`) is recommended over large MoE models for the agentic loop.
+
+### Running the deterministic worker and the AI scanner side by side
+
+`docker compose --profile ai up -d` starts **both** node kinds at once — the deterministic
+`orthrus-worker` (`:8081`, not gated by the profile) and the `orthrus-ai-scanner` (`:8091`). They
+register with the manager independently and both stay available.
+
+The manager routes each run to exactly one kind, based on how it was launched from the Test Plan
+views:
+
+- **Play** launches a *deterministic* run — dispatched **only** to `orthrus-worker` (nodes without
+  the `AI-EXECUTOR` capability).
+- **Play AI** launches an *AI* run — dispatched **only** to `orthrus-ai-scanner` (nodes advertising
+  `AI-EXECUTOR`). The **Play AI** button appears only when at least one AI node is online.
+
+A run never crosses over: an AI run is never placed on the plain worker, and a deterministic run is
+never placed on the AI scanner. If no node of the required kind covers a task's family, that task is
+marked unsupported rather than falling back to the other kind — so make sure `ORTHRUS_AI_FAMILIES`
+on the AI scanner covers the families your AI runs will target.
 
 ## Disclaimer
 

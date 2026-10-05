@@ -22,6 +22,11 @@ orthrus:
       password: ${ADMIN_PASSWORD:superadmin}
 
 spring:
+  http:
+    reactiveclient:
+      # Bounds every WebClient.Builder-derived call (nodes, orchestrator): a black-holed
+      # peer fails fast instead of holding a scheduler cycle.
+      connect-timeout: 5s
   lifecycle:
     timeout-per-shutdown-phase: 30s
   r2dbc:

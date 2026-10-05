@@ -17,7 +17,6 @@
 package ch.nexsol.orthrusdast.web;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -40,13 +40,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
+import ch.nexsol.orthrusdast.engine.ScannerCatalog;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.entity.TestPlanEntity;
@@ -65,6 +66,7 @@ import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.repository.TestPlanRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiOrchestratorClient;
 
 /**
  * Test-plan pages: listing, creation, edition and execution.
@@ -93,21 +95,26 @@ public class PlanController {
 
 	private final JobEventPublisher jobEventPublisher;
 
-	private final WebClient webClient;
-
 	/**
-	 * Offered when the fleet cannot be reached, so the editor still lists every
-	 * discoverer this build ships rather than a hand-maintained subset.
+	 * All discoverers this build ships, listed in the editor without needing a live
+	 * worker.
 	 */
 	private final List<String> defaultDiscoverers;
 
 	private final TestPlanPortabilityService planPortabilityService;
 
+	private final ScannerCatalog scannerCatalog;
+
+	/**
+	 * Present only when an AI orchestrator URL is configured (the AI add-on is optional).
+	 */
+	private final ObjectProvider<AiOrchestratorClient> aiOrchestratorClient;
+
 	public PlanController(TestPlanRepository testPlanRepository, ScanJobRepository scanJobRepository,
 			SlaveNodeRepository slaveNodeRepository, ScanTaskRepository scanTaskRepository,
 			OAuth2TokenFetcher tokenFetcher, ObjectMapper objectMapper, JobEventPublisher jobEventPublisher,
-			WebClient.Builder webClientBuilder, List<EndpointDiscoverer> discoverers,
-			TestPlanPortabilityService planPortabilityService) {
+			List<EndpointDiscoverer> discoverers, TestPlanPortabilityService planPortabilityService,
+			ScannerCatalog scannerCatalog, ObjectProvider<AiOrchestratorClient> aiOrchestratorClient) {
 		this.testPlanRepository = testPlanRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -115,9 +122,20 @@ public class PlanController {
 		this.tokenFetcher = tokenFetcher;
 		this.objectMapper = objectMapper;
 		this.jobEventPublisher = jobEventPublisher;
-		this.webClient = webClientBuilder.build();
 		this.defaultDiscoverers = discoverers.stream().map(EndpointDiscoverer::getId).sorted().toList();
 		this.planPortabilityService = planPortabilityService;
+		this.scannerCatalog = scannerCatalog;
+		this.aiOrchestratorClient = aiOrchestratorClient;
+	}
+
+	/**
+	 * Adds the discoverer and scanner lists the editor form needs, sourced in-process so
+	 * the form works without a live worker and each scanner carries its family.
+	 * @param model the view model
+	 */
+	private void addCatalogToModel(Model model) {
+		model.addAttribute("discoverers", this.defaultDiscoverers);
+		model.addAttribute("scanners", this.scannerCatalog.scanners());
 	}
 
 	@GetMapping("/plans/new")
@@ -159,31 +177,9 @@ public class PlanController {
 
 				model.addAttribute("hasOnlineSlaves", totalCapacity > 0);
 				model.addAttribute("allSlavesBusy", totalCapacity > 0 && availableCapacity == 0);
-
-				SlaveNodeEntity activeSlave = slaves.stream()
-					.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
-					.findFirst()
-					.orElse(null);
-
-				if (activeSlave != null) {
-					return fetchCapabilities(activeSlave).map((caps) -> {
-						model.addAttribute("discoverers", caps.discoverers());
-						model.addAttribute("scanners", caps.scanners());
-						return "plans/edit";
-					}).onErrorResume((e) -> {
-						log.warn("Failed to fetch capabilities from slave {}", activeSlave.getId(), e);
-						model.addAttribute("discoverers", this.defaultDiscoverers);
-						model.addAttribute("scanners", List.of());
-						model.addAttribute("error", "Failed to fetch capabilities from active slave: " + e.getMessage()
-								+ ". Using default discoverers.");
-						return Mono.just("plans/edit");
-					});
-				}
-				else {
-					model.addAttribute("discoverers", this.defaultDiscoverers);
-					model.addAttribute("scanners", List.of());
-					return Mono.just("plans/edit");
-				}
+				model.addAttribute("aiEnabled", this.aiOrchestratorClient.getIfAvailable() != null);
+				addCatalogToModel(model);
+				return Mono.just("plans/edit");
 			}));
 	}
 
@@ -199,52 +195,51 @@ public class PlanController {
 				List<SlaveNodeEntity> slaves = tuple.getT2();
 
 				boolean hasOnlineSlaves = slaves.stream().anyMatch((slave) -> slave.getStatus() != NodeStatus.OFFLINE);
+				boolean aiExecutorAvailable = hasAiExecutor(slaves);
+				int totalScanners = this.scannerCatalog.scanners().size();
 
-				// Get capabilities if slaves are online to know total scanners
-				Mono<Integer> totalScannersMono = Mono.just(0);
-				if (hasOnlineSlaves) {
-					SlaveNodeEntity activeSlave = slaves.stream()
-						.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
-						.findFirst()
-						.orElse(null);
-					if (activeSlave != null) {
-						totalScannersMono = fetchCapabilities(activeSlave)
-							.map((caps) -> (caps.scanners() != null) ? caps.scanners().size() : 0)
-							.onErrorReturn(0);
-					}
-				}
-
-				return totalScannersMono
-					.flatMap((totalScanners) -> Flux.fromIterable(plans)
-						.flatMapSequential((plan) -> Mono.fromCallable(
+				return Flux.fromIterable(plans)
+					.flatMapSequential((plan) -> Mono
+						.fromCallable(
 								() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class))
-							.map((conf) -> {
-								Map<String, Object> map = new HashMap<>();
-								map.put("plan", plan);
-								if (conf.includeScanners() == null || conf.includeScanners().isEmpty()) {
-									map.put("scannersCount", (totalScanners > 0) ? totalScanners : "All");
-								}
-								else {
-									map.put("scannersCount", conf.includeScanners().size());
-								}
-								map.put("totalScanners", (totalScanners > 0) ? totalScanners : "?");
-								return map;
-							})
-							.onErrorResume((e) -> {
-								log.warn("Failed to parse configuration of plan {}", plan.getId(), e);
-								Map<String, Object> map = new HashMap<>();
-								map.put("plan", plan);
+						.map((conf) -> {
+							Map<String, Object> map = new HashMap<>();
+							map.put("plan", plan);
+							if (conf.includeScanners() == null || conf.includeScanners().isEmpty()) {
 								map.put("scannersCount", "All");
-								map.put("totalScanners", (totalScanners > 0) ? totalScanners : "?");
-								return Mono.just(map);
-							}))
-						.collectList()
-						.map((mappedPlans) -> {
-							model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
-							model.addAttribute("mappedPlans", mappedPlans);
-							return "plans/list";
-						}));
+							}
+							else {
+								map.put("scannersCount", conf.includeScanners().size());
+							}
+							map.put("totalScanners", totalScanners);
+							return map;
+						})
+						.onErrorResume((e) -> {
+							log.warn("Failed to parse configuration of plan {}", plan.getId(), e);
+							Map<String, Object> map = new HashMap<>();
+							map.put("plan", plan);
+							map.put("scannersCount", "All");
+							map.put("totalScanners", totalScanners);
+							return Mono.just(map);
+						}))
+					.collectList()
+					.map((mappedPlans) -> {
+						model.addAttribute("hasOnlineSlaves", hasOnlineSlaves);
+						model.addAttribute("aiExecutorAvailable", aiExecutorAvailable);
+						model.addAttribute("mappedPlans", mappedPlans);
+						return "plans/list";
+					});
 			});
+	}
+
+	/**
+	 * @param slaves the fleet
+	 * @return whether at least one live node advertises the AI executor marker
+	 */
+	private boolean hasAiExecutor(List<SlaveNodeEntity> slaves) {
+		return slaves.stream()
+			.anyMatch((slave) -> slave.getStatus() != NodeStatus.OFFLINE && slave.getCapabilities() != null
+					&& slave.getCapabilities().contains("AI-EXECUTOR"));
 	}
 
 	/**
@@ -315,9 +310,25 @@ public class PlanController {
 
 	@PostMapping("/plans/{id}/run")
 	public Mono<String> runTestPlan(@PathVariable Long id, ServerWebExchange exchange) {
-		return testPlanRepository.findById(id).flatMap((plan) -> {
+		return queuePlan(id, false);
+	}
+
+	/**
+	 * Runs an existing plan with the AI executor nodes instead of the deterministic
+	 * workers. The plan itself is unchanged; only where its tasks run differs.
+	 * @param id the plan to run
+	 * @return a redirect to the scan list
+	 */
+	@PostMapping("/plans/{id}/run-ai")
+	public Mono<String> runTestPlanWithAi(@PathVariable Long id) {
+		return queuePlan(id, true);
+	}
+
+	private Mono<String> queuePlan(Long planId, boolean aiMode) {
+		return testPlanRepository.findById(planId).flatMap((plan) -> {
 			ScanJobEntity job = new ScanJobEntity(plan.getDiscovererId(), plan.getTarget(),
 					plan.getScanConfigurationJson(), JobStatus.PENDING, plan.getId());
+			job.setAiMode(aiMode);
 			return scanJobRepository.save(job)
 				.doOnSuccess((savedJob) -> jobEventPublisher.emit(savedJob.getId(),
 						JobEvent.queued(savedJob.getId(), savedJob.getTarget())))
@@ -416,16 +427,21 @@ public class PlanController {
 
 	@GetMapping("/api/plans/{id}/details")
 	public Mono<String> planDetails(@PathVariable Long id, Model model) {
-		return testPlanRepository.findById(id).map((plan) -> {
-			model.addAttribute("plan", plan);
-			return "fragments/plan-offcanvas :: details";
-		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
+		return testPlanRepository.findById(id)
+			.flatMap((plan) -> slaveNodeRepository.findAll().collectList().map((slaves) -> {
+				model.addAttribute("plan", plan);
+				model.addAttribute("aiExecutorAvailable", hasAiExecutor(slaves));
+				return "fragments/plan-offcanvas :: details";
+			}))
+			.switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
 	}
 
 	@GetMapping("/api/plans/{id}/edit")
 	public Mono<String> editPlanDetails(@PathVariable Long id, Model model) {
 		return testPlanRepository.findById(id).flatMap((plan) -> {
 			model.addAttribute("plan", plan);
+			model.addAttribute("aiEnabled", this.aiOrchestratorClient.getIfAvailable() != null);
+			addCatalogToModel(model);
 			return Mono
 				.fromCallable(() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class))
 				.doOnNext((conf) -> model.addAttribute("config", conf))
@@ -433,27 +449,61 @@ public class PlanController {
 					log.warn("Failed to parse configuration of plan {}", plan.getId(), ex);
 					return Mono.empty();
 				})
-				.then(slaveNodeRepository.findAll()
-					.filter((s) -> s.getStatus() != NodeStatus.OFFLINE)
-					.next()
-					.flatMap(this::fetchCapabilities)
-					.onErrorResume((e) -> {
-						log.warn("Failed to fetch capabilities from active slave", e);
-						return Mono.empty();
-					})
-					.map((caps) -> {
-						model.addAttribute("discoverers", caps.discoverers());
-						model.addAttribute("scanners", caps.scanners());
-						return "fragments/plan-offcanvas :: edit";
-					})
-					.defaultIfEmpty("fragments/plan-offcanvas :: edit")
-					.doOnNext((view) -> {
-						if (!model.containsAttribute("discoverers")) {
-							model.addAttribute("discoverers", this.defaultDiscoverers);
-							model.addAttribute("scanners", List.of());
-						}
-					}));
+				.thenReturn("fragments/plan-offcanvas :: edit");
 		}).switchIfEmpty(Mono.error(new IllegalArgumentException("Plan not found")));
+	}
+
+	/**
+	 * Asks the AI orchestrator to plan a scan for a target/objective and returns a
+	 * fragment that pre-fills the editor form. The plan's prioritized families are turned
+	 * into the scanner ids to tick (via the in-process catalog), so the objective
+	 * actually restricts the scan.
+	 * @param exchange the form submission ({@code target}, {@code objective})
+	 * @param model the view model
+	 * @return the pre-fill fragment, or an error fragment when the orchestrator is
+	 * unreachable
+	 */
+	@PostMapping("/plans/ai-suggest")
+	public Mono<String> aiSuggest(ServerWebExchange exchange, Model model) {
+		AiOrchestratorClient client = this.aiOrchestratorClient.getIfAvailable();
+		if (client == null) {
+			model.addAttribute("aiError", "AI orchestration is not configured.");
+			return Mono.just("fragments/plan-offcanvas :: aiSuggestion");
+		}
+		return exchange.getFormData().flatMap((form) -> {
+			String target = form.getFirst("target");
+			String objective = form.getFirst("objective");
+			if (target == null || target.isBlank()) {
+				model.addAttribute("aiError", "Enter a target first.");
+				return Mono.just("fragments/plan-offcanvas :: aiSuggestion");
+			}
+			return client.suggestPlan(target.trim(), objective, this.defaultDiscoverers).map((plan) -> {
+				model.addAttribute("suggestion", toSuggestion(plan));
+				return "fragments/plan-offcanvas :: aiSuggestion";
+			}).onErrorResume((e) -> {
+				log.error("AI suggestion for {} failed: {}", target, e.getMessage());
+				model.addAttribute("aiError", "AI orchestrator error: " + e.getMessage());
+				return Mono.just("fragments/plan-offcanvas :: aiSuggestion");
+			});
+		});
+	}
+
+	/**
+	 * Turns an orchestrator plan into the concrete values the editor form needs: a valid
+	 * discoverer and the scanner ids covering the prioritized families.
+	 * @param plan the orchestrator's plan
+	 * @return the form pre-fill values
+	 */
+	private AiSuggestion toSuggestion(ScanPlan plan) {
+		String discoverer = plan.recommendedDiscoverer();
+		if (discoverer == null || !this.defaultDiscoverers.contains(discoverer)) {
+			discoverer = this.defaultDiscoverers.isEmpty() ? "" : this.defaultDiscoverers.get(0);
+		}
+		List<String> scannerIds = List.copyOf(this.scannerCatalog.scannerIdsForFamilies(plan.prioritizedFamilies()));
+		int concurrency = (plan.concurrency() != null && plan.concurrency() > 0) ? plan.concurrency() : 10;
+		boolean includePassed = plan.includePassed() != null && plan.includePassed();
+		return new AiSuggestion(discoverer, plan.prioritizedFamilies(), scannerIds, concurrency, includePassed,
+				plan.rationale());
 	}
 
 	@PostMapping("/api/plans/{id}")
@@ -549,31 +599,18 @@ public class PlanController {
 		});
 	}
 
-	private Mono<CapabilitiesResponse> fetchCapabilities(SlaveNodeEntity slave) {
-		return webClient.get()
-			.uri(slave.getUrl() + "/api/v1/slave/capabilities")
-			.retrieve()
-			.bodyToMono(CapabilitiesResponse.class)
-			// This runs while a user waits on a page render, so an unresponsive node must
-			// not hold the response open.
-			.timeout(Duration.ofSeconds(5));
-	}
-
-	public record CapabilitiesResponse(List<String> discoverers, List<ScannerInfo> scanners) {
-	}
-
-	public record ScannerInfo(String id, String name, String type) {
-		public String getId() {
-			return id;
-		}
-
-		public String getName() {
-			return name;
-		}
-
-		public String getType() {
-			return type;
-		}
+	/**
+	 * The values the AI suggestion fragment uses to pre-fill the editor form.
+	 *
+	 * @param discovererId the discoverer to select
+	 * @param families the prioritized families (for display)
+	 * @param scannerIds the scanner ids to tick
+	 * @param concurrency the suggested concurrency
+	 * @param includePassed whether to keep passed attempts
+	 * @param rationale the orchestrator's explanation
+	 */
+	public record AiSuggestion(String discovererId, List<String> families, List<String> scannerIds, int concurrency,
+			boolean includePassed, String rationale) {
 	}
 
 }

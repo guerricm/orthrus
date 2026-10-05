@@ -21,7 +21,7 @@ import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import ch.nexsol.orthrusai.orchestrator.model.ScanPlan;
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
 
 /**
  * Default planner used while the LLM is disabled: a broad plan that scans everything with

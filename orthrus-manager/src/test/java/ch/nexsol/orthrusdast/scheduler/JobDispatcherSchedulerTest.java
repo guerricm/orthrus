@@ -47,6 +47,7 @@ import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiJobReconService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -84,6 +85,9 @@ class JobDispatcherSchedulerTest {
 	@Mock
 	private JobOrchestratorService jobOrchestratorService;
 
+	@Mock
+	private AiJobReconService aiJobReconService;
+
 	private MockWebServer worker;
 
 	private JobDispatcherScheduler dispatcher;
@@ -95,9 +99,10 @@ class JobDispatcherSchedulerTest {
 
 		this.dispatcher = new JobDispatcherScheduler(this.scanJobRepository, this.scanTaskRepository,
 				this.slaveNodeRepository, new OrthrusProperties(), this.jobEventPublisher, this.jobOrchestratorService,
-				WebClient.builder());
+				this.aiJobReconService, WebClient.builder());
 
 		when(this.jobOrchestratorService.processPendingJobs()).thenReturn(Mono.empty());
+		when(this.aiJobReconService.contextJsonFor(any(ScanJobEntity.class))).thenReturn("{ctx}");
 		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(job()));
 		when(this.scanJobRepository.assignSlave(anyLong(), anyString())).thenReturn(Mono.just(1));
 		when(this.scanTaskRepository.findByScanJobId(JOB_ID)).thenReturn(Flux.empty());
@@ -126,6 +131,72 @@ class JobDispatcherSchedulerTest {
 		assertThat(dispatched.getMethod()).isEqualTo("POST");
 		assertThat(dispatched.getPath()).isEqualTo("/api/v1/slave/tasks");
 		assertThat(dispatched.getBody().readUtf8()).contains("\"phase\":\"INJECTION\"");
+	}
+
+	@Test
+	void anAiRunIsSentToAnAiExecutorNode() throws Exception {
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(aiJob()));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("ai-1", "AI-EXECUTOR,INJECTION,XSS"));
+		this.worker.enqueue(new MockResponse().setResponseCode(202));
+
+		this.dispatcher.dispatchPendingJobs();
+
+		RecordedRequest dispatched = this.worker.takeRequest(5, TimeUnit.SECONDS);
+		assertThat(dispatched).as("the AI node should have received the AI run").isNotNull();
+		assertThat(dispatched.getPath()).isEqualTo("/api/v1/slave/tasks");
+		// The context (recon + credentials) is built at dispatch, from the stored recon.
+		assertThat(dispatched.getBody().readUtf8()).contains("\"aiContextJson\":\"{ctx}\"");
+	}
+
+	@Test
+	void anAiTaskWaitsUntilItsJobHasBeenReconned() throws Exception {
+		ScanJobEntity awaitingRecon = aiJob();
+		awaitingRecon.setAiRecon(null);
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(awaitingRecon));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("ai-1", "AI-EXECUTOR,INJECTION,XSS"));
+
+		this.dispatcher.dispatchPendingJobs();
+
+		assertThat(this.worker.takeRequest(1, TimeUnit.SECONDS)).as("no dispatch before the recon is stored").isNull();
+		verify(this.scanTaskRepository, never()).claimForDispatch(anyLong(), anyString(), any());
+	}
+
+	@Test
+	void theReconCycleDelegatesToTheOrchestratorService() {
+		when(this.jobOrchestratorService.reconStartedAiJobs()).thenReturn(Mono.empty());
+
+		this.dispatcher.reconAiJobs();
+
+		verify(this.jobOrchestratorService).reconStartedAiJobs();
+	}
+
+	@Test
+	void anAiRunIsNotSentToADeterministicNode() {
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(aiJob()));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("worker-1", "openapi,INJECTION,XSS"));
+		when(this.jobOrchestratorService.onTaskUnsupported(anyLong(), anyString())).thenReturn(Mono.empty());
+
+		this.dispatcher.dispatchPendingJobs();
+
+		verify(this.jobOrchestratorService).onTaskUnsupported(eq(1L), anyString());
+		assertThat(noDispatchHappened()).isTrue();
+	}
+
+	@Test
+	void aDeterministicRunIsNotSentToAnAiNode() {
+		// Default job() is not AI mode; only an AI node is live, so the task cannot be
+		// placed.
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("ai-1", "AI-EXECUTOR,INJECTION,XSS"));
+		when(this.jobOrchestratorService.onTaskUnsupported(anyLong(), anyString())).thenReturn(Mono.empty());
+
+		this.dispatcher.dispatchPendingJobs();
+
+		verify(this.jobOrchestratorService).onTaskUnsupported(eq(1L), anyString());
+		assertThat(noDispatchHappened()).isTrue();
 	}
 
 	@Test
@@ -313,6 +384,13 @@ class JobDispatcherSchedulerTest {
 	private ScanJobEntity job() {
 		ScanJobEntity job = new ScanJobEntity("openapi", "https://target.example", "{}", JobStatus.RUNNING, null);
 		job.setId(JOB_ID);
+		return job;
+	}
+
+	private ScanJobEntity aiJob() {
+		ScanJobEntity job = job();
+		job.setAiMode(true);
+		job.setAiRecon("{\"baseUrl\":\"https://target.example\",\"endpoints\":[],\"context\":\"\"}");
 		return job;
 	}
 

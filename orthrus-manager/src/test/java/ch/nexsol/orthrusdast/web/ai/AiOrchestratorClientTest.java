@@ -16,6 +16,8 @@
 
 package ch.nexsol.orthrusdast.web.ai;
 
+import java.util.List;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -23,12 +25,14 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import ch.nexsol.orthrus.protocol.ai.ScanPlan;
+import ch.nexsol.orthrus.protocol.node.NodeClient;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The proxy client speaks the orchestrator's campaign contract: it posts a target and
- * parses the campaign result. Uses an embedded reactor-netty server standing in for the
- * orchestrator.
+ * The proxy client asks the orchestrator's plan endpoint and parses the returned plan.
+ * Uses an embedded reactor-netty server standing in for the orchestrator.
  */
 class AiOrchestratorClientTest {
 
@@ -42,26 +46,25 @@ class AiOrchestratorClientTest {
 	}
 
 	@Test
-	void launchesCampaignAndParsesResult() {
-		String json = "{\"plan\":{\"recommendedDiscoverer\":\"openapi\",\"prioritizedFamilies\":[\"INJECTION\"],"
-				+ "\"concurrency\":10,\"includePassed\":false,\"rationale\":\"focus on the API\"},"
-				+ "\"jobId\":42,\"target\":\"http://app.test\",\"eventStreamUrl\":\"/api/sse/jobs/42/events\"}";
-		this.server = HttpServer.create()
-			.port(0)
-			.handle((request, response) -> response.status(200)
-				.header("Content-Type", "application/json")
-				.sendString(Mono.just(json)))
-			.bindNow();
+	void suggestsPlanAndParsesResult() {
+		String json = "{\"recommendedDiscoverer\":\"openapi\",\"prioritizedFamilies\":[\"INJECTION\",\"XSS\"],"
+				+ "\"concurrency\":8,\"includePassed\":false,\"rationale\":\"focus on the API\"}";
+		StringBuilder presentedToken = new StringBuilder();
+		this.server = HttpServer.create().port(0).handle((request, response) -> {
+			presentedToken.append(request.requestHeaders().get(NodeClient.INTERNAL_TOKEN_HEADER));
+			return response.status(200).header("Content-Type", "application/json").sendString(Mono.just(json));
+		}).bindNow();
 
-		AiOrchestratorClient client = new AiOrchestratorClient("http://localhost:" + this.server.port(),
+		AiOrchestratorClient client = new AiOrchestratorClient("http://localhost:" + this.server.port(), "s3cret",
 				WebClient.builder());
 
-		CampaignResult result = client.launchCampaign("http://app.test", "find injection").block();
+		ScanPlan plan = client.suggestPlan("http://app.test", "find injection", List.of("openapi", "blackbox")).block();
 
-		assertThat(result).isNotNull();
-		assertThat(result.jobId()).isEqualTo(42L);
-		assertThat(result.plan().recommendedDiscoverer()).isEqualTo("openapi");
-		assertThat(result.eventStreamUrl()).isEqualTo("/api/sse/jobs/42/events");
+		assertThat(plan).isNotNull();
+		assertThat(plan.recommendedDiscoverer()).isEqualTo("openapi");
+		assertThat(plan.prioritizedFamilies()).containsExactly("INJECTION", "XSS");
+		assertThat(plan.concurrency()).isEqualTo(8);
+		assertThat(presentedToken.toString()).isEqualTo("s3cret");
 	}
 
 }

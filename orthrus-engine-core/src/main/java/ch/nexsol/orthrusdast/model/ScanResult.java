@@ -21,6 +21,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
+
 /**
  * Result of a complete scan session.
  */

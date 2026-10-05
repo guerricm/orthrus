@@ -25,8 +25,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusai.scanner.client.ManagerClient;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -62,7 +62,8 @@ class AiSlaveControllerTests {
 		when(this.managerClient.sendTaskAttemptsBatch(eq(42L), any())).thenReturn(Mono.empty());
 		when(this.managerClient.completeTask(eq(42L), any(), anyInt(), anyInt())).thenReturn(Mono.empty());
 
-		ScanTaskRequest task = new ScanTaskRequest(42L, 7L, "INJECTION", "openapi", "http://target.example/api", "{}");
+		ScanTaskRequest task = new ScanTaskRequest(42L, 7L, "INJECTION", "openapi", "http://target.example/api", "{}",
+				null);
 
 		this.client.post()
 			.uri("/api/v1/slave/tasks")

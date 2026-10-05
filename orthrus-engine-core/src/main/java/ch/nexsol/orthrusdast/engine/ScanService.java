@@ -28,8 +28,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 

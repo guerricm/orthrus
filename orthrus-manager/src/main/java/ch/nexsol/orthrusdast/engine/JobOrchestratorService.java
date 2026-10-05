@@ -18,6 +18,9 @@ package ch.nexsol.orthrusdast.engine;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -26,16 +29,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiJobReconService;
 
 /**
  * Owns the lifecycle of a scan job: splitting it into per-family tasks, reacting to task
@@ -51,6 +57,11 @@ public class JobOrchestratorService {
 	 */
 	static final int MAX_TASK_ATTEMPTS = 3;
 
+	/**
+	 * How many AI jobs are reconned through the orchestrator at once.
+	 */
+	private static final int RECON_CONCURRENCY = 4;
+
 	private final ScanJobRepository scanJobRepository;
 
 	private final ScanTaskRepository scanTaskRepository;
@@ -63,15 +74,25 @@ public class JobOrchestratorService {
 
 	private final WebClient webClient;
 
+	private final ScannerCatalog scannerCatalog;
+
+	private final ObjectMapper objectMapper;
+
+	private final AiJobReconService aiJobReconService;
+
 	public JobOrchestratorService(ScanJobRepository scanJobRepository, ScanTaskRepository scanTaskRepository,
 			ScanResultService scanResultService, JobEventPublisher jobEventPublisher,
-			SlaveNodeRepository slaveNodeRepository, WebClient.Builder webClientBuilder) {
+			SlaveNodeRepository slaveNodeRepository, WebClient.Builder webClientBuilder, ScannerCatalog scannerCatalog,
+			ObjectMapper objectMapper, AiJobReconService aiJobReconService) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
 		this.scanResultService = scanResultService;
 		this.jobEventPublisher = jobEventPublisher;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.webClient = webClientBuilder.build();
+		this.scannerCatalog = scannerCatalog;
+		this.objectMapper = objectMapper;
+		this.aiJobReconService = aiJobReconService;
 	}
 
 	public Mono<Void> processPendingJobs() {
@@ -112,15 +133,59 @@ public class JobOrchestratorService {
 			.then();
 	}
 
+	/**
+	 * Recons, through the orchestrator, every running AI job that has not been reconned
+	 * yet, and stores the shared result on the job so all its tasks work from the same
+	 * endpoint map and fingerprint. Runs as its own cycle, off the dispatch path: a slow
+	 * or unreachable orchestrator delays the AI job's tasks, never the placement of other
+	 * jobs. A failed recon still settles the job (with an empty recon) so its tasks are
+	 * released and each node falls back to its own local recon.
+	 * @return completion signal
+	 */
+	public Mono<Void> reconStartedAiJobs() {
+		return this.scanJobRepository.findRunningAiJobsAwaitingRecon()
+			.flatMap((job) -> this.aiJobReconService.reconJsonFor(job)
+				.flatMap((json) -> this.scanJobRepository.saveAiRecon(job.getId(), json)), RECON_CONCURRENCY)
+			.then();
+	}
+
 	private Mono<Void> createFamilyTasks(ScanJobEntity job) {
-		return Flux.fromArray(ScannerFamily.values()).filter((f) -> f != ScannerFamily.DISCOVERY).flatMap((family) -> {
-			ScanTaskEntity subTask = new ScanTaskEntity();
-			subTask.setScanJobId(job.getId());
-			subTask.setPhase(family.name());
-			subTask.setStatus(JobStatus.PENDING);
-			subTask.setCreatedAt(Instant.now());
-			return this.scanTaskRepository.save(subTask);
-		}).then();
+		// Restrict the job to the families its selected scanners cover, so a plan (or a
+		// manual
+		// selection) that targets only some families does not create empty tasks — and
+		// the AI node,
+		// which runs by family, only receives the families that were actually chosen.
+		return Mono.fromCallable(() -> selectedFamilies(job))
+			.onErrorReturn(Optional.empty())
+			.flatMapMany((selected) -> Flux.fromArray(ScannerFamily.values())
+				.filter((f) -> f != ScannerFamily.DISCOVERY)
+				.filter((f) -> selected.isEmpty() || selected.get().contains(f.name())))
+			.flatMap((family) -> {
+				ScanTaskEntity subTask = new ScanTaskEntity();
+				subTask.setScanJobId(job.getId());
+				subTask.setPhase(family.name());
+				subTask.setStatus(JobStatus.PENDING);
+				subTask.setCreatedAt(Instant.now());
+				return this.scanTaskRepository.save(subTask);
+			})
+			.then();
+	}
+
+	/**
+	 * The families to create tasks for, derived from the job's selected scanners.
+	 * @param job the job being split
+	 * @return empty = all families (no restriction); present = only these family names
+	 */
+	private Optional<Set<String>> selectedFamilies(ScanJobEntity job) {
+		ScanConfiguration config = this.objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class);
+		List<String> include = config.includeScanners();
+		if (include == null || include.isEmpty()) {
+			return Optional.empty();
+		}
+		Set<String> families = this.scannerCatalog.familyNamesForScanners(include);
+		// If the selection maps to no known family (unexpected), fall back to all
+		// families.
+		return families.isEmpty() ? Optional.empty() : Optional.of(families);
 	}
 
 	public Mono<Void> onScanTaskComplete(Long taskId, int testsCount, int vulnsCount) {

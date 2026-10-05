@@ -41,18 +41,18 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.TestPlanEntity;
-import ch.nexsol.orthrusdast.model.AttemptStatus;
 import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
 import ch.nexsol.orthrusdast.model.JobStatus;
-import ch.nexsol.orthrusdast.model.RiskLevel;
-import ch.nexsol.orthrusdast.model.ScanAttempt;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.ScanGrade;
-import ch.nexsol.orthrusdast.model.Vulnerability;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.TestPlanRepository;
 import ch.nexsol.orthrusdast.sse.JobEvent;
@@ -315,6 +315,7 @@ public class ScanViewController {
 				model.addAttribute("status", job.getStatus().name());
 				model.addAttribute("resultId", job.getResultId());
 				model.addAttribute("assignedSlaveId", job.getAssignedSlaveId());
+				model.addAttribute("aiMode", job.isAiMode());
 
 				return Mono
 					.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))

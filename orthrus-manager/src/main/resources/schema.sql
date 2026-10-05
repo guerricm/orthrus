@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
     result_id VARCHAR(255),
     vulns_count INT,
     tests_count INT,
+    ai_mode BOOLEAN NOT NULL DEFAULT FALSE,
+    ai_recon TEXT,
     FOREIGN KEY (result_id) REFERENCES "scan_results"(id) ON DELETE SET NULL,
     FOREIGN KEY (test_plan_id) REFERENCES "test_plans"(id) ON DELETE SET NULL
 );
@@ -93,6 +95,10 @@ CREATE TABLE IF NOT EXISTS "scan_jobs" (
 -- Index for fast lookups of jobs by result ID and test plan ID
 CREATE INDEX IF NOT EXISTS idx_scanjobs_result ON "scan_jobs"(result_id);
 CREATE INDEX IF NOT EXISTS idx_scanjobs_test_plan ON "scan_jobs"(test_plan_id);
+
+-- Add the AI orchestration columns safely if they do not exist
+ALTER TABLE "scan_jobs" ADD COLUMN IF NOT EXISTS ai_mode BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE "scan_jobs" ADD COLUMN IF NOT EXISTS ai_recon TEXT;
 
 -- Add auditing columns safely if they do not exist
 ALTER TABLE "test_plans" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;

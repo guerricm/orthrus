@@ -19,53 +19,16 @@ package ch.nexsol.orthrusai.orchestrator.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration for the AI orchestrator. It drives the orthrus manager's public API only,
- * so it needs the manager URL plus the LLM switches.
+ * Configuration for the AI orchestrator. It is a pure planning service (it never calls
+ * the manager), so it only needs the LLM switches.
  */
 @ConfigurationProperties(prefix = "orthrus")
 public class AiOrchestratorProperties {
 
-	private final Manager manager = new Manager();
-
 	private final Ai ai = new Ai();
-
-	public Manager getManager() {
-		return this.manager;
-	}
 
 	public Ai getAi() {
 		return this.ai;
-	}
-
-	/**
-	 * The orthrus manager the orchestrator drives.
-	 */
-	public static class Manager {
-
-		private String url = "http://localhost:8080";
-
-		/**
-		 * Shared secret to reach the manager's internal API, the same token the workers
-		 * use.
-		 */
-		private String internalToken = "change-me-in-production";
-
-		public String getUrl() {
-			return this.url;
-		}
-
-		public void setUrl(String url) {
-			this.url = url;
-		}
-
-		public String getInternalToken() {
-			return this.internalToken;
-		}
-
-		public void setInternalToken(String internalToken) {
-			this.internalToken = internalToken;
-		}
-
 	}
 
 	/**
@@ -98,12 +61,26 @@ public class AiOrchestratorProperties {
 
 		private String model = "";
 
+		/**
+		 * The shared secret the manager must present on every {@code /api/**} call; the
+		 * platform-wide {@code ORTHRUS_INTERNAL_TOKEN}.
+		 */
+		private String internalToken = "change-me-in-production";
+
 		public String getModel() {
 			return this.model;
 		}
 
 		public void setModel(String model) {
 			this.model = model;
+		}
+
+		public String getInternalToken() {
+			return this.internalToken;
+		}
+
+		public void setInternalToken(String internalToken) {
+			this.internalToken = internalToken;
 		}
 
 	}

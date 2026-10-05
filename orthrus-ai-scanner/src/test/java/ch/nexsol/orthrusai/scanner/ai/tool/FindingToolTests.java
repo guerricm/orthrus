@@ -18,8 +18,9 @@ package ch.nexsol.orthrusai.scanner.ai.tool;
 
 import org.junit.jupiter.api.Test;
 
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
+import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
-import ch.nexsol.orthrusai.scanner.wire.Vulnerability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,8 +41,8 @@ class FindingToolTests {
 		assertThat(ctx.findings()).hasSize(1);
 		Vulnerability finding = ctx.findings().get(0);
 		assertThat(finding.name()).isEqualTo("SQL Injection");
-		assertThat(finding.riskLevel()).isEqualTo("CRITICAL");
-		assertThat(finding.confidence()).isEqualTo("HIGH");
+		assertThat(finding.riskLevel()).isEqualTo(RiskLevel.CRITICAL);
+		assertThat(finding.confidence()).isEqualTo(Vulnerability.Confidence.HIGH);
 		assertThat(finding.scannerId()).isEqualTo("ai-injection");
 		assertThat(finding.operationUrl()).isEqualTo("http://app.test/api/users/1");
 		assertThat(finding.operationMethod()).isEqualTo("GET");
@@ -55,8 +56,8 @@ class FindingToolTests {
 		tool.reportVulnerability("Weird", "desc", "APOCALYPTIC", "TOTALLY-SURE", "evidence", "fix");
 
 		Vulnerability finding = ctx.findings().get(0);
-		assertThat(finding.riskLevel()).isEqualTo("MEDIUM");
-		assertThat(finding.confidence()).isEqualTo("MEDIUM");
+		assertThat(finding.riskLevel()).isEqualTo(RiskLevel.MEDIUM);
+		assertThat(finding.confidence()).isEqualTo(Vulnerability.Confidence.MEDIUM);
 	}
 
 }

@@ -41,12 +41,12 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
-import ch.nexsol.orthrusdast.model.RiskLevel;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
@@ -55,6 +55,7 @@ import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.sse.JobEvent;
 import ch.nexsol.orthrusdast.sse.JobEventPublisher;
+import ch.nexsol.orthrusdast.web.ai.AiJobReconService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,6 +86,9 @@ class JobOrchestratorServiceTest {
 	@Mock
 	private SlaveNodeRepository slaveNodeRepository;
 
+	@Mock
+	private AiJobReconService aiJobReconService;
+
 	private MockWebServer slave;
 
 	private JobOrchestratorService orchestrator;
@@ -97,7 +101,8 @@ class JobOrchestratorServiceTest {
 		this.slave.start();
 
 		this.orchestrator = new JobOrchestratorService(this.scanJobRepository, this.scanTaskRepository,
-				this.scanResultService, this.jobEventPublisher, this.slaveNodeRepository, WebClient.builder());
+				this.scanResultService, this.jobEventPublisher, this.slaveNodeRepository, WebClient.builder(),
+				scannerCatalog(), new tools.jackson.databind.ObjectMapper(), this.aiJobReconService);
 
 		when(this.scanTaskRepository.save(any(ScanTaskEntity.class))).thenAnswer((invocation) -> {
 			ScanTaskEntity task = invocation.getArgument(0);
@@ -134,6 +139,55 @@ class JobOrchestratorServiceTest {
 		assertThat(phases).isEqualTo(expected);
 		assertThat(job.getStatus()).isEqualTo(JobStatus.RUNNING);
 		assertThat(job.getResultId()).isNotBlank();
+	}
+
+	@Test
+	void aJobOnlyCreatesTasksForTheFamiliesItsScannersCover() throws Exception {
+		ScanJobEntity job = job(1L, JobStatus.PENDING);
+		// A full config (as stored in production) whose includeScanners map to INJECTION
+		// + XSS only.
+		ScanConfiguration config = new ScanConfiguration(List.of("sqli", "xss"), List.of(), 10, 5000, 10000, false,
+				"json", null, null, "en", false, ch.nexsol.orthrusdast.model.GatewayType.AUTO, null, null, null, null);
+		job.setScanConfigurationJson(new tools.jackson.databind.ObjectMapper().writeValueAsString(config));
+		when(this.scanJobRepository.findByStatus(JobStatus.PENDING)).thenReturn(Flux.just(job));
+		when(this.scanJobRepository.claimForOrchestration(anyLong(), any())).thenReturn(Mono.just(1));
+		when(this.scanJobRepository.attachResult(anyLong(), anyString())).thenReturn(Mono.just(1));
+		when(this.scanResultService.createPlaceholderResult(anyString(), anyString(), any())).thenReturn(Mono.empty());
+
+		StepVerifier.create(this.orchestrator.processPendingJobs()).verifyComplete();
+
+		List<String> phases = this.savedTasks.stream().map(ScanTaskEntity::getPhase).sorted().toList();
+		assertThat(phases).containsExactly("INJECTION", "XSS");
+	}
+
+	@Test
+	void startingAnAiJobSplitsItWithoutWaitingForTheOrchestratorRecon() {
+		ScanJobEntity job = job(1L, JobStatus.PENDING);
+		job.setAiMode(true);
+		when(this.scanJobRepository.findByStatus(JobStatus.PENDING)).thenReturn(Flux.just(job));
+		when(this.scanJobRepository.claimForOrchestration(anyLong(), any())).thenReturn(Mono.just(1));
+		when(this.scanJobRepository.attachResult(anyLong(), anyString())).thenReturn(Mono.just(1));
+		when(this.scanResultService.createPlaceholderResult(anyString(), anyString(), any())).thenReturn(Mono.empty());
+
+		StepVerifier.create(this.orchestrator.processPendingJobs()).verifyComplete();
+
+		assertThat(this.savedTasks).isNotEmpty();
+		// The recon runs in its own cycle so a slow orchestrator never holds the
+		// dispatch.
+		verify(this.aiJobReconService, never()).reconJsonFor(any(ScanJobEntity.class));
+	}
+
+	@Test
+	void theReconCycleStoresTheOrchestratorReconOnEachRunningAiJob() {
+		ScanJobEntity job = job(1L, JobStatus.RUNNING);
+		job.setAiMode(true);
+		when(this.scanJobRepository.findRunningAiJobsAwaitingRecon()).thenReturn(Flux.just(job));
+		when(this.aiJobReconService.reconJsonFor(job)).thenReturn(Mono.just("{\"endpoints\":[]}"));
+		when(this.scanJobRepository.saveAiRecon(1L, "{\"endpoints\":[]}")).thenReturn(Mono.just(1));
+
+		StepVerifier.create(this.orchestrator.reconStartedAiJobs()).verifyComplete();
+
+		verify(this.scanJobRepository).saveAiRecon(1L, "{\"endpoints\":[]}");
 	}
 
 	@Test
@@ -363,6 +417,20 @@ class JobOrchestratorServiceTest {
 		job.setId(id);
 		job.setStartedAt(Instant.now());
 		return job;
+	}
+
+	private ScannerCatalog scannerCatalog() {
+		return new ScannerCatalog(List.of(scanner("sqli", ScannerFamily.INJECTION), scanner("xss", ScannerFamily.XSS),
+				scanner("cors", ScannerFamily.CONFIGURATION)));
+	}
+
+	private ch.nexsol.orthrusdast.scanner.SecurityScanner scanner(String id, ScannerFamily family) {
+		ch.nexsol.orthrusdast.scanner.SecurityScanner s = org.mockito.Mockito
+			.mock(ch.nexsol.orthrusdast.scanner.SecurityScanner.class);
+		when(s.getId()).thenReturn(id);
+		when(s.getName()).thenReturn(id);
+		when(s.getFamily()).thenReturn(family);
+		return s;
 	}
 
 	private ScanTaskEntity task(Long id, Long jobId, JobStatus status) {

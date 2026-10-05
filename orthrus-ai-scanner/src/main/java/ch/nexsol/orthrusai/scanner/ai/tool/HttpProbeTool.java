@@ -17,6 +17,7 @@
 package ch.nexsol.orthrusai.scanner.ai.tool;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -30,6 +31,8 @@ import reactor.core.publisher.Mono;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.Credentials;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
 
@@ -54,11 +57,22 @@ public class HttpProbeTool {
 
 	private final RunContext runContext;
 
+	private final List<Credential> credentials;
+
+	private final Duration readTimeout;
+
 	public HttpProbeTool(WebClient webClient, ScopeGuard scopeGuard, ObjectMapper objectMapper, RunContext runContext) {
+		this(webClient, scopeGuard, objectMapper, runContext, List.of(), Duration.ofSeconds(15));
+	}
+
+	public HttpProbeTool(WebClient webClient, ScopeGuard scopeGuard, ObjectMapper objectMapper, RunContext runContext,
+			List<Credential> credentials, Duration readTimeout) {
 		this.webClient = webClient;
 		this.scopeGuard = scopeGuard;
 		this.objectMapper = objectMapper;
 		this.runContext = runContext;
+		this.credentials = (credentials != null) ? credentials : List.of();
+		this.readTimeout = readTimeout;
 	}
 
 	@Tool(description = "Send an HTTP request to the target under test and return the response "
@@ -81,12 +95,14 @@ public class HttpProbeTool {
 
 		HttpMethod httpMethod = HttpMethod.valueOf((method != null) ? method.trim().toUpperCase() : "GET");
 		try {
-			WebClient.RequestBodySpec spec = this.webClient.method(httpMethod).uri(url);
+			WebClient.RequestBodySpec spec = this.webClient.method(httpMethod)
+				.uri(Credentials.withQueryCredentials(url, this.credentials));
+			Credentials.applyHeaderAndCookie(spec, this.credentials);
 			applyHeaders(spec, headersJson);
 			if (body != null && !body.isBlank()) {
 				spec.bodyValue(body);
 			}
-			return spec.exchangeToMono(this::render).timeout(Duration.ofSeconds(15)).block(Duration.ofSeconds(20));
+			return spec.exchangeToMono(this::render).timeout(this.readTimeout).block(this.readTimeout.plusSeconds(5));
 		}
 		catch (RuntimeException ex) {
 			log.debug("Probe {} {} failed: {}", httpMethod, url, ex.getMessage());

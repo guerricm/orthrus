@@ -20,13 +20,12 @@ spring:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
 
 orthrus:
-  manager:
-    # Public API of the orthrus manager the orchestrator drives.
-    url: ${ORTHRUS_MANAGER_URL:http://localhost:8080}
   ai:
     enabled: ${ORTHRUS_AI_ENABLED:false}
     orchestrator:
       model: ${ORTHRUS_AI_ORCHESTRATOR_MODEL:}
+      # Shared secret the manager presents on /api/**; the same ORTHRUS_INTERNAL_TOKEN as the nodes.
+      internal-token: ${ORTHRUS_INTERNAL_TOKEN:change-me-in-production}
 
 management:
   endpoints:

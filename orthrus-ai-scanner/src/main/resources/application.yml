@@ -37,7 +37,7 @@ orthrus:
     enabled: ${ORTHRUS_AI_ENABLED:false}
     # Scanner families this AI node advertises to the manager (comma-separated ScannerFamily names).
     # The manager only routes these phases here; the rest stay on the deterministic workers.
-    families: ${ORTHRUS_AI_FAMILIES:INJECTION,XSS,LOGIC}
+    families: ${ORTHRUS_AI_FAMILIES:INJECTION,XSS,LOGIC,CONFIGURATION,HTTP,JWT,SSL,BOLA}
     scanner:
       model: ${ORTHRUS_AI_SCANNER_MODEL:}
     budget:

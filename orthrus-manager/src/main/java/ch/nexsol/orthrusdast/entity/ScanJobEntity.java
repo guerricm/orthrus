@@ -59,6 +59,21 @@ public class ScanJobEntity {
 
 	private Integer retryCount = 0;
 
+	/**
+	 * When true, the job is dispatched to AI executor nodes instead of the deterministic
+	 * workers.
+	 */
+	private boolean aiMode;
+
+	/**
+	 * The orchestrator's shared recon for this job (serialized {@code ReconResult}: base
+	 * URL, endpoints, target fingerprint). Null until the recon cycle has settled it,
+	 * which is what releases the job's tasks to the AI nodes; for a job without an
+	 * orchestrator it settles to an empty recon. Never holds credentials: those are
+	 * resolved from the scan configuration at dispatch time.
+	 */
+	private String aiRecon;
+
 	@Transient
 	private String planName;
 
@@ -193,6 +208,22 @@ public class ScanJobEntity {
 
 	public void setRetryCount(Integer retryCount) {
 		this.retryCount = retryCount;
+	}
+
+	public boolean isAiMode() {
+		return aiMode;
+	}
+
+	public void setAiMode(boolean aiMode) {
+		this.aiMode = aiMode;
+	}
+
+	public String getAiRecon() {
+		return aiRecon;
+	}
+
+	public void setAiRecon(String aiRecon) {
+		this.aiRecon = aiRecon;
 	}
 
 	public String getFormattedDuration() {

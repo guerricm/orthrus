@@ -32,6 +32,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusdast.client.MasterApiClient;
 import ch.nexsol.orthrusdast.engine.ScanService;
 import ch.nexsol.orthrusdast.model.Operation;
@@ -126,8 +127,8 @@ class SlaveApiControllerTest {
 
 	@Test
 	void anUnparseableConfigurationIsRejectedRatherThanStartingAScan() {
-		SlaveApiController.ScanTaskRequest request = new SlaveApiController.ScanTaskRequest(1L, JOB_ID,
-				ScannerFamily.INJECTION.name(), "openapi", "https://target.example", "not json");
+		ScanTaskRequest request = new ScanTaskRequest(1L, JOB_ID, ScannerFamily.INJECTION.name(), "openapi",
+				"https://target.example", "not json", null);
 
 		HttpStatus status = HttpStatus
 			.valueOf(this.controller.receiveScanTask(request).block().getStatusCode().value());
@@ -144,9 +145,8 @@ class SlaveApiControllerTest {
 	}
 
 	private HttpStatus accept(long taskId, long jobId, ScannerFamily family) {
-		SlaveApiController.ScanTaskRequest request = new SlaveApiController.ScanTaskRequest(taskId, jobId,
-				family.name(), "openapi", "https://target.example",
-				this.objectMapper.writeValueAsString(ScanConfiguration.defaults()));
+		ScanTaskRequest request = new ScanTaskRequest(taskId, jobId, family.name(), "openapi", "https://target.example",
+				this.objectMapper.writeValueAsString(ScanConfiguration.defaults()), null);
 		return HttpStatus.valueOf(this.controller.receiveScanTask(request).block().getStatusCode().value());
 	}
 

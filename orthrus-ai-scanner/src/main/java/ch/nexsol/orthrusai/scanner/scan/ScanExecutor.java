@@ -18,8 +18,8 @@ package ch.nexsol.orthrusai.scanner.scan;
 
 import reactor.core.publisher.Flux;
 
-import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
-import ch.nexsol.orthrusai.scanner.wire.ScanTaskRequest;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
+import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 
 /**
  * Executes a dispatched scan task and streams the attempts it produces. The echo

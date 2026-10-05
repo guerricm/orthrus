@@ -16,10 +16,8 @@
 
 package ch.nexsol.orthrusai.scanner.client;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,67 +28,45 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.NodeClient;
+import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
-import ch.nexsol.orthrusai.scanner.wire.CompleteTaskRequest;
-import ch.nexsol.orthrusai.scanner.wire.FailTaskRequest;
-import ch.nexsol.orthrusai.scanner.wire.ScanAttempt;
-import ch.nexsol.orthrusai.scanner.wire.SlaveRegistration;
 
 /**
- * Talks to the orthrus manager's internal API. This is the autonomous equivalent of a
- * regular worker's master client: it registers this node, heartbeats its load, and
- * streams task results back. It shares no code with the other orthrus modules, only the
- * JSON contract.
+ * This node's side of the manager's internal API. The protocol itself lives in the shared
+ * {@link NodeClient}; this component adds what is specific to the AI scanner: the
+ * capabilities it advertises, when it registers and heartbeats, and the policy that a
+ * lost report never fails a task (the agent's findings are already streamed).
  */
 @Component
 public class ManagerClient {
 
 	private static final Logger log = LoggerFactory.getLogger(ManagerClient.class);
 
-	private static final String INTERNAL_TOKEN_HEADER = "X-Orthrus-Internal-Token";
+	/**
+	 * Capability marker telling the manager this node runs scans with LLM agents. The
+	 * manager routes "AI" runs to nodes advertising it, and deterministic runs to nodes
+	 * that do not.
+	 */
+	private static final String AI_EXECUTOR_MARKER = "AI-EXECUTOR";
 
-	private final WebClient webClient;
-
-	private final String masterUrl;
-
-	private final String slaveId;
-
-	private final String slaveUrl;
-
-	private final String capabilities;
-
-	private final AtomicInteger activeTasks = new AtomicInteger();
+	private final NodeClient nodeClient;
 
 	public ManagerClient(AiScannerProperties properties, WebClient.Builder webClientBuilder) {
-		this.masterUrl = properties.getMaster().getUrl();
-		this.slaveId = properties.getSlave().getId();
-		this.slaveUrl = properties.getSlave().getAdvertisedUrl();
-		this.capabilities = String.join(",", properties.getAi().getFamilies());
-		this.webClient = webClientBuilder
-			.defaultHeader(INTERNAL_TOKEN_HEADER, properties.getMaster().getInternalToken())
-			.build();
+		String capabilities = AI_EXECUTOR_MARKER + "," + String.join(",", properties.getAi().getFamilies());
+		this.nodeClient = new NodeClient(webClientBuilder, properties.getMaster().getUrl(),
+				properties.getMaster().getInternalToken(), properties.getSlave().getId(),
+				properties.getSlave().getAdvertisedUrl(), capabilities);
 	}
 
 	/**
-	 * Registers with the manager once the context is ready, advertising the families this
-	 * node runs.
+	 * Registers with the manager, advertising the families this node runs. Called once
+	 * the context is ready and again whenever a heartbeat is rejected, so the node
+	 * re-appears after the manager restarts or after starting before the manager is up.
 	 */
 	@EventListener(ApplicationReadyEvent.class)
 	public void registerToManager() {
-		SlaveRegistration registration = new SlaveRegistration(this.slaveId, this.slaveUrl, this.capabilities);
-		this.webClient.post()
-			.uri(this.masterUrl + "/api/internal/slaves/register")
-			.bodyValue(registration)
-			.retrieve()
-			.bodyToMono(Void.class)
-			.timeout(Duration.ofSeconds(10))
-			.doOnSuccess((v) -> log.info("Registered AI scanner node '{}' with capabilities [{}]", this.slaveId,
-					this.capabilities))
-			.onErrorResume((e) -> {
-				log.warn("Could not register with manager at {}: {}", this.masterUrl, e.getMessage());
-				return Mono.empty();
-			})
-			.subscribe();
+		this.nodeClient.register();
 	}
 
 	/**
@@ -98,36 +74,19 @@ public class ManagerClient {
 	 * @param activeTaskCount the number of tasks currently running
 	 */
 	public void reportLoad(int activeTaskCount) {
-		this.activeTasks.set(activeTaskCount);
-		sendHeartbeat();
+		this.nodeClient.reportLoad(activeTaskCount);
 	}
 
 	@Scheduled(fixedDelayString = "${orthrus.master.heartbeat-interval-ms:10000}")
 	public void sendHeartbeat() {
-		this.webClient.post()
-			.uri(this.masterUrl + "/api/internal/slaves/{id}/heartbeat?activeTasks={n}&url={url}", this.slaveId,
-					this.activeTasks.get(), this.slaveUrl)
-			.retrieve()
-			.bodyToMono(Void.class)
-			.timeout(Duration.ofSeconds(5))
-			.onErrorResume((e) -> {
-				log.debug("Heartbeat failed: {}", e.getMessage());
-				return Mono.empty();
-			})
-			.subscribe();
+		this.nodeClient.heartbeat();
 	}
 
 	/**
 	 * Marks the node offline as it shuts down.
 	 */
 	public void markOffline() {
-		this.webClient.post()
-			.uri(this.masterUrl + "/api/internal/slaves/" + this.slaveId + "/offline")
-			.retrieve()
-			.bodyToMono(Void.class)
-			.timeout(Duration.ofSeconds(5))
-			.onErrorResume((e) -> Mono.empty())
-			.subscribe();
+		this.nodeClient.markOffline();
 	}
 
 	/**
@@ -137,16 +96,10 @@ public class ManagerClient {
 	 * @return completion signal
 	 */
 	public Mono<Void> sendTaskAttemptsBatch(Long taskId, List<ScanAttempt> batch) {
-		return this.webClient.post()
-			.uri(this.masterUrl + "/api/internal/tasks/" + taskId + "/attempts")
-			.bodyValue(batch)
-			.retrieve()
-			.bodyToMono(Void.class)
-			.timeout(Duration.ofSeconds(15))
-			.onErrorResume((e) -> {
-				log.warn("Could not send attempts for task {}: {}", taskId, e.getMessage());
-				return Mono.empty();
-			});
+		return this.nodeClient.sendTaskAttemptsBatch(taskId, batch).onErrorResume((e) -> {
+			log.warn("Could not send attempts for task {}: {}", taskId, e.getMessage());
+			return Mono.empty();
+		});
 	}
 
 	/**
@@ -158,17 +111,10 @@ public class ManagerClient {
 	 * @return completion signal
 	 */
 	public Mono<Void> completeTask(Long taskId, Instant startTime, int testsCount, int vulnsCount) {
-		CompleteTaskRequest request = new CompleteTaskRequest(startTime, Instant.now(), testsCount, vulnsCount);
-		return this.webClient.post()
-			.uri(this.masterUrl + "/api/internal/tasks/" + taskId + "/complete")
-			.bodyValue(request)
-			.retrieve()
-			.bodyToMono(Void.class)
-			.timeout(Duration.ofSeconds(10))
-			.onErrorResume((e) -> {
-				log.warn("Could not complete task {}: {}", taskId, e.getMessage());
-				return Mono.empty();
-			});
+		return this.nodeClient.completeTask(taskId, startTime, testsCount, vulnsCount).onErrorResume((e) -> {
+			log.warn("Could not complete task {}: {}", taskId, e.getMessage());
+			return Mono.empty();
+		});
 	}
 
 	/**
@@ -178,16 +124,10 @@ public class ManagerClient {
 	 * @return completion signal
 	 */
 	public Mono<Void> failTask(Long taskId, String reason) {
-		return this.webClient.post()
-			.uri(this.masterUrl + "/api/internal/tasks/" + taskId + "/fail")
-			.bodyValue(new FailTaskRequest(reason))
-			.retrieve()
-			.bodyToMono(Void.class)
-			.timeout(Duration.ofSeconds(10))
-			.onErrorResume((e) -> {
-				log.warn("Could not fail task {}: {}", taskId, e.getMessage());
-				return Mono.empty();
-			});
+		return this.nodeClient.failTask(taskId, reason).onErrorResume((e) -> {
+			log.warn("Could not fail task {}: {}", taskId, e.getMessage());
+			return Mono.empty();
+		});
 	}
 
 }
