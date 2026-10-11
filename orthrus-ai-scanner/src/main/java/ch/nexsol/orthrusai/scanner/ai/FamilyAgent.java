@@ -63,7 +63,7 @@ public class FamilyAgent {
 
 	private final ObjectMapper objectMapper;
 
-	private final int maxHttpCallsPerOperation;
+	private final AiScannerProperties.Budget budget;
 
 	private final AgentActivity agentActivity;
 
@@ -78,7 +78,7 @@ public class FamilyAgent {
 		this.probeWebClient = webClientBuilder.observationRegistry(ObservationRegistry.NOOP).build();
 		this.scopeGuard = scopeGuard;
 		this.objectMapper = objectMapper;
-		this.maxHttpCallsPerOperation = properties.getAi().getBudget().getMaxHttpCallsPerOperation();
+		this.budget = properties.getAi().getBudget();
 	}
 
 	/**
@@ -93,7 +93,8 @@ public class FamilyAgent {
 	 */
 	public List<Vulnerability> scan(String family, Endpoint endpoint, String context, ProbeConfig probeConfig) {
 		String scannerId = "ai-" + family.toLowerCase();
-		RunContext runContext = new RunContext(endpoint.url(), scannerId, this.maxHttpCallsPerOperation);
+		RunContext runContext = new RunContext(endpoint.url(), scannerId, this.budget.getMaxHttpCallsPerOperation(),
+				this.budget.getMaxToolIterations(), this.budget.getMaxResponseChars());
 		WebClient probeClient = probeConfig.ignoreSslErrors() ? insecureWebClient() : this.probeWebClient;
 		HttpProbeTool httpProbeTool = new HttpProbeTool(probeClient, this.scopeGuard, this.objectMapper, runContext,
 				probeConfig.credentials(), Duration.ofMillis(probeConfig.readTimeoutMs()));
@@ -113,7 +114,11 @@ public class FamilyAgent {
 				.content();
 		}
 		catch (RuntimeException ex) {
-			if (isInterruption(ex)) {
+			if (causedBy(ex, AgentTurnLimitException.class)) {
+				log.info("Family agent {} on {} {} used its {} tool calls", family, endpoint.method(), endpoint.url(),
+						this.budget.getMaxToolIterations());
+			}
+			else if (isInterruption(ex)) {
 				log.info("Family agent {} on {} {} interrupted (task cancelled or budget spent)", family,
 						endpoint.method(), endpoint.url());
 			}
@@ -141,8 +146,12 @@ public class FamilyAgent {
 		if (Thread.currentThread().isInterrupted()) {
 			return true;
 		}
+		return causedBy(ex, InterruptedException.class) || causedBy(ex, InterruptedIOException.class);
+	}
+
+	private static boolean causedBy(Throwable ex, Class<? extends Throwable> type) {
 		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-			if (cause instanceof InterruptedException || cause instanceof InterruptedIOException) {
+			if (type.isInstance(cause)) {
 				return true;
 			}
 		}

@@ -59,7 +59,7 @@ class FamilyAgentProbeMetricsTests {
 	}
 
 	@Test
-	void probesAreNotRecordedAsHttpClientObservations() {
+	void probesAreNotRecordedAsHttpClientObservations() throws Exception {
 		this.server = HttpServer.create()
 			.port(0)
 			.handle((request, response) -> response.status(200).sendString(Mono.just("ok")))

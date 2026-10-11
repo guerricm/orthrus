@@ -67,7 +67,7 @@ class HttpProbeToolTests {
 	}
 
 	@Test
-	void probesInScopeTargetAndConsumesBudget() {
+	void probesInScopeTargetAndConsumesBudget() throws Exception {
 		RunContext ctx = new RunContext(this.target, "ai-injection", 5);
 		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
 
@@ -79,7 +79,7 @@ class HttpProbeToolTests {
 	}
 
 	@Test
-	void probesConcreteUrlWhenTargetIsAPathTemplate() {
+	void probesConcreteUrlWhenTargetIsAPathTemplate() throws Exception {
 		RunContext ctx = new RunContext(this.target + "/pet/{petId}", "ai-injection", 5);
 		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
 
@@ -90,7 +90,7 @@ class HttpProbeToolTests {
 	}
 
 	@Test
-	void refusesOutOfScopeWithoutConsumingBudget() {
+	void refusesOutOfScopeWithoutConsumingBudget() throws Exception {
 		RunContext ctx = new RunContext(this.target, "ai-injection", 5);
 		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
 
@@ -101,7 +101,7 @@ class HttpProbeToolTests {
 	}
 
 	@Test
-	void appliesConfiguredHeaderAndQueryCredentialsOnEveryRequest() {
+	void appliesConfiguredHeaderAndQueryCredentialsOnEveryRequest() throws Exception {
 		StringBuilder receivedAuth = new StringBuilder();
 		StringBuilder receivedUri = new StringBuilder();
 		DisposableServer echo = HttpServer.create().port(0).handle((request, response) -> {
@@ -129,7 +129,7 @@ class HttpProbeToolTests {
 	}
 
 	@Test
-	void stopsWhenBudgetExhausted() {
+	void stopsWhenBudgetExhausted() throws Exception {
 		RunContext ctx = new RunContext(this.target, "ai-injection", 1);
 		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
 

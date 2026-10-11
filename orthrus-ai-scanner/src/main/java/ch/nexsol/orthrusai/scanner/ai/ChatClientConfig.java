@@ -19,6 +19,9 @@ package ch.nexsol.orthrusai.scanner.ai;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.ai.ollama.api.ThinkOption;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -39,9 +42,21 @@ public class ChatClientConfig {
 	@Bean
 	ChatClient scannerChatClient(ChatModel chatModel, AiScannerProperties properties) {
 		ChatClient.Builder builder = ChatClient.builder(chatModel);
-		String model = properties.getAi().getScanner().getModel();
-		if (model != null && !model.isBlank()) {
-			builder.defaultOptions(ChatOptions.builder().model(model));
+		AiScannerProperties.Scanner scanner = properties.getAi().getScanner();
+		boolean modelSet = scanner.getModel() != null && !scanner.getModel().isBlank();
+		if (chatModel instanceof OllamaChatModel) {
+			// Thinking models (Qwen3...) otherwise reason before every answer, and the
+			// agent
+			// makes one model call per tool call.
+			OllamaChatOptions.Builder options = OllamaChatOptions.builder()
+				.thinkOption(scanner.isThink() ? ThinkOption.ThinkBoolean.ENABLED : ThinkOption.ThinkBoolean.DISABLED);
+			if (modelSet) {
+				options.model(scanner.getModel());
+			}
+			builder.defaultOptions(options);
+		}
+		else if (modelSet) {
+			builder.defaultOptions(ChatOptions.builder().model(scanner.getModel()));
 		}
 		return builder.build();
 	}

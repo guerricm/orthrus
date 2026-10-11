@@ -33,6 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.ai.Credentials;
+import ch.nexsol.orthrusai.scanner.ai.AgentTurnLimitException;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
 
@@ -47,7 +48,8 @@ public class HttpProbeTool {
 
 	private static final Logger log = LoggerFactory.getLogger(HttpProbeTool.class);
 
-	private static final int MAX_BODY_CHARS = 4000;
+	private static final String LAST_REQUEST_NOTE = "\n\nLAST_REQUEST: this was your last allowed request. "
+			+ "Report any confirmed finding now, then stop.";
 
 	private final WebClient webClient;
 
@@ -82,15 +84,21 @@ public class HttpProbeTool {
 			@ToolParam(description = "HTTP method, e.g. GET, POST, PUT, DELETE, PATCH") String method,
 			@ToolParam(required = false,
 					description = "JSON object of extra request headers, or empty") String headersJson,
-			@ToolParam(required = false, description = "Request body to send, or empty") String body) {
+			@ToolParam(required = false, description = "Request body to send, or empty") String body)
+			throws AgentTurnLimitException {
 
+		int call = this.runContext.nextToolCall();
+		if (call > this.runContext.maxToolCalls()) {
+			throw new AgentTurnLimitException(this.runContext.maxToolCalls());
+		}
+		String note = (call == this.runContext.maxToolCalls()) ? LAST_REQUEST_NOTE : "";
 		if (!this.scopeGuard.inScope(url, this.runContext.targetUrl())) {
 			return "REFUSED: '" + url + "' is out of scope. Only the target host " + this.runContext.targetUrl()
-					+ " may be probed.";
+					+ " may be probed." + note;
 		}
 		if (!this.runContext.tryConsumeHttpCall()) {
 			return "BUDGET_EXCEEDED: the HTTP request budget for this endpoint is spent. "
-					+ "Report your findings and stop.";
+					+ "Report your findings and stop." + note;
 		}
 
 		HttpMethod httpMethod = HttpMethod.valueOf((method != null) ? method.trim().toUpperCase() : "GET");
@@ -102,11 +110,12 @@ public class HttpProbeTool {
 			if (body != null && !body.isBlank()) {
 				spec.bodyValue(body);
 			}
-			return spec.exchangeToMono(this::render).timeout(this.readTimeout).block(this.readTimeout.plusSeconds(5));
+			return spec.exchangeToMono(this::render).timeout(this.readTimeout).block(this.readTimeout.plusSeconds(5))
+					+ note;
 		}
 		catch (RuntimeException ex) {
 			log.debug("Probe {} {} failed: {}", httpMethod, url, ex.getMessage());
-			return "ERROR: request failed: " + ex.getMessage();
+			return "ERROR: request failed: " + ex.getMessage() + note;
 		}
 	}
 
@@ -137,8 +146,9 @@ public class HttpProbeTool {
 				.asHttpHeaders()
 				.forEach((name, values) -> sb.append(name).append(": ").append(String.join(",", values)).append('\n'));
 			sb.append('\n');
-			sb.append((responseBody.length() > MAX_BODY_CHARS)
-					? responseBody.substring(0, MAX_BODY_CHARS) + "...[truncated]" : responseBody);
+			int maxChars = this.runContext.maxResponseChars();
+			sb.append((responseBody.length() > maxChars) ? responseBody.substring(0, maxChars) + "...[truncated]"
+					: responseBody);
 			return sb.toString();
 		});
 	}

@@ -27,6 +27,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
+import ch.nexsol.orthrusai.scanner.ai.AgentTurnLimitException;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 
 /**
@@ -39,6 +40,12 @@ import ch.nexsol.orthrusai.scanner.ai.RunContext;
 public class FindingTool {
 
 	private static final Logger log = LoggerFactory.getLogger(FindingTool.class);
+
+	/**
+	 * Tool calls allowed past the limit for reporting only, so the findings an agent
+	 * confirmed on its last request can still be recorded.
+	 */
+	private static final int REPORTING_GRACE_CALLS = 3;
 
 	private final RunContext runContext;
 
@@ -59,8 +66,11 @@ public class FindingTool {
 			@ToolParam(description = "Severity: one of INFO, LOW, MEDIUM, HIGH, CRITICAL") String riskLevel,
 			@ToolParam(description = "Confidence: one of LOW, MEDIUM, HIGH, CONFIRMED") String confidence,
 			@ToolParam(description = "The request/response evidence that proves the finding") String evidence,
-			@ToolParam(description = "How to fix it") String remediation) {
+			@ToolParam(description = "How to fix it") String remediation) throws AgentTurnLimitException {
 
+		if (this.runContext.nextToolCall() > this.runContext.maxToolCalls() + REPORTING_GRACE_CALLS) {
+			throw new AgentTurnLimitException(this.runContext.maxToolCalls());
+		}
 		RiskLevel risk = normalise(riskLevel, RiskLevel.class, RiskLevel.MEDIUM);
 		Vulnerability.Confidence conf = normalise(confidence, Vulnerability.Confidence.class,
 				Vulnerability.Confidence.MEDIUM);

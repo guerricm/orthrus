@@ -348,12 +348,19 @@ spring:
 When `orthrus.ai.enabled` is `false` (the default), each module still boots and runs a
 deterministic fallback (an echo executor / a static planner), so the wiring is testable without any
 model credentials. Guard-rails: the agents' only network access is a tool restricted to the target
-host, capped by a per-endpoint HTTP-call budget and a per-task timeout
+host, capped by a per-endpoint HTTP-call budget, a per-endpoint tool-call limit
+(`ORTHRUS_AI_BUDGET_MAX_TOOL_ITERATIONS`, 12 by default: every tool call costs one model round trip, and
+the agent is stopped once it has used them) and a per-task timeout
 (`ORTHRUS_AI_BUDGET_TASK_TIMEOUT_SECONDS`, 900 by default) that bounds the whole task: once it is
 spent, no further endpoint is started, the agents still running are interrupted, and the task
 completes with the findings gathered so far (it is not failed, so the manager does not requeue it
 to start over). Size it to the target: with a large local model an agent can take minutes per
 endpoint.
+
+Latency levers: on Ollama the hidden reasoning of thinking models (Qwen3...) is turned off
+(`ORTHRUS_AI_SCANNER_THINK=false`, the default; it multiplied each agent turn by about 20 on a 27B
+model), and only the first `ORTHRUS_AI_BUDGET_MAX_RESPONSE_CHARS` (1500) characters of each probe
+response body are fed back to the model, since the whole conversation is resent on every turn.
 
 An AI task runs several endpoint agents in parallel, so the task count understates an AI node's
 load. The System page shows the node's running LLM agents, reported on every heartbeat, next to

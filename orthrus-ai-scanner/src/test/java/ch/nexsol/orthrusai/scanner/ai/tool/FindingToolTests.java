@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FindingToolTests {
 
 	@Test
-	void recordsFindingWithValidatedEnums() {
+	void recordsFindingWithValidatedEnums() throws Exception {
 		RunContext ctx = new RunContext("http://app.test/api", "ai-injection", 10);
 		FindingTool tool = new FindingTool(ctx, "http://app.test/api/users/1", "GET");
 
@@ -49,7 +49,7 @@ class FindingToolTests {
 	}
 
 	@Test
-	void coercesUnknownSeverityToSafeDefaults() {
+	void coercesUnknownSeverityToSafeDefaults() throws Exception {
 		RunContext ctx = new RunContext("http://app.test/api", "ai-xss", 10);
 		FindingTool tool = new FindingTool(ctx, "http://app.test/api", "POST");
 

@@ -157,12 +157,27 @@ public class AiScannerProperties {
 
 		private String model = "";
 
+		/**
+		 * Whether a reasoning model (e.g. Qwen3 on Ollama) may think before each answer.
+		 * Off by default: the agent makes one model call per tool call, and the hidden
+		 * reasoning multiplies the latency of every one of them.
+		 */
+		private boolean think = false;
+
 		public String getModel() {
 			return this.model;
 		}
 
 		public void setModel(String model) {
 			this.model = model;
+		}
+
+		public boolean isThink() {
+			return this.think;
+		}
+
+		public void setThink(boolean think) {
+			this.think = think;
 		}
 
 	}
@@ -175,6 +190,13 @@ public class AiScannerProperties {
 		private int maxHttpCallsPerOperation = 40;
 
 		private int maxToolIterations = 12;
+
+		/**
+		 * How much of each probe response body is fed back to the model. The whole
+		 * conversation is resent on every turn, so this bounds how fast the context
+		 * grows.
+		 */
+		private int maxResponseChars = 1500;
 
 		private long taskTimeoutSeconds = 900;
 
@@ -192,6 +214,14 @@ public class AiScannerProperties {
 
 		public void setMaxToolIterations(int maxToolIterations) {
 			this.maxToolIterations = maxToolIterations;
+		}
+
+		public int getMaxResponseChars() {
+			return this.maxResponseChars;
+		}
+
+		public void setMaxResponseChars(int maxResponseChars) {
+			this.maxResponseChars = maxResponseChars;
 		}
 
 		public long getTaskTimeoutSeconds() {

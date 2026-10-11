@@ -35,14 +35,34 @@ public class RunContext {
 
 	private final int maxHttpCalls;
 
+	private final int maxToolCalls;
+
+	private final int maxResponseChars;
+
 	private final AtomicInteger httpCalls = new AtomicInteger();
+
+	private final AtomicInteger toolCalls = new AtomicInteger();
 
 	private final List<Vulnerability> findings = new CopyOnWriteArrayList<>();
 
 	public RunContext(String targetUrl, String scannerId, int maxHttpCalls) {
+		this(targetUrl, scannerId, maxHttpCalls, 12, 1500);
+	}
+
+	/**
+	 * @param targetUrl the endpoint under test, which bounds the scope
+	 * @param scannerId the scanner id findings are attributed to
+	 * @param maxHttpCalls the HTTP requests the agent may send
+	 * @param maxToolCalls the tool calls the agent may make, each costing one model round
+	 * trip
+	 * @param maxResponseChars the characters of each response body fed back to the model
+	 */
+	public RunContext(String targetUrl, String scannerId, int maxHttpCalls, int maxToolCalls, int maxResponseChars) {
 		this.targetUrl = targetUrl;
 		this.scannerId = scannerId;
 		this.maxHttpCalls = maxHttpCalls;
+		this.maxToolCalls = maxToolCalls;
+		this.maxResponseChars = maxResponseChars;
 	}
 
 	public String targetUrl() {
@@ -59,6 +79,22 @@ public class RunContext {
 	 */
 	public boolean tryConsumeHttpCall() {
 		return this.httpCalls.incrementAndGet() <= this.maxHttpCalls;
+	}
+
+	/**
+	 * Counts one more tool call.
+	 * @return the number of this call, starting at 1
+	 */
+	public int nextToolCall() {
+		return this.toolCalls.incrementAndGet();
+	}
+
+	public int maxToolCalls() {
+		return this.maxToolCalls;
+	}
+
+	public int maxResponseChars() {
+		return this.maxResponseChars;
 	}
 
 	public int httpCallsUsed() {

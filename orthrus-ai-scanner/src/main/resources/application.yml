@@ -40,9 +40,15 @@ orthrus:
     families: ${ORTHRUS_AI_FAMILIES:INJECTION,XSS,LOGIC,CONFIGURATION,HTTP,JWT,SSL,BOLA}
     scanner:
       model: ${ORTHRUS_AI_SCANNER_MODEL:}
+      # Hidden reasoning of thinking models (Qwen3...) on Ollama; off, as it multiplies the latency of
+      # every agent turn (one model call per tool call).
+      think: ${ORTHRUS_AI_SCANNER_THINK:false}
     budget:
       max-http-calls-per-operation: 40
+      # One model round trip per tool call: the agent stops after this many.
       max-tool-iterations: 12
+      # Characters of each probe response body fed back to the model.
+      max-response-chars: 1500
       task-timeout-seconds: 900
 
 management:
