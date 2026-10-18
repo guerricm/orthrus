@@ -16,6 +16,7 @@
 
 package ch.nexsol.orthrusai.scanner.scan;
 
+import java.time.Duration;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -102,6 +104,48 @@ class LlmScanExecutorTests {
 		assertThat(attempts.get(0).operationUrl()).isEqualTo("http://app.test/api/v3/pet");
 		// The shared recon is used verbatim; the node does not run its own recon.
 		verify(this.reconService, never()).discover(any());
+	}
+
+	@Test
+	void endpointsLeftWhenTheBudgetIsSpentAreReportedAsNotRun() {
+		Endpoint fast = new Endpoint("GET", "http://app.test/api/fast");
+		Endpoint slow = new Endpoint("GET", "http://app.test/api/slow");
+		Endpoint queued = new Endpoint("GET", "http://app.test/api/queued");
+		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(fast, slow, queued)));
+		when(this.familyAgent.scan(eq("LOGIC"), eq(fast), any(), any())).thenReturn(List.of());
+		when(this.familyAgent.scan(eq("LOGIC"), eq(slow), any(), any())).thenAnswer((invocation) -> {
+			Thread.sleep(5000);
+			return List.of();
+		});
+		when(this.familyAgent.scan(eq("LOGIC"), eq(queued), any(), any())).thenAnswer((invocation) -> {
+			Thread.sleep(5000);
+			return List.of();
+		});
+		var task = new ScanTaskRequest(1L, 1L, "LOGIC", "openapi", "http://app.test", "{}", null);
+
+		List<ScanAttempt> attempts = this.executor.execute(task, Mono.delay(Duration.ofMillis(500)))
+			.collectList()
+			.block(Duration.ofSeconds(4));
+
+		assertThat(attempts).extracting(ScanAttempt::operationUrl, ScanAttempt::status)
+			.containsExactlyInAnyOrder(tuple(fast.url(), AttemptStatus.PASSED), tuple(slow.url(), AttemptStatus.ERROR),
+					tuple(queued.url(), AttemptStatus.ERROR));
+		assertThat(attempts).filteredOn((a) -> a.status() == AttemptStatus.ERROR)
+			.allSatisfy((a) -> assertThat(a.scannerName()).contains("not run").contains("budget"));
+	}
+
+	@Test
+	void aTaskFinishingWithinTheBudgetReportsNoSkippedEndpoint() {
+		Endpoint only = new Endpoint("GET", "http://app.test/api/only");
+		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(only)));
+		when(this.familyAgent.scan(eq("LOGIC"), eq(only), any(), any())).thenReturn(List.of());
+		var task = new ScanTaskRequest(1L, 1L, "LOGIC", "openapi", "http://app.test", "{}", null);
+
+		List<ScanAttempt> attempts = this.executor.execute(task, Mono.delay(Duration.ofSeconds(30)))
+			.collectList()
+			.block(Duration.ofSeconds(4));
+
+		assertThat(attempts).singleElement().extracting(ScanAttempt::status).isEqualTo(AttemptStatus.PASSED);
 	}
 
 }

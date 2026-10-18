@@ -40,6 +40,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusai.scanner.client.ManagerClient;
@@ -91,15 +92,17 @@ public class AiSlaveController {
 		Instant startTime = Instant.now();
 		AtomicInteger testsCount = new AtomicInteger();
 		AtomicInteger vulnsCount = new AtomicInteger();
+		AtomicInteger notRunCount = new AtomicInteger();
 
 		AtomicBoolean budgetSpent = new AtomicBoolean();
 
-		Disposable disposable = this.scanExecutor.execute(request)
-			// The budget bounds the whole task. Spending it is not a failure: the agents
-			// still running are stopped and the task completes with what it found, so the
-			// manager keeps the results instead of requeueing the task to start over.
-			.takeUntilOther(
-					Mono.delay(Duration.ofSeconds(this.taskTimeoutSeconds)).doOnNext((tick) -> budgetSpent.set(true)))
+		// The budget bounds the whole task. Spending it is not a failure: the running
+		// agents are stopped, the endpoints left are reported as not run, and the task
+		// completes with what it found, so the manager keeps the results instead of
+		// requeueing the task to start over.
+		Mono<Long> budget = Mono.delay(Duration.ofSeconds(this.taskTimeoutSeconds))
+			.doOnNext((tick) -> budgetSpent.set(true));
+		Disposable disposable = this.scanExecutor.execute(request, budget)
 			.bufferTimeout(10, Duration.ofSeconds(1))
 			.flatMap((batch) -> {
 				testsCount.addAndGet(batch.size());
@@ -107,13 +110,18 @@ public class AiSlaveController {
 					if (attempt.vulnerabilities() != null) {
 						vulnsCount.addAndGet(attempt.vulnerabilities().size());
 					}
+					if (attempt.status() == AttemptStatus.ERROR) {
+						notRunCount.incrementAndGet();
+					}
 				}
 				return this.managerClient.sendTaskAttemptsBatch(request.taskId(), batch);
 			})
 			.then(Mono.defer(() -> {
 				if (budgetSpent.get()) {
-					log.warn("Task {} ({}) spent its {} s budget; completing with {} tests, {} vulnerabilities",
-							request.taskId(), request.phase(), this.taskTimeoutSeconds, testsCount.get(),
+					log.warn(
+							"Task {} ({}) spent its {} s budget: {} endpoint(s) not run; completing with {} "
+									+ "vulnerabilities",
+							request.taskId(), request.phase(), this.taskTimeoutSeconds, notRunCount.get(),
 							vulnsCount.get());
 				}
 				else {

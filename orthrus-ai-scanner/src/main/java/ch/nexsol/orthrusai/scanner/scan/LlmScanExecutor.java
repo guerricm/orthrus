@@ -17,6 +17,8 @@
 package ch.nexsol.orthrusai.scanner.scan;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,15 +68,40 @@ public class LlmScanExecutor implements ScanExecutor {
 
 	@Override
 	public Flux<ScanAttempt> execute(ScanTaskRequest request) {
+		return execute(request, Mono.never());
+	}
+
+	/**
+	 * Probes the endpoints until done or stopped. When the stop signal fires, the agents
+	 * still running are interrupted and every endpoint without a verdict is reported as
+	 * an ERROR attempt, so the report shows the coverage was partial instead of silently
+	 * listing fewer endpoints.
+	 * @param request the dispatched task
+	 * @param stop fires when the task budget is spent
+	 * @return the attempts, one per endpoint
+	 */
+	@Override
+	public Flux<ScanAttempt> execute(ScanTaskRequest request, Mono<?> stop) {
 		String family = request.phase();
 		return recon(request).flatMapMany((recon) -> {
 			log.info("AI task {} ({}): probing {} endpoint(s){}{}", request.taskId(), family, recon.endpoints().size(),
 					recon.shared() ? " from orchestrator recon" : " from local recon",
 					recon.probeConfig().credentials().isEmpty() ? "" : " (authenticated)");
-			return Flux.fromIterable(recon.endpoints())
-				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), recon.probeConfig()),
-						ENDPOINT_CONCURRENCY);
+			Set<Endpoint> done = ConcurrentHashMap.newKeySet();
+			Flux<ScanAttempt> probed = Flux.fromIterable(recon.endpoints())
+				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), recon.probeConfig())
+					.doOnNext((attempt) -> done.add(endpoint)), ENDPOINT_CONCURRENCY)
+				.takeUntilOther(stop);
+			Flux<ScanAttempt> notRun = Flux.defer(() -> Flux.fromIterable(recon.endpoints())
+				.filter((endpoint) -> !done.contains(endpoint))
+				.map((endpoint) -> notRunAttempt(family, endpoint)));
+			return probed.concatWith(notRun);
 		});
+	}
+
+	private ScanAttempt notRunAttempt(String family, Endpoint endpoint) {
+		return new ScanAttempt("ai-" + family.toLowerCase(), "AI " + family + " Agent (not run: task budget spent)",
+				endpoint.method(), endpoint.url(), AttemptStatus.ERROR, List.of());
 	}
 
 	/**

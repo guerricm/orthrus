@@ -17,6 +17,7 @@
 package ch.nexsol.orthrusai.scanner.scan;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
@@ -34,5 +35,15 @@ public interface ScanExecutor {
 	 * @return a stream of attempts for the task
 	 */
 	Flux<ScanAttempt> execute(ScanTaskRequest request);
+
+	/**
+	 * Runs the task until it completes or the stop signal fires, whichever comes first.
+	 * @param request the dispatched task
+	 * @param stop fires when the task must stop (its time budget is spent)
+	 * @return a stream of attempts for the task
+	 */
+	default Flux<ScanAttempt> execute(ScanTaskRequest request, Mono<?> stop) {
+		return execute(request).takeUntilOther(stop);
+	}
 
 }
