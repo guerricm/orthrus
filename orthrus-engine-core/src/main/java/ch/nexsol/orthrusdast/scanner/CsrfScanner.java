@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -27,7 +28,9 @@ import ch.nexsol.orthrus.protocol.node.CWEReference;
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.Operation;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
  * Scans for Cross-Site Request Forgery (CSRF) vulnerabilities (CWE-352).
@@ -86,7 +89,7 @@ public class CsrfScanner implements SecurityScanner {
 					operation.expectedContentTypes(), operation.authScheme());
 
 			return Flux.concat(httpClient.send(testOpNoToken).flatMapMany((response) -> {
-				if (response.isSuccessful()) {
+				if (response.isSuccessful() && usesAmbientCredentials(operation, response)) {
 					Vulnerability vuln = createVulnerabilityWithTrace(
 							"Cross-Site Request Forgery (CSRF) - Missing Token",
 							"The state-changing endpoint allowed a request originating from an untrusted Origin without requiring an explicit Anti-CSRF token in the headers.",
@@ -99,7 +102,7 @@ public class CsrfScanner implements SecurityScanner {
 				}
 				return Flux.empty();
 			}), httpClient.send(testOpPlain).flatMapMany((response) -> {
-				if (response.isSuccessful()) {
+				if (response.isSuccessful() && usesAmbientCredentials(operation, response)) {
 					Vulnerability vuln = createVulnerabilityWithTrace(
 							"Cross-Site Request Forgery (CSRF) - Content-Type Bypass",
 							"The endpoint relies on CORS preflight requests (e.g. demanding application/json) to prevent CSRF, but it successfully accepts and processes requests with Content-Type: text/plain, which do not trigger preflights.",
@@ -113,6 +116,22 @@ public class CsrfScanner implements SecurityScanner {
 				return Flux.empty();
 			})); // Avoid duplicate reports if both work
 		});
+	}
+
+	/**
+	 * Whether the request is authenticated by something a browser attaches on its own to
+	 * a cross-site request: a cookie. Header credentials (API key, bearer token) are
+	 * never sent by a forged request, and without credentials there is no victim session.
+	 * @param operation the probed operation
+	 * @param response the target's answer to the probe
+	 * @return true when the operation relies on cookies
+	 */
+	private static boolean usesAmbientCredentials(Operation operation, ScanHttpResponse response) {
+		boolean cookieHeader = operation.headers() != null
+				&& operation.headers().keySet().stream().anyMatch("Cookie"::equalsIgnoreCase);
+		boolean cookieAuth = operation.authScheme() != null
+				&& operation.authScheme().paramLocation() == SecurityScheme.ParamLocation.COOKIE;
+		return cookieHeader || cookieAuth || response.hasHeader(HttpHeaders.SET_COOKIE);
 	}
 
 }

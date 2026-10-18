@@ -33,6 +33,7 @@ import ch.nexsol.orthrus.protocol.node.CWEReference;
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.Operation;
 
 /**
@@ -71,6 +72,10 @@ public class HppScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		List<Mono<Vulnerability>> checks = new ArrayList<>();
+		// Sent only if a polluted request crashes, and at most once per operation.
+		Mono<Boolean> baselineFails = httpClient.send(operation, false)
+			.map((response) -> response.statusCode().value() == 500)
+			.cache();
 
 		// 1. Query Parameters HPP
 		if (operation.queryParams() != null && !operation.queryParams().isEmpty()) {
@@ -100,7 +105,7 @@ public class HppScanner implements SecurityScanner {
 						operation.expectedContentTypes(), operation.authScheme(), operation.templateUrl(),
 						operation.sourceNode());
 
-				checks.add(executeAndCheck(testOp, operation, "Query Parameter '" + param + "'"));
+				checks.add(executeAndCheck(testOp, operation, baselineFails, "Query Parameter '" + param + "'"));
 			}
 		}
 
@@ -130,7 +135,8 @@ public class HppScanner implements SecurityScanner {
 									operation.expectedContentTypes(), operation.authScheme(), operation.templateUrl(),
 									operation.sourceNode());
 
-							jsonChecks.add(executeAndCheck(testOp, operation, "JSON Body Field '" + field + "'"));
+							jsonChecks.add(executeAndCheck(testOp, operation, baselineFails,
+									"JSON Body Field '" + field + "'"));
 						}
 					}
 				}
@@ -144,20 +150,26 @@ public class HppScanner implements SecurityScanner {
 		});
 	}
 
-	private Mono<Vulnerability> executeAndCheck(Operation testOp, Operation originalOp, String injectionPoint) {
+	/**
+	 * Sends a polluted request. A server error counts only when the same request without
+	 * the duplicate does not fail too: otherwise the endpoint rejects the request itself
+	 * (an invalid body, a missing field), not the duplicate.
+	 * @param testOp the polluted request
+	 * @param originalOp the operation under test
+	 * @param baselineFails whether the unpolluted request already returns HTTP 500
+	 * @param injectionPoint where the duplicate was placed, for the evidence
+	 * @return the finding, or empty
+	 */
+	private Mono<Vulnerability> executeAndCheck(Operation testOp, Operation originalOp, Mono<Boolean> baselineFails,
+			String injectionPoint) {
 		return httpClient.send(testOp, false).flatMap((response) -> {
 			boolean is500 = response.statusCode().value() == 500;
 			boolean is2xx = response.statusCode().value() >= 200 && response.statusCode().value() < 300;
 			boolean reflectsPayload = response.bodyContainsExact(PAYLOAD);
 
 			if (is500) {
-				Vulnerability vuln = createVulnerabilityWithTrace("HTTP Parameter Pollution (HPP) - Server Error",
-						"The endpoint crashed (HTTP 500) when duplicate parameters were supplied.", RiskLevel.HIGH,
-						Vulnerability.Confidence.HIGH, originalOp, CWEReference.CWE_235, List.of("CAPEC-460"), 7.5,
-						"Server returned HTTP 500 when injecting duplicate parameter into " + injectionPoint + ".",
-						"Ensure the application handles duplicate parameters safely. Frameworks should expect arrays if multiple values are permitted, or strictly reject duplicate keys.",
-						testOp, response, "API Endpoint (Network)", "Denial of Service / Unintended Behavior");
-				return Mono.just(vuln);
+				return baselineFails.filter((fails) -> !fails)
+					.map((ok) -> serverErrorFinding(testOp, originalOp, injectionPoint, response));
 			}
 
 			if (is2xx && reflectsPayload) {
@@ -174,6 +186,20 @@ public class HppScanner implements SecurityScanner {
 
 			return Mono.empty();
 		});
+	}
+
+	private Vulnerability serverErrorFinding(Operation testOp, Operation originalOp, String injectionPoint,
+			ScanHttpResponse response) {
+		return createVulnerabilityWithTrace("HTTP Parameter Pollution (HPP) - Server Error",
+				"The endpoint crashed (HTTP 500) when duplicate parameters were supplied, while the same request "
+						+ "without the duplicate did not.",
+				RiskLevel.HIGH, Vulnerability.Confidence.HIGH, originalOp, CWEReference.CWE_235, List.of("CAPEC-460"),
+				7.5,
+				"Server returned HTTP 500 when injecting duplicate parameter into " + injectionPoint
+						+ ", and not for the unpolluted request.",
+				"Ensure the application handles duplicate parameters safely. Frameworks should expect arrays if "
+						+ "multiple values are permitted, or strictly reject duplicate keys.",
+				testOp, response, "API Endpoint (Network)", "Denial of Service / Unintended Behavior");
 	}
 
 }
