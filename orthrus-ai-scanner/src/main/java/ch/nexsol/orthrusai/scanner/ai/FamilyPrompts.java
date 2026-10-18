@@ -22,7 +22,9 @@ import java.util.Map;
  * System prompts, one per scanner family. Each prompt frames the family's attack strategy
  * and lets the model generate its own contextual payloads; the module ships no static
  * payload files. A base preamble states the rules of engagement shared by every family
- * agent.
+ * agent, including that every subject is owned by exactly one family: security headers by
+ * HTTP, CORS and server version disclosure by CONFIGURATION, HSTS and the Secure cookie
+ * flag by SSL.
  */
 public final class FamilyPrompts {
 
@@ -39,6 +41,9 @@ public final class FamilyPrompts {
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
 			- Stay within your HTTP budget. If a tool says the budget is spent, report and stop.
 			- Only the target host is reachable; never attempt other hosts.
+			- Report only your own family's subject. Each subject belongs to exactly one family, \
+			so a weakness outside your focus is another agent's job: note it in your summary but \
+			do not report it.
 			When you are done, briefly summarize what you tried.
 			""";
 
@@ -48,9 +53,11 @@ public final class FamilyPrompts {
 			Focus: cross-site scripting. Test reflection of your markers in HTML, JSON and header \
 			contexts, and whether special characters are returned unencoded in an executable context."""),
 			Map.entry("CONFIGURATION", """
-					Focus: server misconfiguration (verbose stack traces and errors, permissive CORS, \
-					content-type handling, directory/debug endpoints, insecure cookie flags)."""),
-			Map.entry("LOGIC", """
+					Focus: server misconfiguration. Check permissive CORS (reflected or wildcard origins \
+					with credentials), server version disclosure (Server, X-Powered-By and similar \
+					banners), verbose stack traces and errors, content-type handling, directory/debug \
+					endpoints and cookies without HttpOnly or SameSite. Security headers belong to HTTP; \
+					HSTS and the Secure cookie flag belong to SSL."""), Map.entry("LOGIC", """
 					Focus: business-logic and abuse flaws (mass assignment, missing rate limiting, \
 					pagination and resource-exhaustion abuse, parameter tampering)."""), Map.entry("JWT", """
 					Focus: JSON Web Token weaknesses. Inspect any token: try the "none" algorithm, \
@@ -59,12 +66,14 @@ public final class FamilyPrompts {
 					Focus: broken object-level and function-level authorization (IDOR). Tamper with object \
 					identifiers in the path, query and body to reach other users' or roles' objects, and \
 					probe admin/privileged operations without the required role."""), Map.entry("HTTP", """
-					Focus: HTTP-protocol issues. Check missing/weak security headers (HSTS, CSP, \
-					X-Content-Type-Options, X-Frame-Options), dangerous methods (TRACE, PUT, DELETE), \
-					redirect handling and cache-control on sensitive responses."""), Map.entry("SSL", """
-					Focus: transport security as observable over HTTP: plain-HTTP exposure, missing HSTS, \
-					cookies without Secure, mixed-content and http->https redirect gaps. Report only what \
-					the responses actually prove."""), Map.entry("MISC", """
+					Focus: HTTP-protocol issues. Check missing/weak security headers (CSP, \
+					X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Cache-Control on sensitive \
+					responses), dangerous methods (TRACE, PUT, DELETE) and redirect handling. HSTS belongs \
+					to SSL; CORS and server banners belong to CONFIGURATION."""), Map.entry("SSL", """
+					Focus: transport security as observable over HTTP: plain-HTTP exposure, missing or weak \
+					HSTS, cookies without the Secure flag, mixed content and http->https redirect gaps. \
+					Report only what the responses actually prove. Other security headers belong to HTTP; \
+					other cookie flags belong to CONFIGURATION."""), Map.entry("MISC", """
 					Focus: anything not covered by the other families that a careful tester would still \
 					check on this endpoint."""));
 
