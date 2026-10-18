@@ -48,6 +48,17 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	Mono<Integer> incrementCounts(Long id, int vulns, int tests);
 
 	/**
+	 * Replaces the running vulnerability count with the job's final one, once host-wide
+	 * findings have been consolidated.
+	 * @param id the job
+	 * @param vulns the consolidated vulnerability count
+	 * @return the number of rows updated
+	 */
+	@org.springframework.data.r2dbc.repository.Modifying
+	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET vulns_count = :vulns WHERE id = :id")
+	Mono<Integer> setVulnsCount(Long id, int vulns);
+
+	/**
 	 * Records which node is running the job, touching that column only: a whole-row write
 	 * would race with {@link #incrementCounts}.
 	 * @param id the job

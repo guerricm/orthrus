@@ -353,6 +353,12 @@ public class JobOrchestratorService {
 
 				return this.scanResultService
 					.finalizeJobResult(job.getResultId(), job.getTarget(), job.getStartedAt(), completedAt, testsCount)
+					// The running count adds up raw per-task findings; the final one
+					// matches
+					// the consolidated report.
+					.flatMap((result) -> this.scanJobRepository
+						.setVulnsCount(job.getId(), result.vulnerabilities().size())
+						.thenReturn(result))
 					.doOnNext((result) -> {
 						if (status == JobStatus.FAILED) {
 							this.jobEventPublisher.emit(job.getId(),

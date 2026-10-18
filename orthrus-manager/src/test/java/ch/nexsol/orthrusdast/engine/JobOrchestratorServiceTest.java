@@ -112,6 +112,7 @@ class JobOrchestratorServiceTest {
 		when(this.scanJobRepository.save(any(ScanJobEntity.class)))
 			.thenAnswer((invocation) -> Mono.just(invocation.getArgument(0)));
 		when(this.scanJobRepository.finishJob(anyLong(), anyString(), any())).thenReturn(Mono.just(1));
+		when(this.scanJobRepository.setVulnsCount(anyLong(), anyInt())).thenReturn(Mono.just(1));
 	}
 
 	@AfterEach
@@ -255,6 +256,8 @@ class JobOrchestratorServiceTest {
 		assertThat(event.getValue().status()).isEqualTo("COMPLETED");
 		assertThat(event.getValue().grade()).isEqualTo("D");
 		verify(this.jobEventPublisher).complete(1L);
+		// The scan list shows the consolidated count, the same as the report.
+		verify(this.scanJobRepository).setVulnsCount(1L, resultWith(RiskLevel.HIGH).vulnerabilities().size());
 	}
 
 	@Test

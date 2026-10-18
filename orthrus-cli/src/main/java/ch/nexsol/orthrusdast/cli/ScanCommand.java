@@ -43,6 +43,7 @@ import ch.nexsol.orthrusdast.model.OAuth2Config;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.ScanResult;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
+import ch.nexsol.orthrusdast.report.FindingConsolidator;
 import ch.nexsol.orthrusdast.report.ReportGenerator;
 
 @Component
@@ -183,9 +184,12 @@ public class ScanCommand implements Callable<Integer> {
 			}
 
 			int testsCount = attempts.size();
-			List<Vulnerability> vulnerabilities = attempts.stream()
-				.filter((a) -> a.vulnerabilities() != null)
-				.flatMap((a) -> a.vulnerabilities().stream())
+			List<Vulnerability> vulnerabilities = FindingConsolidator
+				.consolidate(attempts.stream()
+					.filter((a) -> a.vulnerabilities() != null)
+					.flatMap((a) -> a.vulnerabilities().stream())
+					.toList())
+				.stream()
 				.sorted(Comparator.comparing(Vulnerability::riskLevel).reversed())
 				.toList();
 

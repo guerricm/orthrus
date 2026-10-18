@@ -33,6 +33,12 @@ The plan's **Target URL** is the gateway's admin base (the discoverer appends th
 
 ### 41 Specialized Scanners
 
+Findings that describe the whole host rather than one endpoint (missing security headers, TLS and
+cleartext issues, the CORS policy, the server banner) are consolidated into one finding per host,
+kept at the highest severity and listing every endpoint they were seen on; the counts, the grade and
+the scan list use the consolidated figures. A probe the target never answered (DNS, connection or
+timeout failure) is never read as the target reflecting a payload.
+
 | Scanner ID | Description | Associated CWE |
 | --- | --- | --- |
 | `auth-bruteforce` | Brute force / weak password detection on authentication endpoints (uses SecLists top-100) | CWE-307 (Improper Restriction of Excessive Authentication Attempts) |
@@ -354,8 +360,9 @@ the agent is stopped once it has used them) and a per-task timeout
 (`ORTHRUS_AI_BUDGET_TASK_TIMEOUT_SECONDS`, 900 by default) that bounds the whole task: once it is
 spent, no further endpoint is started, the agents still running are interrupted, and the task
 completes with the findings gathered so far (it is not failed, so the manager does not requeue it
-to start over). Size it to the target: with a large local model an agent can take minutes per
-endpoint.
+to start over). Every endpoint left unprobed then appears in the report's execution details as an
+ERROR attempt "not run: task budget spent", so partial coverage is visible. Size it to the target:
+with a large local model an agent can take minutes per endpoint.
 
 Latency levers: on Ollama the hidden reasoning of thinking models (Qwen3...) is turned off
 (`ORTHRUS_AI_SCANNER_THINK=false`, the default; it multiplied each agent turn by about 20 on a 27B

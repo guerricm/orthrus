@@ -41,6 +41,7 @@ import ch.nexsol.orthrusdast.entity.ScanResultEntity;
 import ch.nexsol.orthrusdast.entity.VulnerabilityEntity;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.ScanResult;
+import ch.nexsol.orthrusdast.report.FindingConsolidator;
 import ch.nexsol.orthrusdast.repository.ScanAttemptRepository;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanResultRepository;
@@ -188,7 +189,7 @@ public class ScanResultService {
 
 	private ScanResult mapToDomain(ScanResultEntity entity, List<VulnerabilityEntity> vulnEntities,
 			List<ScanAttemptEntity> attemptEntities, ScanConfiguration configuration) {
-		List<Vulnerability> vulnerabilities = vulnEntities.stream().map((ve) -> {
+		List<Vulnerability> rawVulnerabilities = vulnEntities.stream().map((ve) -> {
 			CWEReference cwe = null;
 			if (ve.cweId() != null) {
 				try {
@@ -213,7 +214,13 @@ public class ScanResultService {
 							: Collections.emptyList(),
 					ve.cvssBaseScore(), ve.evidence(), ve.recommendation(), ve.requestSummary(), ve.responseSummary(),
 					ve.attackVector(), ve.technicalImpact());
-		}).sorted(Comparator.comparing(Vulnerability::riskLevel).reversed()).toList();
+		}).toList();
+		// Host-wide issues count once in the findings, the summary and the grade; each
+		// attempt still lists what was observed on its own endpoint.
+		List<Vulnerability> vulnerabilities = FindingConsolidator.consolidate(rawVulnerabilities)
+			.stream()
+			.sorted(Comparator.comparing(Vulnerability::riskLevel).reversed())
+			.toList();
 
 		Map<RiskLevel, Long> riskSummary = vulnerabilities.stream()
 			.collect(Collectors.groupingBy(Vulnerability::riskLevel, Collectors.counting()));
@@ -223,7 +230,7 @@ public class ScanResultService {
 					Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
 		List<ScanAttempt> attempts = attemptEntities.stream().map((ae) -> {
-			List<Vulnerability> relatedVulns = vulnerabilities.stream()
+			List<Vulnerability> relatedVulns = rawVulnerabilities.stream()
 				.filter((v) -> v.scannerId().equals(ae.scannerId()) && v.operationMethod().equals(ae.operationMethod())
 						&& v.operationUrl().equals(ae.operationUrl()))
 				.toList();
