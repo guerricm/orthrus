@@ -67,9 +67,9 @@ public final class FamilyPrompts {
 			likely to prove a flaw. When a tool says a budget is spent, report your findings and stop.
 			- Only the target host is reachable; never attempt other hosts.
 			- Report only your own family's subject. Each subject belongs to exactly one family, \
-			so a weakness outside your focus is another agent's job: note it in your summary but \
-			do not report it.
-			When you are done, briefly summarize what you tried.
+			so a weakness outside your focus is another agent's job: leave it alone and do not report it.
+			When you have nothing left to probe, reply with just DONE. Do not summarize: your reply \
+			text is discarded, only recorded findings are kept.
 			""";
 
 	private static final Map<String, String> BY_FAMILY = Map.ofEntries(Map.entry("INJECTION", """

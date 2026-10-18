@@ -89,6 +89,13 @@ class FamilyPromptsTests {
 	}
 
 	@Test
+	void asksForADoneMarkerInsteadOfADiscardedSummary() {
+		String prompt = prompt("INJECTION");
+
+		assertThat(prompt).contains("reply with just DONE").doesNotContain("briefly summarize");
+	}
+
+	@Test
 	void eachFamilyIsToldToReportOnlyItsOwnSubject() {
 		assertThat(prompt("INJECTION")).contains("Report only your own family's subject");
 		assertThat(prompt("unknown")).contains("Report only your own family's subject")
