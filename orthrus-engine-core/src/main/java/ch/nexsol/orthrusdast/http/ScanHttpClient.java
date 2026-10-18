@@ -25,9 +25,10 @@ import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -60,12 +61,25 @@ public class ScanHttpClient {
 
 	private final WebClient webClient;
 
+	/**
+	 * Same client without redirect following, for probes whose verdict depends on the
+	 * target's own answer (a redirect is evidence, not a hop to take).
+	 */
+	private final WebClient noRedirectWebClient;
+
 	private final HttpRetryPolicy retryPolicy;
 
 	private final Duration requestTimeout;
 
 	public ScanHttpClient(WebClient webClient, OrthrusProperties properties) {
+		this(webClient, webClient, properties);
+	}
+
+	@Autowired
+	public ScanHttpClient(WebClient webClient, @Qualifier("noRedirectWebClient") WebClient noRedirectWebClient,
+			OrthrusProperties properties) {
 		this.webClient = webClient;
+		this.noRedirectWebClient = noRedirectWebClient;
 		this.retryPolicy = HttpRetryPolicy.from(properties.getHttp());
 		this.requestTimeout = Duration.ofMillis(properties.getHttp().getRequestTimeoutMs());
 	}
@@ -111,6 +125,22 @@ public class ScanHttpClient {
 	 */
 	public Mono<ScanHttpResponse> send(Operation operation, Map<String, String> extraHeaders, String bodyOverride,
 			boolean retryTransientErrors) {
+		return send(this.webClient, operation, extraHeaders, bodyOverride, retryTransientErrors);
+	}
+
+	/**
+	 * Send a request with extra headers and hand back the target's own answer, without
+	 * following redirects: for probes where a redirect is itself the evidence.
+	 * @param operation the operation
+	 * @param extraHeaders extra headers
+	 * @return the result
+	 */
+	public Mono<ScanHttpResponse> sendWithoutRedirects(Operation operation, Map<String, String> extraHeaders) {
+		return send(this.noRedirectWebClient, operation, extraHeaders, null, true);
+	}
+
+	private Mono<ScanHttpResponse> send(WebClient client, Operation operation, Map<String, String> extraHeaders,
+			String bodyOverride, boolean retryTransientErrors) {
 		String body = (bodyOverride != null) ? bodyOverride : operation.body();
 
 		// Rebuilt on every attempt so the captured timing reflects only the last try, not
@@ -121,18 +151,19 @@ public class ScanHttpClient {
 		// Retry-After)
 		// cannot trip it and discard the real response.
 		Mono<ScanHttpResponse> attemptMono = Mono
-			.defer(() -> singleAttempt(operation, extraHeaders, body, retryTransientErrors).timeout(requestTimeout));
+			.defer(() -> singleAttempt(client, operation, extraHeaders, body, retryTransientErrors)
+				.timeout(requestTimeout));
 
 		return attemptMono.retryWhen(buildRetry(retryTransientErrors))
 			.onErrorResume((e) -> recoverFromError(operation, e));
 	}
 
-	private Mono<ScanHttpResponse> singleAttempt(Operation operation, Map<String, String> extraHeaders, String body,
-			boolean retryTransientErrors) {
+	private Mono<ScanHttpResponse> singleAttempt(WebClient client, Operation operation,
+			Map<String, String> extraHeaders, String body, boolean retryTransientErrors) {
 		long startTime = System.currentTimeMillis();
 		HttpMethod method = operation.method();
 
-		WebClient.RequestBodySpec requestSpec = webClient.method(method).uri(buildUri(operation)).headers((headers) -> {
+		WebClient.RequestBodySpec requestSpec = client.method(method).uri(buildUri(operation)).headers((headers) -> {
 			// Apply operation headers
 			if (operation.headers() != null) {
 				operation.headers().forEach((k, v) -> {
@@ -221,8 +252,7 @@ public class ScanHttpClient {
 		}
 
 		log.warn("HTTP request failed for {} {}: {}", operation.method().name(), logUrl, errorMsg);
-		return Mono.just(new ScanHttpResponse(HttpStatus.SERVICE_UNAVAILABLE, new HttpHeaders(), "Error: " + errorMsg,
-				requestTimeout.toMillis()));
+		return Mono.just(ScanHttpResponse.clientError(errorMsg, requestTimeout.toMillis()));
 	}
 
 	/**

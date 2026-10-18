@@ -16,9 +16,11 @@
 
 package ch.nexsol.orthrusdast.scanner;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -35,6 +37,9 @@ import ch.nexsol.orthrusdast.scanner.oast.OastService;
  */
 @Component
 public class HostHeaderInjectionScanner implements SecurityScanner {
+
+	private static final String REMEDIATION = "Validate and sanitize all HTTP headers. Avoid reflecting the Host "
+			+ "header in links, password resets, or cache keys without strict allowlist validation.";
 
 	private final ScanHttpClient httpClient;
 
@@ -77,7 +82,11 @@ public class HostHeaderInjectionScanner implements SecurityScanner {
 			Mono<Vulnerability> check2 = executeAndCheck(operation, payload2Headers, "X-Forwarded-Host header",
 					oastDomain);
 
-			Flux<Vulnerability> directChecks = Flux.concat(check1, check2).filter((vuln) -> vuln != null);
+			// One direct finding per operation: the most severe of the two injection
+			// points.
+			Flux<Vulnerability> directChecks = Flux.concat(check1, check2)
+				.reduce((first, second) -> (second.riskLevel().compareTo(first.riskLevel()) > 0) ? second : first)
+				.flux();
 
 			Flux<Vulnerability> blindChecks = oastService.pollInteractions(session)
 				.map((interaction) -> createVulnerabilityWithTrace(
@@ -95,33 +104,57 @@ public class HostHeaderInjectionScanner implements SecurityScanner {
 		}));
 	}
 
+	/**
+	 * Sends the injected headers and judges the target's own answer. Redirects are not
+	 * followed: a proxy answering an unknown Host with a redirect to it would otherwise
+	 * send the client to the injected domain, and that client-side failure is no evidence
+	 * about the target.
+	 * @param operation the probed operation
+	 * @param extraHeaders the injected headers
+	 * @param injectionPoint how the domain was injected, for the evidence
+	 * @param injectedDomain the domain to look for
+	 * @return the finding, or empty when the target ignored the injection
+	 */
 	private Mono<Vulnerability> executeAndCheck(Operation operation, Map<String, String> extraHeaders,
 			String injectionPoint, String injectedDomain) {
-		return httpClient.send(operation, extraHeaders, null, false).flatMap((response) -> {
+		return httpClient.sendWithoutRedirects(operation, extraHeaders).flatMap((response) -> {
+			Operation testOp = withHeaders(operation, extraHeaders);
 			if (response.bodyContainsExact(injectedDomain)) {
-
-				// Generate a testOp containing the extra headers for evidence formatting
-				Map<String, String> mergedHeaders = new java.util.HashMap<>(
-						(operation.headers() != null) ? operation.headers() : Map.of());
-				mergedHeaders.putAll(extraHeaders);
-				Operation testOp = new Operation(operation.url(), operation.method(), mergedHeaders,
-						operation.queryParams(), operation.body(), operation.securityRequirements(),
-						operation.expectedContentTypes(), operation.authScheme(), operation.templateUrl(),
-						operation.sourceNode());
-
-				Vulnerability vuln = createVulnerabilityWithTrace("Host Header Injection - Content Reflection",
+				return Mono.just(createVulnerabilityWithTrace("Host Header Injection - Content Reflection",
 						"The endpoint reflects the injected Host header (" + injectedDomain
 								+ ") in its response. This can lead to Password Reset Poisoning or cache poisoning.",
 						RiskLevel.MEDIUM, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_644,
 						List.of("CAPEC-141"), 5.4,
 						"Server reflected the injected domain ('" + injectedDomain + "') when it was supplied via the "
 								+ injectionPoint + ".",
-						"Validate and sanitize all HTTP headers. Avoid reflecting the Host header in links, password resets, or cache keys without strict allowlist validation.",
-						testOp, response, "API Endpoint (Network)", "Unintended Behavior / Content Spoofing");
-				return Mono.just(vuln);
+						REMEDIATION, testOp, response, "API Endpoint (Network)",
+						"Unintended Behavior / Content Spoofing"));
+			}
+			String location = response.getHeader(HttpHeaders.LOCATION);
+			if (!response.clientError() && response.statusCode().is3xxRedirection() && location != null
+					&& location.contains(injectedDomain)) {
+				return Mono.just(createVulnerabilityWithTrace("Host Header Injection - Reflected in Redirect",
+						"The endpoint builds its redirect from the injected Host header (" + injectedDomain
+								+ "). Usually a front proxy behaviour; it only becomes exploitable when such a "
+								+ "redirect is cached or reaches a victim (cache poisoning, open redirect).",
+						RiskLevel.LOW, Vulnerability.Confidence.HIGH, operation, CWEReference.CWE_644,
+						List.of("CAPEC-141"), 3.1,
+						"HTTP " + response.statusCode().value() + " with Location: " + location + " when the "
+								+ injectionPoint + " was set to '" + injectedDomain + "'.",
+						REMEDIATION, testOp, response, "API Endpoint (Network)",
+						"Unintended Behavior / Content Spoofing"));
 			}
 			return Mono.empty();
 		});
+	}
+
+	private static Operation withHeaders(Operation operation, Map<String, String> extraHeaders) {
+		Map<String, String> mergedHeaders = new HashMap<>(
+				(operation.headers() != null) ? operation.headers() : Map.of());
+		mergedHeaders.putAll(extraHeaders);
+		return new Operation(operation.url(), operation.method(), mergedHeaders, operation.queryParams(),
+				operation.body(), operation.securityRequirements(), operation.expectedContentTypes(),
+				operation.authScheme(), operation.templateUrl(), operation.sourceNode());
 	}
 
 }

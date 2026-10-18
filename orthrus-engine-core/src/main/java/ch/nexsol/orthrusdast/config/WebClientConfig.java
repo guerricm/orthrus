@@ -22,6 +22,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -36,37 +37,55 @@ public class WebClientConfig {
 
 	private final OrthrusProperties properties;
 
+	/**
+	 * Shared by both scan clients so redirect handling never doubles the connections.
+	 */
+	private final ConnectionProvider connectionProvider = ConnectionProvider.builder("orthrus-dast-pool")
+		.maxConnections(500)
+		.maxIdleTime(Duration.ofSeconds(20))
+		.maxLifeTime(Duration.ofSeconds(60))
+		.pendingAcquireTimeout(Duration.ofSeconds(30))
+		.evictInBackground(Duration.ofSeconds(40))
+		.build();
+
 	public WebClientConfig(OrthrusProperties properties) {
 		this.properties = properties;
 	}
 
+	/**
+	 * The scan client most probes use; it follows redirects like a browser would.
+	 * @return the client
+	 */
 	@Bean
+	@Primary
 	public WebClient webClient() {
-		int connectTimeout = properties.getHttp().getConnectTimeoutMs();
-		int readTimeout = properties.getHttp().getReadTimeoutMs();
-		boolean ignoreSslErrors = properties.getHttp().isIgnoreSslErrors();
+		return build(scanHttpClient().followRedirect(true));
+	}
 
-		ConnectionProvider provider = ConnectionProvider.builder("orthrus-dast-pool")
-			.maxConnections(500)
-			.maxIdleTime(Duration.ofSeconds(20))
-			.maxLifeTime(Duration.ofSeconds(60))
-			.pendingAcquireTimeout(Duration.ofSeconds(30))
-			.evictInBackground(Duration.ofSeconds(40))
-			.build();
+	/**
+	 * The same client without redirect following, for probes whose verdict depends on the
+	 * target's own answer.
+	 * @return the client
+	 */
+	@Bean
+	public WebClient noRedirectWebClient() {
+		return build(scanHttpClient().followRedirect(false));
+	}
 
-		HttpClient httpClient = HttpClient.create(provider)
-			.responseTimeout(Duration.ofMillis(readTimeout))
-			.followRedirect(true);
-
-		if (ignoreSslErrors) {
+	private HttpClient scanHttpClient() {
+		HttpClient httpClient = HttpClient.create(this.connectionProvider)
+			.responseTimeout(Duration.ofMillis(properties.getHttp().getReadTimeoutMs()));
+		if (properties.getHttp().isIgnoreSslErrors()) {
 			httpClient = httpClient.secure((spec) -> spec.sslContext(createInsecureSslContext()));
 		}
+		return httpClient;
+	}
 
+	private WebClient build(HttpClient httpClient) {
 		// Allow larger response bodies (up to 16MB)
 		ExchangeStrategies strategies = ExchangeStrategies.builder()
 			.codecs((config) -> config.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
 			.build();
-
 		return WebClient.builder()
 			.clientConnector(new ReactorClientHttpConnector(httpClient))
 			.exchangeStrategies(strategies)
