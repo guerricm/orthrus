@@ -19,6 +19,8 @@ package ch.nexsol.orthrusai.scanner.ai;
 import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLException;
 
@@ -36,6 +38,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.ai.Endpoint;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.tool.FindingTool;
@@ -104,6 +107,10 @@ public class FamilyAgent {
 		if (context != null && !context.isBlank()) {
 			userPrompt += "\n\nPrior recon of the target (shared context): " + context;
 		}
+		String authNote = describeConfiguredAuth(probeConfig.credentials());
+		if (!authNote.isEmpty()) {
+			userPrompt += "\n\n" + authNote;
+		}
 		this.agentActivity.started();
 		try {
 			this.chatClient.prompt()
@@ -134,6 +141,31 @@ public class FamilyAgent {
 		log.info("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
 				runContext.httpCallsUsed(), runContext.findings().size());
 		return runContext.findings();
+	}
+
+	/**
+	 * Describes the credentials the operator configured, by location and name only, so
+	 * the agent knows the endpoint is authenticated. Without this the credentials are
+	 * attached silently and an agent whose subject depends on them (JWT, BOLA) would
+	 * wrongly judge its subject absent and stop. Values are never exposed.
+	 * @param credentials the configured credentials, may be empty
+	 * @return a note for the prompt, or an empty string when none are configured
+	 */
+	private static String describeConfiguredAuth(List<Credential> credentials) {
+		if (credentials == null || credentials.isEmpty()) {
+			return "";
+		}
+		String summary = credentials.stream()
+			.filter((c) -> c != null && c.name() != null)
+			.map((c) -> ((c.location() != null) ? c.location().toUpperCase(Locale.ROOT) : "HEADER") + " " + c.name())
+			.distinct()
+			.collect(Collectors.joining(", "));
+		if (summary.isEmpty()) {
+			return "";
+		}
+		return "The operator configured credentials, attached automatically to every request (" + summary
+				+ "). Treat the endpoint as authenticated: your subject may apply even if the baseline "
+				+ "response shows nothing.";
 	}
 
 	/**

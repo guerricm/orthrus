@@ -80,6 +80,15 @@ class FamilyPromptsTests {
 	}
 
 	@Test
+	void tellsTheAgentToStopEarlyWhenItsSubjectCannotApply() {
+		String prompt = prompt("JWT");
+
+		assertThat(prompt).contains("judge whether your family's subject can exist on this endpoint")
+			.contains("report nothing and stop")
+			.contains("the credentials you were given");
+	}
+
+	@Test
 	void eachFamilyIsToldToReportOnlyItsOwnSubject() {
 		assertThat(prompt("INJECTION")).contains("Report only your own family's subject");
 		assertThat(prompt("unknown")).contains("Report only your own family's subject")

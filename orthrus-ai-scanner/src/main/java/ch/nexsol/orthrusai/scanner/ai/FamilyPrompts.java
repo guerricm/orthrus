@@ -41,6 +41,11 @@ public final class FamilyPrompts {
 			replace each with a realistic value before requesting. When a template needs an \
 			identifier you do not have, first get a valid one from a list or create endpoint on \
 			the same host, then reuse it.
+			- First judge whether your family's subject can exist on this endpoint, spending at most \
+			one baseline request to decide. If it cannot apply here, report nothing and stop \
+			immediately instead of spending the rest of your budget: for example JWT when no token is \
+			present in the request, the response or the credentials you were given, or BOLA when the \
+			endpoint exposes no object identifier in its path, query or body.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
 			- Rate each finding by its proven impact, on this scale, so the same weakness never gets \
