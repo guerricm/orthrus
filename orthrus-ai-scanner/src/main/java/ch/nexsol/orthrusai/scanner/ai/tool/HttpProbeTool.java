@@ -78,7 +78,9 @@ public class HttpProbeTool {
 	}
 
 	@Tool(description = "Send an HTTP request to the target under test and return the response "
-			+ "(status line, headers, and truncated body). Only the target host is reachable.")
+			+ "(status line, round-trip time in milliseconds, headers, and truncated body). "
+			+ "The time measures the full request until the body is read, so it can confirm "
+			+ "time-based blind flaws. Only the target host is reachable.")
 	public String sendRequest(
 			@ToolParam(description = "Absolute URL to request (must be on the target host)") String url,
 			@ToolParam(description = "HTTP method, e.g. GET, POST, PUT, DELETE, PATCH") String method,
@@ -110,8 +112,10 @@ public class HttpProbeTool {
 			if (body != null && !body.isBlank()) {
 				spec.bodyValue(body);
 			}
-			return spec.exchangeToMono(this::render).timeout(this.readTimeout).block(this.readTimeout.plusSeconds(5))
-					+ note;
+			long startNanos = System.nanoTime();
+			return spec.exchangeToMono((response) -> render(response, startNanos))
+				.timeout(this.readTimeout)
+				.block(this.readTimeout.plusSeconds(5)) + note;
 		}
 		catch (RuntimeException ex) {
 			log.debug("Probe {} {} failed: {}", httpMethod, url, ex.getMessage());
@@ -138,10 +142,12 @@ public class HttpProbeTool {
 		}
 	}
 
-	private Mono<String> render(ClientResponse response) {
+	private Mono<String> render(ClientResponse response, long startNanos) {
 		return response.bodyToMono(String.class).defaultIfEmpty("").map((responseBody) -> {
+			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
 			StringBuilder sb = new StringBuilder();
 			sb.append("HTTP ").append(response.statusCode().value()).append('\n');
+			sb.append("Time: ").append(elapsedMs).append(" ms\n");
 			response.headers()
 				.asHttpHeaders()
 				.forEach((name, values) -> sb.append(name).append(": ").append(String.join(",", values)).append('\n'));

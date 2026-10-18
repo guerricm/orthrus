@@ -79,6 +79,16 @@ class HttpProbeToolTests {
 	}
 
 	@Test
+	void reportsRoundTripTimeSoTheAgentCanConfirmTimeBasedFlaws() throws Exception {
+		RunContext ctx = new RunContext(this.target, "ai-injection", 5);
+		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
+
+		String result = tool.sendRequest(this.target, "GET", null, null);
+
+		assertThat(result).containsPattern("(?m)^Time: \\d+ ms$");
+	}
+
+	@Test
 	void probesConcreteUrlWhenTargetIsAPathTemplate() throws Exception {
 		RunContext ctx = new RunContext(this.target + "/pet/{petId}", "ai-injection", 5);
 		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
