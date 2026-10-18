@@ -43,6 +43,20 @@ public final class FamilyPrompts {
 			the same host, then reuse it.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
+			- Rate each finding by its proven impact, on this scale, so the same weakness never gets \
+			two different levels:
+			INFO: no security impact on its own (server banner or version disclosure).
+			LOW: weak hardening with no direct exploit path (CORS * without Allow-Credentials, a \
+			missing security header, a cookie missing a flag).
+			MEDIUM: a real weakness that needs conditions or leaks limited data (an attacker origin \
+			reflected into Access-Control-Allow-Origin together with Allow-Credentials true, a verbose \
+			stack trace exposing internals).
+			HIGH: a proven direct exploit (SQL or command injection, reaching another user's object, \
+			an authorization or authentication bypass).
+			CRITICAL: full compromise (remote code execution, admin takeover, mass data exfiltration).
+			Note: Access-Control-Allow-Origin: * makes the browser drop credentials, so wildcard CORS \
+			without Allow-Credentials is at most LOW, and allowing the Authorization header does not \
+			raise it.
 			- Your budget for this endpoint is %d tool calls and %d HTTP requests; spend them on \
 			confirming, not exploring. Send one baseline, then go straight for the payloads most \
 			likely to prove a flaw. When a tool says a budget is spent, report your findings and stop.

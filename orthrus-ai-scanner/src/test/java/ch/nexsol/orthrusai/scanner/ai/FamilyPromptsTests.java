@@ -64,6 +64,22 @@ class FamilyPromptsTests {
 	}
 
 	@Test
+	void givesASeverityScaleWithPerLevelExamples() {
+		String prompt = prompt("CONFIGURATION");
+
+		assertThat(prompt).contains("Rate each finding by its proven impact")
+			.contains("CORS * without Allow-Credentials")
+			.contains("reaching another user's object");
+	}
+
+	@Test
+	void correctsTheWildcardCorsOverrating() {
+		assertThat(prompt("CONFIGURATION"))
+			.contains("Access-Control-Allow-Origin: * makes the browser drop credentials")
+			.contains("at most LOW");
+	}
+
+	@Test
 	void eachFamilyIsToldToReportOnlyItsOwnSubject() {
 		assertThat(prompt("INJECTION")).contains("Report only your own family's subject");
 		assertThat(prompt("unknown")).contains("Report only your own family's subject")
