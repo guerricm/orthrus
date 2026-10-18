@@ -29,31 +29,40 @@ class FamilyPromptsTests {
 
 	@Test
 	void securityHeadersAreTheHttpFamilysSubject() {
-		assertThat(FamilyPrompts.forFamily("HTTP")).contains("Check missing/weak security headers");
-		assertThat(FamilyPrompts.forFamily("CONFIGURATION")).contains("Security headers belong to HTTP");
-		assertThat(FamilyPrompts.forFamily("SSL")).contains("Other security headers belong to HTTP");
+		assertThat(prompt("HTTP")).contains("Check missing/weak security headers");
+		assertThat(prompt("CONFIGURATION")).contains("Security headers belong to HTTP");
+		assertThat(prompt("SSL")).contains("Other security headers belong to HTTP");
 	}
 
 	@Test
 	void corsAndServerVersionAreTheConfigurationFamilysSubject() {
-		assertThat(FamilyPrompts.forFamily("CONFIGURATION")).contains("Check permissive CORS")
-			.contains("server version disclosure");
-		assertThat(FamilyPrompts.forFamily("HTTP")).contains("CORS and server banners belong to CONFIGURATION");
+		assertThat(prompt("CONFIGURATION")).contains("Check permissive CORS").contains("server version disclosure");
+		assertThat(prompt("HTTP")).contains("CORS and server banners belong to CONFIGURATION");
 	}
 
 	@Test
 	void hstsAndSecureCookiesAreTheSslFamilysSubject() {
-		assertThat(FamilyPrompts.forFamily("SSL")).contains("missing or weak HSTS")
-			.contains("cookies without the Secure flag");
-		assertThat(FamilyPrompts.forFamily("HTTP")).contains("HSTS belongs to SSL");
-		assertThat(FamilyPrompts.forFamily("CONFIGURATION")).contains("HSTS and the Secure cookie flag belong to SSL");
+		assertThat(prompt("SSL")).contains("missing or weak HSTS").contains("cookies without the Secure flag");
+		assertThat(prompt("HTTP")).contains("HSTS belongs to SSL");
+		assertThat(prompt("CONFIGURATION")).contains("HSTS and the Secure cookie flag belong to SSL");
+	}
+
+	@Test
+	void injectsTheConcreteBudgetNumbersIntoThePrompt() {
+		String prompt = FamilyPrompts.forFamily("INJECTION", 12, 40);
+
+		assertThat(prompt).contains("budget for this endpoint is 12 tool calls and 40 HTTP requests");
 	}
 
 	@Test
 	void eachFamilyIsToldToReportOnlyItsOwnSubject() {
-		assertThat(FamilyPrompts.forFamily("INJECTION")).contains("Report only your own family's subject");
-		assertThat(FamilyPrompts.forFamily("unknown")).contains("Report only your own family's subject")
+		assertThat(prompt("INJECTION")).contains("Report only your own family's subject");
+		assertThat(prompt("unknown")).contains("Report only your own family's subject")
 			.contains("Focus: general security testing");
+	}
+
+	private static String prompt(String family) {
+		return FamilyPrompts.forFamily(family, 12, 40);
 	}
 
 }

@@ -39,7 +39,9 @@ public final class FamilyPrompts {
 			detected technology). Do not rely on a fixed list.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
-			- Stay within your HTTP budget. If a tool says the budget is spent, report and stop.
+			- Your budget for this endpoint is %d tool calls and %d HTTP requests; spend them on \
+			confirming, not exploring. Send one baseline, then go straight for the payloads most \
+			likely to prove a flaw. When a tool says a budget is spent, report your findings and stop.
 			- Only the target host is reachable; never attempt other hosts.
 			- Report only your own family's subject. Each subject belongs to exactly one family, \
 			so a weakness outside your focus is another agent's job: note it in your summary but \
@@ -81,14 +83,18 @@ public final class FamilyPrompts {
 	}
 
 	/**
-	 * The system prompt for a family, or a generic one for an unknown family.
+	 * The system prompt for a family, or a generic one for an unknown family. The agent's
+	 * budget is rendered into the preamble so the model knows exactly how many calls it
+	 * may spend rather than guessing from a vague instruction.
 	 * @param family the scanner family name
+	 * @param maxToolCalls the tool-call budget for one endpoint
+	 * @param maxHttpCalls the HTTP-request budget for one endpoint
 	 * @return the system prompt
 	 */
-	public static String forFamily(String family) {
+	public static String forFamily(String family, int maxToolCalls, int maxHttpCalls) {
 		String key = (family != null) ? family.toUpperCase() : "";
 		String specific = BY_FAMILY.getOrDefault(key, "Focus: general security testing of this endpoint.");
-		return BASE + "\n" + specific;
+		return BASE.formatted(maxToolCalls, maxHttpCalls) + "\n" + specific;
 	}
 
 }

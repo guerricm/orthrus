@@ -107,7 +107,8 @@ public class FamilyAgent {
 		this.agentActivity.started();
 		try {
 			this.chatClient.prompt()
-				.system(FamilyPrompts.forFamily(family))
+				.system(FamilyPrompts.forFamily(family, this.budget.getMaxToolIterations(),
+						this.budget.getMaxHttpCallsPerOperation()))
 				.user(userPrompt)
 				.tools(httpProbeTool, findingTool)
 				.call()
