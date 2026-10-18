@@ -37,6 +37,10 @@ public final class FamilyPrompts {
 			Rules:
 			- Generate your own payloads tailored to this endpoint (parameter types, Content-Type, \
 			detected technology). Do not rely on a fixed list.
+			- The URL may contain path templates such as {petId}. Never send the literal braces: \
+			replace each with a realistic value before requesting. When a template needs an \
+			identifier you do not have, first get a valid one from a list or create endpoint on \
+			the same host, then reuse it.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
 			- Your budget for this endpoint is %d tool calls and %d HTTP requests; spend them on \

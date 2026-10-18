@@ -55,6 +55,15 @@ class FamilyPromptsTests {
 	}
 
 	@Test
+	void tellsTheAgentToResolvePathTemplatesWithRealisticValues() {
+		String prompt = prompt("INJECTION");
+
+		assertThat(prompt).contains("path templates")
+			.contains("Never send the literal braces")
+			.contains("list or create endpoint");
+	}
+
+	@Test
 	void eachFamilyIsToldToReportOnlyItsOwnSubject() {
 		assertThat(prompt("INJECTION")).contains("Report only your own family's subject");
 		assertThat(prompt("unknown")).contains("Report only your own family's subject")
