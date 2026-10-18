@@ -23,6 +23,7 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,6 +93,15 @@ class HostHeaderInjectionScannerTest {
 		serve((request, injected) -> new MockResponse().setBody("Reset link: https://" + injected + "/reset?t=1"));
 
 		assertThat(scan()).extracting(Vulnerability::name).contains("Host Header Injection - Content Reflection");
+	}
+
+	@Test
+	void aTargetDroppingTheConnectionOnTheInjectedHostIsNotRetried() {
+		serve((request, injected) -> new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST));
+
+		assertThat(scan()).isEmpty();
+		// One request per injection point, none of them retried.
+		assertThat(this.server.getRequestCount()).isEqualTo(2);
 	}
 
 	@Test

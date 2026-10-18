@@ -135,6 +135,21 @@ class LlmScanExecutorTests {
 	}
 
 	@Test
+	void aReconStillRunningWhenTheBudgetIsSpentYieldsNoEndpoint() {
+		Endpoint late = new Endpoint("GET", "http://app.test/api/late");
+		when(this.reconService.discover("http://app.test"))
+			.thenReturn(Mono.delay(Duration.ofSeconds(10)).thenReturn(List.of(late)));
+		var task = new ScanTaskRequest(1L, 1L, "LOGIC", "openapi", "http://app.test", "{}", null);
+
+		List<ScanAttempt> attempts = this.executor.execute(task, Mono.delay(Duration.ofMillis(300)))
+			.collectList()
+			.block(Duration.ofSeconds(4));
+
+		assertThat(attempts).isEmpty();
+		verify(this.familyAgent, never()).scan(any(), any(), any(), any());
+	}
+
+	@Test
 	void aTaskFinishingWithinTheBudgetReportsNoSkippedEndpoint() {
 		Endpoint only = new Endpoint("GET", "http://app.test/api/only");
 		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(only)));

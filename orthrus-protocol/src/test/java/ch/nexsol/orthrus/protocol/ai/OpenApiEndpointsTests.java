@@ -105,6 +105,35 @@ class OpenApiEndpointsTests {
 	}
 
 	@Test
+	void resolvesParametersAndRequestBodiesDeclaredAsComponentRefs() {
+		String spec = """
+				{"openapi":"3.0.0","paths":{"/pet/{id}":{"put":{
+				"parameters":[{"$ref":"#/components/parameters/PetId"}],
+				"requestBody":{"$ref":"#/components/requestBodies/PetBody"}}}},
+				"components":{
+				"parameters":{"PetId":{"name":"id","in":"path","required":true,"schema":{"type":"integer"}}},
+				"requestBodies":{"PetBody":{"content":{"application/json":{"schema":{"type":"object",
+				"properties":{"name":{"type":"string"}}}}}}}}}""";
+
+		OpenApiEndpoints parsed = OpenApiEndpoints.parse(this.objectMapper, "https://host/openapi.json", spec);
+
+		assertThat(parsed.endpoints()).singleElement()
+			.satisfies((e) -> assertThat(e.parameters())
+				.containsExactly(new Endpoint.Parameter("id", "path", "integer", true)))
+			.satisfies((e) -> assertThat(e.requestBodySchema()).isEqualTo("{ name: string }"));
+	}
+
+	@Test
+	void keepsTheOtherEndpointsWhenARequestBodyHasNoContent() {
+		String spec = """
+				{"openapi":"3.0.0","paths":{"/pet":{"post":{"requestBody":{"content":{}}},"get":{}}}}""";
+
+		OpenApiEndpoints parsed = OpenApiEndpoints.parse(this.objectMapper, "https://host/openapi.json", spec);
+
+		assertThat(parsed.endpoints()).hasSize(2).allSatisfy((e) -> assertThat(e.requestBodySchema()).isNull());
+	}
+
+	@Test
 	void leavesShapeEmptyForOperationsWithoutParametersOrBody() {
 		String spec = """
 				{"openapi":"3.0.0","paths":{"/health":{"get":{}}}}""";

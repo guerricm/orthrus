@@ -72,9 +72,10 @@ public class HppScanner implements SecurityScanner {
 	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		List<Mono<Vulnerability>> checks = new ArrayList<>();
-		// Sent only if a polluted request crashes, and at most once per operation.
+		// Sent only if a polluted request crashes, and at most once per operation. A
+		// baseline the target never answered is no comparison either.
 		Mono<Boolean> baselineFails = httpClient.send(operation, false)
-			.map((response) -> response.statusCode().value() == 500)
+			.map((response) -> response.clientError() || response.statusCode().value() == 500)
 			.cache();
 
 		// 1. Query Parameters HPP
@@ -156,7 +157,8 @@ public class HppScanner implements SecurityScanner {
 	 * (an invalid body, a missing field), not the duplicate.
 	 * @param testOp the polluted request
 	 * @param originalOp the operation under test
-	 * @param baselineFails whether the unpolluted request already returns HTTP 500
+	 * @param baselineFails whether the unpolluted request already returns HTTP 500, or
+	 * was never answered
 	 * @param injectionPoint where the duplicate was placed, for the evidence
 	 * @return the finding, or empty
 	 */

@@ -24,6 +24,7 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,6 +77,21 @@ class HppScannerTest {
 		respond((body) -> body.contains("orthrus_hpp_test") ? 500 : 200);
 
 		assertThat(scan()).extracting(Vulnerability::name).contains("HTTP Parameter Pollution (HPP) - Server Error");
+	}
+
+	@Test
+	void aBaselineTheTargetNeverAnsweredIsNoComparison() {
+		this.server.setDispatcher(new Dispatcher() {
+			@Override
+			public MockResponse dispatch(RecordedRequest request) {
+				if (request.getBody().readUtf8().contains("orthrus_hpp_test")) {
+					return new MockResponse().setResponseCode(500);
+				}
+				return new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST);
+			}
+		});
+
+		assertThat(scan()).isEmpty();
 	}
 
 	private void respond(StatusForBody statusForBody) {

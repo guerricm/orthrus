@@ -88,6 +88,17 @@ class AiSlaveControllerTimeoutTests {
 	}
 
 	@Test
+	void anEndpointReportedAsNotRunIsNotCountedAsATest() {
+		ScanAttempt notRun = new ScanAttempt("ai-injection", "AI INJECTION Agent (not run: task budget spent)", "GET",
+				"http://target.example/api/left", AttemptStatus.ERROR, List.of());
+		ScanExecutor partial = (request) -> Flux.just(attempt(), notRun);
+
+		controller(partial, 5).receiveScanTask(this.task).block();
+
+		verify(this.managerClient, timeout(4000)).completeTask(eq(42L), any(), eq(1), eq(0));
+	}
+
+	@Test
 	void aTaskFinishingWithinTheBudgetCompletes() {
 		ScanExecutor quick = (request) -> Flux.just(attempt(), attempt());
 

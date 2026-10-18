@@ -117,7 +117,9 @@ public class HostHeaderInjectionScanner implements SecurityScanner {
 	 */
 	private Mono<Vulnerability> executeAndCheck(Operation operation, Map<String, String> extraHeaders,
 			String injectionPoint, String injectedDomain) {
-		return httpClient.sendWithoutRedirects(operation, extraHeaders).flatMap((response) -> {
+		// Not retried: a target that drops the connection on an unknown Host has
+		// answered.
+		return httpClient.sendWithoutRedirects(operation, extraHeaders, false).flatMap((response) -> {
 			Operation testOp = withHeaders(operation, extraHeaders);
 			if (response.bodyContainsExact(injectedDomain)) {
 				return Mono.just(createVulnerabilityWithTrace("Host Header Injection - Content Reflection",

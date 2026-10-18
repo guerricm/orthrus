@@ -71,7 +71,7 @@ public record OpenApiEndpoints(String baseUrl, List<Endpoint> endpoints) {
 					if (pathItem.has(method) && endpoints.size() < MAX_ENDPOINTS) {
 						JsonNode op = pathItem.get(method);
 						endpoints.add(new Endpoint(method.toUpperCase(Locale.ROOT), base + path,
-								readParameters(pathItem, op), readRequestBodySchema(op, root)));
+								readParameters(pathItem, op, root), readRequestBodySchema(op, root)));
 					}
 				}
 			});
@@ -130,23 +130,26 @@ public record OpenApiEndpoints(String baseUrl, List<Endpoint> endpoints) {
 	/**
 	 * Reads an operation's parameters, merging the path-level parameters that apply to
 	 * every method with the operation's own. Operation parameters win on a name/location
-	 * clash.
+	 * clash. Parameters declared as a {@code $ref} to the document's components are
+	 * resolved.
 	 * @param pathItem the path item node
 	 * @param op the operation node
+	 * @param root the whole document, for resolving references
 	 * @return the parameters, never null
 	 */
-	private static List<Endpoint.Parameter> readParameters(JsonNode pathItem, JsonNode op) {
+	private static List<Endpoint.Parameter> readParameters(JsonNode pathItem, JsonNode op, JsonNode root) {
 		List<Endpoint.Parameter> params = new ArrayList<>();
-		addParameters(params, pathItem.get("parameters"));
-		addParameters(params, op.get("parameters"));
+		addParameters(params, pathItem.get("parameters"), root);
+		addParameters(params, op.get("parameters"), root);
 		return params;
 	}
 
-	private static void addParameters(List<Endpoint.Parameter> into, JsonNode array) {
+	private static void addParameters(List<Endpoint.Parameter> into, JsonNode array, JsonNode root) {
 		if (array == null || !array.isArray()) {
 			return;
 		}
-		for (JsonNode p : array) {
+		for (JsonNode entry : array) {
+			JsonNode p = resolveRef(entry, root);
 			String name = p.hasNonNull("name") ? p.get("name").asString() : null;
 			if (name == null) {
 				continue;
@@ -163,15 +166,16 @@ public record OpenApiEndpoints(String baseUrl, List<Endpoint> endpoints) {
 
 	/**
 	 * Reads and renders the JSON request body schema of an operation into a compact,
-	 * one-line description, resolving a top-level {@code $ref} against the document's
-	 * components. Only the first level of properties is rendered.
+	 * one-line description, resolving a {@code $ref} on the request body or its schema
+	 * against the document's components. Only the first level of properties is rendered.
 	 * @param op the operation node
 	 * @param root the whole document, for resolving references
 	 * @return the rendered schema, or null when there is no JSON body
 	 */
 	private static String readRequestBodySchema(JsonNode op, JsonNode root) {
-		JsonNode content = (op.get("requestBody") != null) ? op.get("requestBody").get("content") : null;
-		if (content == null || !content.isObject()) {
+		JsonNode requestBody = resolveRef(op.get("requestBody"), root);
+		JsonNode content = (requestBody != null) ? requestBody.get("content") : null;
+		if (content == null || !content.isObject() || content.isEmpty()) {
 			return null;
 		}
 		JsonNode media = content.has("application/json") ? content.get("application/json")

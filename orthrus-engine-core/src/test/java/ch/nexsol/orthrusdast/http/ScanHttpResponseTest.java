@@ -35,7 +35,8 @@ class ScanHttpResponseTest {
 
 		assertThat(error.clientError()).isTrue();
 		assertThat(error.statusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-		assertThat(error.body()).contains("abc.oast.invalid");
+		assertThat(error.body()).isEmpty();
+		assertThat(error.clientMessage()).contains("abc.oast.invalid");
 		assertThat(error.bodyContainsExact("abc.oast.invalid")).isFalse();
 		assertThat(error.bodyContains("ABC.OAST.INVALID")).isFalse();
 	}
@@ -45,6 +46,7 @@ class ScanHttpResponseTest {
 		ScanHttpResponse real = new ScanHttpResponse(HttpStatus.OK, new HttpHeaders(), "link to abc.oast.invalid", 5);
 
 		assertThat(real.clientError()).isFalse();
+		assertThat(real.clientMessage()).isNull();
 		assertThat(real.bodyContainsExact("abc.oast.invalid")).isTrue();
 	}
 

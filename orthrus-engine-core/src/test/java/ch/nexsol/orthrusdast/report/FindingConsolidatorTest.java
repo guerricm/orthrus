@@ -113,8 +113,28 @@ class FindingConsolidatorTest {
 		assertThat(FindingConsolidator.consolidate(List.of(only))).containsExactly(only);
 	}
 
+	@Test
+	void aFindingWithoutDescriptionConsolidatesWithoutALiteralNull() {
+		List<Vulnerability> findings = List.of(
+				finding("security-headers", "Missing Security Header: HSTS", RiskLevel.LOW, "GET", HOST + "/a", null),
+				finding("security-headers", "Missing Security Header: HSTS", RiskLevel.LOW, "GET", HOST + "/b", null));
+
+		List<Vulnerability> consolidated = FindingConsolidator.consolidate(findings);
+
+		assertThat(consolidated).singleElement()
+			.extracting(Vulnerability::description)
+			.asString()
+			.doesNotContain("null")
+			.startsWith("Observed on 2 endpoints");
+	}
+
 	private static Vulnerability finding(String scannerId, String name, RiskLevel risk, String method, String url) {
-		return new Vulnerability("id-" + name.hashCode() + url.hashCode(), name, "Description of " + name, risk,
+		return finding(scannerId, name, risk, method, url, "Description of " + name);
+	}
+
+	private static Vulnerability finding(String scannerId, String name, RiskLevel risk, String method, String url,
+			String description) {
+		return new Vulnerability("id-" + name.hashCode() + url.hashCode(), name, description, risk,
 				Vulnerability.Confidence.HIGH, scannerId, url, method, null, List.of(), List.of(), null, "evidence",
 				"fix", "req", "resp", "vector", "impact");
 	}

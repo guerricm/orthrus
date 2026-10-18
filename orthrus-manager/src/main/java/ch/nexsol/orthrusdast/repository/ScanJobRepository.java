@@ -20,6 +20,8 @@ import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.r2dbc.repository.Modifying;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
@@ -43,8 +45,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 
 	Mono<ScanJobEntity> findByResultId(String resultId);
 
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET vulns_count = COALESCE(vulns_count, 0) + :vulns, tests_count = COALESCE(tests_count, 0) + :tests WHERE id = :id")
+	@Modifying
+	@Query("UPDATE scan_jobs SET vulns_count = COALESCE(vulns_count, 0) + :vulns, tests_count = COALESCE(tests_count, 0) + :tests WHERE id = :id")
 	Mono<Integer> incrementCounts(Long id, int vulns, int tests);
 
 	/**
@@ -54,8 +56,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param vulns the consolidated vulnerability count
 	 * @return the number of rows updated
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET vulns_count = :vulns WHERE id = :id")
+	@Modifying
+	@Query("UPDATE scan_jobs SET vulns_count = :vulns WHERE id = :id")
 	Mono<Integer> setVulnsCount(Long id, int vulns);
 
 	/**
@@ -65,8 +67,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param slaveId the node the job's tasks are pinned to
 	 * @return the number of rows updated
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET assigned_slave_id = :slaveId WHERE id = :id")
+	@Modifying
+	@Query("UPDATE scan_jobs SET assigned_slave_id = :slaveId WHERE id = :id")
 	Mono<Integer> assignSlave(Long id, String slaveId);
 
 	/**
@@ -76,8 +78,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param startedAt when the claim was made
 	 * @return 1 when this caller won the job, 0 when someone else already had it
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET status = 'RUNNING', started_at = :startedAt WHERE id = :id AND status = 'PENDING'")
+	@Modifying
+	@Query("UPDATE scan_jobs SET status = 'RUNNING', started_at = :startedAt WHERE id = :id AND status = 'PENDING'")
 	Mono<Integer> claimForOrchestration(Long id, Instant startedAt);
 
 	/**
@@ -86,8 +88,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param resultId the result row it writes into
 	 * @return the number of rows updated
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET result_id = :resultId WHERE id = :id")
+	@Modifying
+	@Query("UPDATE scan_jobs SET result_id = :resultId WHERE id = :id")
 	Mono<Integer> attachResult(Long id, String resultId);
 
 	/**
@@ -95,7 +97,7 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * yet. Their tasks stay pending until the recon is stored.
 	 * @return the jobs awaiting recon
 	 */
-	@org.springframework.data.r2dbc.repository.Query("SELECT * FROM scan_jobs WHERE status = 'RUNNING' AND ai_mode = TRUE AND ai_recon IS NULL")
+	@Query("SELECT * FROM scan_jobs WHERE status = 'RUNNING' AND ai_mode = TRUE AND ai_recon IS NULL")
 	Flux<ScanJobEntity> findRunningAiJobsAwaitingRecon();
 
 	/**
@@ -106,8 +108,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param aiRecon the serialized recon result
 	 * @return the number of rows updated
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET ai_recon = :aiRecon WHERE id = :id")
+	@Modifying
+	@Query("UPDATE scan_jobs SET ai_recon = :aiRecon WHERE id = :id")
 	Mono<Integer> saveAiRecon(Long id, String aiRecon);
 
 	/**
@@ -118,8 +120,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param completedAt when the job ended
 	 * @return 1 when this caller closed the job, 0 when it was no longer running
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET status = :status, completed_at = :completedAt WHERE id = :id AND status = 'RUNNING'")
+	@Modifying
+	@Query("UPDATE scan_jobs SET status = :status, completed_at = :completedAt WHERE id = :id AND status = 'RUNNING'")
 	Mono<Integer> finishJob(Long id, String status, Instant completedAt);
 
 	/**
@@ -129,8 +131,8 @@ public interface ScanJobRepository extends R2dbcRepository<ScanJobEntity, Long> 
 	 * @param completedAt when the job was cancelled
 	 * @return 1 when this caller cancelled the job, 0 when it had already finished
 	 */
-	@org.springframework.data.r2dbc.repository.Modifying
-	@org.springframework.data.r2dbc.repository.Query("UPDATE scan_jobs SET status = 'CANCELLED', completed_at = :completedAt WHERE id = :id AND status IN ('PENDING', 'RUNNING')")
+	@Modifying
+	@Query("UPDATE scan_jobs SET status = 'CANCELLED', completed_at = :completedAt WHERE id = :id AND status IN ('PENDING', 'RUNNING')")
 	Mono<Integer> cancelJob(Long id, Instant completedAt);
 
 }

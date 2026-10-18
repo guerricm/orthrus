@@ -197,8 +197,9 @@ public interface SecurityScanner {
 				.forEach((k, values) -> values.forEach((v) -> sb.append(k).append(": ").append(v).append("\n")));
 		}
 		sb.append("\n");
-		if (res.body() != null) {
-			sb.append((res.body().length() > 1000) ? res.body().substring(0, 1000) + "... [TRUNCATED]" : res.body());
+		String body = res.clientError() ? res.clientMessage() : res.body();
+		if (body != null) {
+			sb.append((body.length() > 1000) ? body.substring(0, 1000) + "... [TRUNCATED]" : body);
 		}
 		return sb.toString();
 	}

@@ -133,10 +133,12 @@ public class ScanHttpClient {
 	 * following redirects: for probes where a redirect is itself the evidence.
 	 * @param operation the operation
 	 * @param extraHeaders extra headers
+	 * @param retryTransientErrors whether to retry transient errors
 	 * @return the result
 	 */
-	public Mono<ScanHttpResponse> sendWithoutRedirects(Operation operation, Map<String, String> extraHeaders) {
-		return send(this.noRedirectWebClient, operation, extraHeaders, null, true);
+	public Mono<ScanHttpResponse> sendWithoutRedirects(Operation operation, Map<String, String> extraHeaders,
+			boolean retryTransientErrors) {
+		return send(this.noRedirectWebClient, operation, extraHeaders, null, retryTransientErrors);
 	}
 
 	private Mono<ScanHttpResponse> send(WebClient client, Operation operation, Map<String, String> extraHeaders,

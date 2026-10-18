@@ -28,8 +28,9 @@ import org.springframework.http.HttpStatusCode;
  * @param body the response body (possibly truncated)
  * @param responseTimeMs how long the exchange took
  * @param clientError true when the request never got an answer from the target (DNS,
- * connection, timeout) and this response was produced by the client to report it; its
- * body is the client's error message, never target content
+ * connection, timeout) and this response was produced by the client to report it; the
+ * client's error message is then {@link #clientMessage()}, and {@link #body()} is empty
+ * so no check reads that message as target content
  */
 public record ScanHttpResponse(HttpStatusCode statusCode, HttpHeaders headers, String body, long responseTimeMs,
 		boolean clientError) {
@@ -47,6 +48,21 @@ public record ScanHttpResponse(HttpStatusCode statusCode, HttpHeaders headers, S
 	public static ScanHttpResponse clientError(String message, long elapsedMs) {
 		return new ScanHttpResponse(HttpStatus.SERVICE_UNAVAILABLE, new HttpHeaders(), "Error: " + message, elapsedMs,
 				true);
+	}
+
+	/**
+	 * The target's body: empty for a client error, whose message is never target content.
+	 */
+	@Override
+	public String body() {
+		return this.clientError ? "" : this.body;
+	}
+
+	/**
+	 * The client's failure message for a client error, for the evidence; null otherwise.
+	 */
+	public String clientMessage() {
+		return this.clientError ? this.body : null;
 	}
 
 	/**
@@ -75,7 +91,8 @@ public record ScanHttpResponse(HttpStatusCode statusCode, HttpHeaders headers, S
 	 * false for a client error: the client's own message must not pass for a reflection.
 	 */
 	public boolean bodyContains(String text) {
-		return !this.clientError && body != null && body.toLowerCase().contains(text.toLowerCase());
+		String targetBody = body();
+		return targetBody != null && targetBody.toLowerCase().contains(text.toLowerCase());
 	}
 
 	/**
@@ -83,6 +100,7 @@ public record ScanHttpResponse(HttpStatusCode statusCode, HttpHeaders headers, S
 	 * false for a client error.
 	 */
 	public boolean bodyContainsExact(String text) {
-		return !this.clientError && body != null && body.contains(text);
+		String targetBody = body();
+		return targetBody != null && targetBody.contains(text);
 	}
 }

@@ -37,7 +37,8 @@ Findings that describe the whole host rather than one endpoint (missing security
 cleartext issues, the CORS policy, the server banner) are consolidated into one finding per host,
 kept at the highest severity and listing every endpoint they were seen on; the counts, the grade and
 the scan list use the consolidated figures. A probe the target never answered (DNS, connection or
-timeout failure) is never read as the target reflecting a payload.
+timeout failure) carries an empty body, so it is never read as the target reflecting a payload or
+as matching another response.
 
 | Scanner ID | Description | Associated CWE |
 | --- | --- | --- |
@@ -361,7 +362,8 @@ the agent is stopped once it has used them) and a per-task timeout
 spent, no further endpoint is started, the agents still running are interrupted, and the task
 completes with the findings gathered so far (it is not failed, so the manager does not requeue it
 to start over). Every endpoint left unprobed then appears in the report's execution details as an
-ERROR attempt "not run: task budget spent", so partial coverage is visible. Size it to the target:
+ERROR attempt "not run: task budget spent", so partial coverage is visible; such attempts are not
+counted as tests. The budget also bounds the node's own recon when the task carries none. Size it to the target:
 with a large local model an agent can take minutes per endpoint.
 
 Latency levers: on Ollama the hidden reasoning of thinking models (Qwen3...) is turned off

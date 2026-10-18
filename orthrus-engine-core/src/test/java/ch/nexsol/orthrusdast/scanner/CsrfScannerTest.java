@@ -87,10 +87,11 @@ class CsrfScannerTest {
 	}
 
 	@Test
-	void aTargetSettingASessionCookieIsReported() {
-		acceptEverything(new MockResponse().setBody("deleted").addHeader("Set-Cookie", "SESSION=abc; Path=/"));
+	void aCookieSetByTheTargetOnAHeaderAuthenticatedRequestIsNotReported() {
+		acceptEverything(new MockResponse().setBody("deleted").addHeader("Set-Cookie", "JSESSIONID=abc; Path=/"));
+		Operation delete = operation(Map.of(), SecurityScheme.apiKey("k", "api_key"));
 
-		assertThat(scan(operation(Map.of(), null))).isNotEmpty();
+		assertThat(scan(delete)).isEmpty();
 	}
 
 	private void acceptEverything(MockResponse response) {

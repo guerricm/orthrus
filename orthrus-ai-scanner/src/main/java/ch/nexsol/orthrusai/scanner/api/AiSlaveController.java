@@ -105,13 +105,16 @@ public class AiSlaveController {
 		Disposable disposable = this.scanExecutor.execute(request, budget)
 			.bufferTimeout(10, Duration.ofSeconds(1))
 			.flatMap((batch) -> {
-				testsCount.addAndGet(batch.size());
 				for (ScanAttempt attempt : batch) {
 					if (attempt.vulnerabilities() != null) {
 						vulnsCount.addAndGet(attempt.vulnerabilities().size());
 					}
+					// An endpoint left unprobed is reported, not tested.
 					if (attempt.status() == AttemptStatus.ERROR) {
 						notRunCount.incrementAndGet();
+					}
+					else {
+						testsCount.incrementAndGet();
 					}
 				}
 				return this.managerClient.sendTaskAttemptsBatch(request.taskId(), batch);

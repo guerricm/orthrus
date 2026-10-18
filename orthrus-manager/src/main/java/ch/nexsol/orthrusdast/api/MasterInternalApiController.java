@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.CompleteTaskRequest;
 import ch.nexsol.orthrus.protocol.node.FailTaskRequest;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
@@ -165,14 +166,20 @@ public class MasterInternalApiController {
 		return this.scanTaskRepository.findById(id)
 			.flatMap((task) -> this.scanJobRepository.findById(task.getScanJobId()).flatMap((job) -> {
 				int vulnsInBatch = 0;
+				int testsInBatch = 0;
 				for (ScanAttempt attempt : batch) {
 					if (attempt.vulnerabilities() != null) {
 						vulnsInBatch += attempt.vulnerabilities().size();
 					}
+					// An attempt that never ran, whether a scanner error or an endpoint
+					// left unprobed when a budget is spent, is listed but not counted.
+					if (attempt.status() != AttemptStatus.ERROR) {
+						testsInBatch++;
+					}
 				}
 
 				return this.scanResultService.saveBatch(job.getResultId(), batch)
-					.then(this.scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, batch.size()))
+					.then(this.scanJobRepository.incrementCounts(job.getId(), vulnsInBatch, testsInBatch))
 					.thenReturn(ResponseEntity.ok().<Void>build());
 			}))
 			.defaultIfEmpty(ResponseEntity.notFound().build());

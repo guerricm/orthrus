@@ -75,15 +75,18 @@ public class LlmScanExecutor implements ScanExecutor {
 	 * Probes the endpoints until done or stopped. When the stop signal fires, the agents
 	 * still running are interrupted and every endpoint without a verdict is reported as
 	 * an ERROR attempt, so the report shows the coverage was partial instead of silently
-	 * listing fewer endpoints.
+	 * listing fewer endpoints. The signal bounds the whole task, recon included: a recon
+	 * still running when it fires yields no endpoint at all.
 	 * @param request the dispatched task
-	 * @param stop fires when the task budget is spent
+	 * @param stop fires when the task budget is spent; subscribed once, so a timer starts
+	 * when the task does
 	 * @return the attempts, one per endpoint
 	 */
 	@Override
 	public Flux<ScanAttempt> execute(ScanTaskRequest request, Mono<?> stop) {
 		String family = request.phase();
-		return recon(request).flatMapMany((recon) -> {
+		Mono<?> budget = stop.cache();
+		return recon(request).takeUntilOther(budget).flatMapMany((recon) -> {
 			log.info("AI task {} ({}): probing {} endpoint(s){}{}", request.taskId(), family, recon.endpoints().size(),
 					recon.shared() ? " from orchestrator recon" : " from local recon",
 					recon.probeConfig().credentials().isEmpty() ? "" : " (authenticated)");
@@ -91,7 +94,7 @@ public class LlmScanExecutor implements ScanExecutor {
 			Flux<ScanAttempt> probed = Flux.fromIterable(recon.endpoints())
 				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), recon.probeConfig())
 					.doOnNext((attempt) -> done.add(endpoint)), ENDPOINT_CONCURRENCY)
-				.takeUntilOther(stop);
+				.takeUntilOther(budget);
 			Flux<ScanAttempt> notRun = Flux.defer(() -> Flux.fromIterable(recon.endpoints())
 				.filter((endpoint) -> !done.contains(endpoint))
 				.map((endpoint) -> notRunAttempt(family, endpoint)));

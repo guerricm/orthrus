@@ -109,8 +109,8 @@ public final class FindingConsolidator {
 			.map((finding) -> finding.operationMethod() + " " + finding.operationUrl())
 			.distinct()
 			.toList();
-		String description = worst.description() + "\n\nObserved on " + endpoints.size() + " endpoints: "
-				+ String.join(", ", endpoints) + ".";
+		String description = ((worst.description() != null) ? worst.description() + "\n\n" : "") + "Observed on "
+				+ endpoints.size() + " endpoints: " + String.join(", ", endpoints) + ".";
 		return new Vulnerability(worst.id(), worst.name(), description, worst.riskLevel(), worst.confidence(),
 				worst.scannerId(), worst.operationUrl(), worst.operationMethod(), worst.cwe(), worst.cves(),
 				worst.capecs(), worst.cvssScore(), worst.evidence(), worst.remediation(), worst.requestDetails(),
