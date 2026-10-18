@@ -66,10 +66,12 @@ public record OpenApiEndpoints(String baseUrl, List<Endpoint> endpoints) {
 			List<Endpoint> endpoints = new ArrayList<>();
 			paths.properties().forEach((entry) -> {
 				String path = entry.getKey();
-				JsonNode methods = entry.getValue();
+				JsonNode pathItem = entry.getValue();
 				for (String method : HTTP_METHODS) {
-					if (methods.has(method) && endpoints.size() < MAX_ENDPOINTS) {
-						endpoints.add(new Endpoint(method.toUpperCase(Locale.ROOT), base + path));
+					if (pathItem.has(method) && endpoints.size() < MAX_ENDPOINTS) {
+						JsonNode op = pathItem.get(method);
+						endpoints.add(new Endpoint(method.toUpperCase(Locale.ROOT), base + path,
+								readParameters(pathItem, op), readRequestBodySchema(op, root)));
 					}
 				}
 			});
@@ -117,6 +119,150 @@ public record OpenApiEndpoints(String baseUrl, List<Endpoint> endpoints) {
 		catch (IllegalArgumentException ex) {
 			return target;
 		}
+	}
+
+	/**
+	 * Upper bound on properties rendered from a body schema, so a large model does not
+	 * bloat every agent turn (the whole conversation is resent each turn).
+	 */
+	private static final int MAX_SCHEMA_PROPERTIES = 24;
+
+	/**
+	 * Reads an operation's parameters, merging the path-level parameters that apply to
+	 * every method with the operation's own. Operation parameters win on a name/location
+	 * clash.
+	 * @param pathItem the path item node
+	 * @param op the operation node
+	 * @return the parameters, never null
+	 */
+	private static List<Endpoint.Parameter> readParameters(JsonNode pathItem, JsonNode op) {
+		List<Endpoint.Parameter> params = new ArrayList<>();
+		addParameters(params, pathItem.get("parameters"));
+		addParameters(params, op.get("parameters"));
+		return params;
+	}
+
+	private static void addParameters(List<Endpoint.Parameter> into, JsonNode array) {
+		if (array == null || !array.isArray()) {
+			return;
+		}
+		for (JsonNode p : array) {
+			String name = p.hasNonNull("name") ? p.get("name").asString() : null;
+			if (name == null) {
+				continue;
+			}
+			String in = p.hasNonNull("in") ? p.get("in").asString() : "query";
+			JsonNode schema = p.get("schema");
+			String type = (schema != null && schema.hasNonNull("type")) ? schema.get("type").asString()
+					: (p.hasNonNull("type") ? p.get("type").asString() : "string");
+			boolean required = p.hasNonNull("required") && p.get("required").asBoolean();
+			into.removeIf((existing) -> existing.name().equals(name) && existing.in().equals(in));
+			into.add(new Endpoint.Parameter(name, in, type, required));
+		}
+	}
+
+	/**
+	 * Reads and renders the JSON request body schema of an operation into a compact,
+	 * one-line description, resolving a top-level {@code $ref} against the document's
+	 * components. Only the first level of properties is rendered.
+	 * @param op the operation node
+	 * @param root the whole document, for resolving references
+	 * @return the rendered schema, or null when there is no JSON body
+	 */
+	private static String readRequestBodySchema(JsonNode op, JsonNode root) {
+		JsonNode content = (op.get("requestBody") != null) ? op.get("requestBody").get("content") : null;
+		if (content == null || !content.isObject()) {
+			return null;
+		}
+		JsonNode media = content.has("application/json") ? content.get("application/json")
+				: content.properties().iterator().next().getValue();
+		JsonNode schema = (media != null) ? media.get("schema") : null;
+		if (schema == null) {
+			return null;
+		}
+		return renderObjectSchema(resolveRef(schema, root), root);
+	}
+
+	private static String renderObjectSchema(JsonNode schema, JsonNode root) {
+		if (schema == null) {
+			return null;
+		}
+		JsonNode properties = schema.get("properties");
+		String title = schema.hasNonNull("title") ? schema.get("title").asString() : "";
+		if (properties == null || !properties.isObject()) {
+			String type = schema.hasNonNull("type") ? schema.get("type").asString() : "object";
+			return title.isEmpty() ? type : title + " (" + type + ")";
+		}
+		List<String> required = requiredNames(schema);
+		StringBuilder sb = new StringBuilder();
+		if (!title.isEmpty()) {
+			sb.append(title).append(' ');
+		}
+		sb.append("{ ");
+		int count = 0;
+		for (var entry : properties.properties()) {
+			if (count == MAX_SCHEMA_PROPERTIES) {
+				sb.append(", ...");
+				break;
+			}
+			if (count > 0) {
+				sb.append(", ");
+			}
+			sb.append(entry.getKey()).append(": ").append(typeOf(entry.getValue(), root));
+			if (required.contains(entry.getKey())) {
+				sb.append(" (required)");
+			}
+			count++;
+		}
+		sb.append(" }");
+		return sb.toString();
+	}
+
+	private static List<String> requiredNames(JsonNode schema) {
+		List<String> names = new ArrayList<>();
+		JsonNode required = schema.get("required");
+		if (required != null && required.isArray()) {
+			for (JsonNode n : required) {
+				names.add(n.asString());
+			}
+		}
+		return names;
+	}
+
+	private static String typeOf(JsonNode property, JsonNode root) {
+		if (property.hasNonNull("$ref")) {
+			return refName(property.get("$ref").asString());
+		}
+		String type = property.hasNonNull("type") ? property.get("type").asString() : "object";
+		if ("array".equals(type)) {
+			JsonNode items = property.get("items");
+			return (items != null) ? "array<" + typeOf(items, root) + ">" : "array";
+		}
+		return type;
+	}
+
+	private static JsonNode resolveRef(JsonNode node, JsonNode root) {
+		if (node != null && node.hasNonNull("$ref")) {
+			String ref = node.get("$ref").asString();
+			if (ref.startsWith("#/")) {
+				JsonNode resolved = root;
+				for (String segment : ref.substring(2).split("/")) {
+					if (resolved == null) {
+						return node;
+					}
+					resolved = resolved.get(segment);
+				}
+				if (resolved != null) {
+					return resolved;
+				}
+			}
+		}
+		return node;
+	}
+
+	private static String refName(String ref) {
+		int slash = ref.lastIndexOf('/');
+		return (slash >= 0 && slash < ref.length() - 1) ? ref.substring(slash + 1) : ref;
 	}
 
 	/**

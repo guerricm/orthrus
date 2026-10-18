@@ -104,6 +104,10 @@ public class FamilyAgent {
 		FindingTool findingTool = new FindingTool(runContext, endpoint.url(), endpoint.method());
 
 		String userPrompt = "Test this endpoint: " + endpoint.method() + " " + endpoint.url();
+		String shape = describeShape(endpoint);
+		if (!shape.isEmpty()) {
+			userPrompt += "\n\n" + shape;
+		}
 		if (context != null && !context.isBlank()) {
 			userPrompt += "\n\nPrior recon of the target (shared context): " + context;
 		}
@@ -141,6 +145,37 @@ public class FamilyAgent {
 		log.info("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
 				runContext.httpCallsUsed(), runContext.findings().size());
 		return runContext.findings();
+	}
+
+	/**
+	 * Describes the operation's shape read from the API spec, its parameters and request
+	 * body, so the agent forges realistic requests instead of guessing field names and
+	 * types. Empty when recon found no shape.
+	 * @param endpoint the endpoint being scanned
+	 * @return a note for the prompt, or an empty string when nothing is known
+	 */
+	private static String describeShape(Endpoint endpoint) {
+		boolean hasParams = !endpoint.parameters().isEmpty();
+		boolean hasBody = endpoint.requestBodySchema() != null && !endpoint.requestBodySchema().isBlank();
+		if (!hasParams && !hasBody) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder(
+				"Operation shape from the API spec (use real values, do not invent field names):");
+		for (Endpoint.Parameter p : endpoint.parameters()) {
+			sb.append("\n- ")
+				.append(p.in())
+				.append(" parameter ")
+				.append(p.name())
+				.append(" (")
+				.append(p.type())
+				.append(p.required() ? ", required" : "")
+				.append(")");
+		}
+		if (hasBody) {
+			sb.append("\n- request body: ").append(endpoint.requestBodySchema());
+		}
+		return sb.toString();
 	}
 
 	/**

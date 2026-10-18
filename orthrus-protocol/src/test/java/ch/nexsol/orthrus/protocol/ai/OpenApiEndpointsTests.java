@@ -16,6 +16,8 @@
 
 package ch.nexsol.orthrus.protocol.ai;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -68,6 +70,50 @@ class OpenApiEndpointsTests {
 		assertThat(OpenApiEndpoints.parse(this.objectMapper, "https://host/", "{\"paths\":{}}").endpoints()).isEmpty();
 		assertThat(OpenApiEndpoints.parse(this.objectMapper, "https://host/x", "{").baseUrl())
 			.isEqualTo("https://host");
+	}
+
+	@Test
+	void readsParametersMergingPathLevelAndOperationLevel() {
+		String spec = """
+				{"openapi":"3.0.0","paths":{"/pet/{id}":{
+				"parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer"}}],
+				"get":{"parameters":[{"name":"verbose","in":"query","schema":{"type":"boolean"}}]}}}}""";
+
+		OpenApiEndpoints parsed = OpenApiEndpoints.parse(this.objectMapper, "https://host/openapi.json", spec);
+
+		assertThat(parsed.endpoints()).singleElement()
+			.extracting(Endpoint::parameters)
+			.isEqualTo(List.of(new Endpoint.Parameter("id", "path", "integer", true),
+					new Endpoint.Parameter("verbose", "query", "boolean", false)));
+	}
+
+	@Test
+	void rendersTheRequestBodySchemaResolvingAComponentRef() {
+		String spec = """
+				{"openapi":"3.0.0","paths":{"/pet":{"post":{"requestBody":{"content":{"application/json":{
+				"schema":{"$ref":"#/components/schemas/Pet"}}}}}}},
+				"components":{"schemas":{"Pet":{"title":"Pet","type":"object","required":["name"],
+				"properties":{"id":{"type":"integer"},"name":{"type":"string"},
+				"tags":{"type":"array","items":{"$ref":"#/components/schemas/Tag"}},
+				"status":{"type":"string"}}}}}}""";
+
+		OpenApiEndpoints parsed = OpenApiEndpoints.parse(this.objectMapper, "https://host/openapi.json", spec);
+
+		assertThat(parsed.endpoints()).singleElement()
+			.extracting(Endpoint::requestBodySchema)
+			.isEqualTo("Pet { id: integer, name: string (required), tags: array<Tag>, status: string }");
+	}
+
+	@Test
+	void leavesShapeEmptyForOperationsWithoutParametersOrBody() {
+		String spec = """
+				{"openapi":"3.0.0","paths":{"/health":{"get":{}}}}""";
+
+		OpenApiEndpoints parsed = OpenApiEndpoints.parse(this.objectMapper, "https://host/openapi.json", spec);
+
+		assertThat(parsed.endpoints()).singleElement()
+			.satisfies((e) -> assertThat(e.parameters()).isEmpty())
+			.satisfies((e) -> assertThat(e.requestBodySchema()).isNull());
 	}
 
 	@Test

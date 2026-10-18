@@ -97,7 +97,8 @@ public class ReconService {
 		if (overrideHost != null && !overrideHost.isBlank()) {
 			base = OpenApiEndpoints.rewriteHost(base, overrideHost);
 			endpoints = endpoints.stream()
-				.map((e) -> new Endpoint(e.method(), OpenApiEndpoints.rewriteHost(e.url(), overrideHost)))
+				.map((e) -> new Endpoint(e.method(), OpenApiEndpoints.rewriteHost(e.url(), overrideHost),
+						e.parameters(), e.requestBodySchema()))
 				.toList();
 		}
 		log.info("Recon of {} found {} endpoint(s)", target, endpoints.size());
