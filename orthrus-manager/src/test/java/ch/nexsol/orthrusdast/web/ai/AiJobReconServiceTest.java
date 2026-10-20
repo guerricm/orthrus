@@ -32,8 +32,11 @@ import ch.nexsol.orthrus.protocol.ai.AiScanContext;
 import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.ai.Endpoint;
 import ch.nexsol.orthrus.protocol.ai.ReconResult;
+import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
+import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.JobStatus;
+import ch.nexsol.orthrusdast.model.OAuth2Config;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
@@ -41,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,9 +65,14 @@ class AiJobReconServiceTest {
 
 	private AiJobReconService service;
 
+	@Mock
+	private OAuth2TokenFetcher tokenFetcher;
+
 	@BeforeEach
 	void setUp() {
-		this.service = new AiJobReconService(this.orchestratorClient, this.objectMapper);
+		this.service = new AiJobReconService(this.orchestratorClient, this.objectMapper, this.tokenFetcher);
+		lenient().when(this.tokenFetcher.refreshAuth(any(ScanConfiguration.class)))
+			.thenAnswer((invocation) -> Mono.just(invocation.getArgument(0)));
 	}
 
 	@Test
@@ -121,6 +130,22 @@ class AiJobReconServiceTest {
 
 		verify(this.client).recon(eq("https://api.test"), any(),
 				eq(List.of(new Credential("HEADER", "Authorization", "Bearer secret-token"))));
+	}
+
+	@Test
+	void theOrchestratorReconIsSentAnOauth2TokenIssuedForTheRecon() {
+		when(this.orchestratorClient.getIfAvailable()).thenReturn(this.client);
+		when(this.client.recon(any(), any(), anyList())).thenReturn(Mono.just(new ReconResult(null, List.of(), "")));
+		ScanConfiguration oauth2Plan = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "html", null,
+				null, "en", false, GatewayType.AUTO, null, null,
+				new OAuth2Config("https://idp.test/token", "client", "secret", "client_credentials", null), null, null);
+		when(this.tokenFetcher.refreshAuth(any(ScanConfiguration.class)))
+			.thenReturn(Mono.just(oauth2Plan.withAuthSchemes(SecurityScheme.bearer("fresh-token"), null)));
+
+		StepVerifier.create(this.service.reconJsonFor(job(oauth2Plan))).expectNextCount(1).verifyComplete();
+
+		verify(this.client).recon(eq("https://api.test"), any(),
+				eq(List.of(new Credential("HEADER", "Authorization", "Bearer fresh-token"))));
 	}
 
 	@Test

@@ -33,7 +33,6 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.GatewayType;
@@ -54,8 +53,6 @@ public class ScanController {
 
 	private static final Logger log = LoggerFactory.getLogger(ScanController.class);
 
-	private final OAuth2TokenFetcher tokenFetcher;
-
 	private final ScanJobRepository scanJobRepository;
 
 	private final tools.jackson.databind.ObjectMapper objectMapper;
@@ -69,10 +66,8 @@ public class ScanController {
 	 */
 	private final Set<String> knownDiscovererIds;
 
-	public ScanController(OAuth2TokenFetcher tokenFetcher, ScanJobRepository scanJobRepository,
-			tools.jackson.databind.ObjectMapper objectMapper, SlaveNodeRepository slaveNodeRepository,
-			List<EndpointDiscoverer> discoverers) {
-		this.tokenFetcher = tokenFetcher;
+	public ScanController(ScanJobRepository scanJobRepository, tools.jackson.databind.ObjectMapper objectMapper,
+			SlaveNodeRepository slaveNodeRepository, List<EndpointDiscoverer> discoverers) {
 		this.scanJobRepository = scanJobRepository;
 		this.objectMapper = objectMapper;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -107,40 +102,29 @@ public class ScanController {
 	@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	public Mono<ResponseEntity<ScanJobAccepted>> triggerScan(@RequestBody ScanRequest request) {
 
-		return Mono.justOrEmpty(request.oauth2())
-			.flatMap((oauth2Config) -> this.tokenFetcher.fetchTokens(oauth2Config))
-			.defaultIfEmpty(List.of())
-			.flatMap((fetchedTokens) -> {
-				SecurityScheme authScheme = request.authScheme();
-				SecurityScheme secondaryAuthScheme = request.secondaryAuthScheme();
+		// OAuth2 tokens are issued when the job's tasks are dispatched, not stored here.
+		return Mono.defer(() -> {
+			SecurityScheme authScheme = request.authScheme();
+			SecurityScheme secondaryAuthScheme = request.secondaryAuthScheme();
 
-				if (!fetchedTokens.isEmpty()) {
-					authScheme = fetchedTokens.get(0);
-					if (fetchedTokens.size() > 1) {
-						secondaryAuthScheme = fetchedTokens.get(1);
-					}
-				}
+			ScanConfiguration config = new ScanConfiguration(
+					(request.includeScanners() != null) ? request.includeScanners() : List.of(),
+					(request.excludeScanners() != null) ? request.excludeScanners() : List.of(),
+					(request.concurrency() > 0) ? request.concurrency() : 10, 5000, 10000, request.ignoreSslErrors(),
+					"json", authScheme, secondaryAuthScheme, (request.language() != null) ? request.language() : "en",
+					(request.includePassed() != null) ? request.includePassed() : false, GatewayType.AUTO, null, null,
+					request.oauth2(), request.overrideHost(), null);
 
-				ScanConfiguration config = new ScanConfiguration(
-						(request.includeScanners() != null) ? request.includeScanners() : List.of(),
-						(request.excludeScanners() != null) ? request.excludeScanners() : List.of(),
-						(request.concurrency() > 0) ? request.concurrency() : 10, 5000, 10000,
-						request.ignoreSslErrors(), "json", authScheme, secondaryAuthScheme,
-						(request.language() != null) ? request.language() : "en",
-						(request.includePassed() != null) ? request.includePassed() : false, GatewayType.AUTO, null,
-						null, request.oauth2(), request.overrideHost(), null);
-
-				return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(config)).flatMap((configJson) -> {
-					ScanJobEntity job = new ScanJobEntity(request.discovererId(), request.target(), configJson,
-							JobStatus.PENDING, null);
-					return this.scanJobRepository.save(job);
-				})
-					.map((savedJob) -> ResponseEntity.accepted()
-						.body(new ScanJobAccepted(savedJob.getId(), savedJob.getTarget(), savedJob.getStatus(),
-								"/scans/" + savedJob.getId() + "/stream")))
-					.doOnError(
-							(e) -> log.error("Failed to create or save scan job for target: {}", request.target(), e));
+			return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(config)).flatMap((configJson) -> {
+				ScanJobEntity job = new ScanJobEntity(request.discovererId(), request.target(), configJson,
+						JobStatus.PENDING, null);
+				return this.scanJobRepository.save(job);
 			})
+				.map((savedJob) -> ResponseEntity.accepted()
+					.body(new ScanJobAccepted(savedJob.getId(), savedJob.getTarget(), savedJob.getStatus(),
+							"/scans/" + savedJob.getId() + "/stream")))
+				.doOnError((e) -> log.error("Failed to create or save scan job for target: {}", request.target(), e));
+		})
 			.onErrorResume(IllegalArgumentException.class, (e) -> Mono.just(ResponseEntity.badRequest().build()))
 			.onErrorResume(Exception.class,
 					(e) -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()));

@@ -31,14 +31,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
+import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
+import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
@@ -78,6 +82,10 @@ public class JobDispatcherScheduler {
 
 	private final AiJobReconService aiJobReconService;
 
+	private final OAuth2TokenFetcher tokenFetcher;
+
+	private final ObjectMapper objectMapper;
+
 	private final AtomicBoolean dispatchInFlight = new AtomicBoolean();
 
 	private final AtomicBoolean reconInFlight = new AtomicBoolean();
@@ -87,7 +95,8 @@ public class JobDispatcherScheduler {
 	public JobDispatcherScheduler(ScanJobRepository scanJobRepository, ScanTaskRepository scanTaskRepository,
 			SlaveNodeRepository slaveNodeRepository, OrthrusProperties orthrusProperties,
 			JobEventPublisher jobEventPublisher, JobOrchestratorService jobOrchestratorService,
-			AiJobReconService aiJobReconService, WebClient.Builder webClientBuilder) {
+			AiJobReconService aiJobReconService, OAuth2TokenFetcher tokenFetcher, ObjectMapper objectMapper,
+			WebClient.Builder webClientBuilder) {
 		this.scanJobRepository = scanJobRepository;
 		this.scanTaskRepository = scanTaskRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -96,6 +105,8 @@ public class JobDispatcherScheduler {
 		this.jobEventPublisher = jobEventPublisher;
 		this.jobOrchestratorService = jobOrchestratorService;
 		this.aiJobReconService = aiJobReconService;
+		this.tokenFetcher = tokenFetcher;
+		this.objectMapper = objectMapper;
 	}
 
 	/**
@@ -326,7 +337,7 @@ public class JobDispatcherScheduler {
 		task.setAssignedSlaveId(slave.getId());
 		task.setStartedAt(startedAt);
 
-		return this.scanJobRepository.findById(task.getScanJobId()).flatMap((job) -> {
+		return this.scanJobRepository.findById(task.getScanJobId()).flatMap(this::withFreshTokens).flatMap((job) -> {
 			// The AI context (stored recon + credentials resolved from the configuration)
 			// is assembled here, in memory, so credentials are never persisted twice.
 			String aiContext = job.isAiMode() ? this.aiJobReconService.contextJsonFor(job) : null;
@@ -350,6 +361,27 @@ public class JobDispatcherScheduler {
 					return this.jobOrchestratorService.onTaskFailed(task.getId(), "Dispatch failed");
 				}));
 		}).then();
+	}
+
+	/**
+	 * Issues the job's OAuth2 tokens for this dispatch: plans and jobs keep only the
+	 * OAuth2 settings, since tokens are short-lived. The tokens only go on this in-memory
+	 * copy of the job, which is never saved whole, so they are never persisted.
+	 * @param job the job whose task is being dispatched
+	 * @return the same job, carrying fresh tokens when it has OAuth2 settings
+	 */
+	private Mono<ScanJobEntity> withFreshTokens(ScanJobEntity job) {
+		return Mono.justOrEmpty(job.getScanConfigurationJson())
+			.map((json) -> this.objectMapper.readValue(json, ScanConfiguration.class))
+			.filter((config) -> config.oauth2Config() != null)
+			.flatMap(this.tokenFetcher::refreshAuth)
+			.map(this.objectMapper::writeValueAsString)
+			.doOnNext(job::setScanConfigurationJson)
+			.onErrorResume((e) -> {
+				log.warn("Could not issue the OAuth2 tokens of job {}: {}", job.getId(), e.getMessage());
+				return Mono.empty();
+			})
+			.thenReturn(job);
 	}
 
 }

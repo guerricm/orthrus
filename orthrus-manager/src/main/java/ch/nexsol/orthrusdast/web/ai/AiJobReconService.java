@@ -30,6 +30,7 @@ import ch.nexsol.orthrus.protocol.ai.AiScanContext;
 import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.ai.Endpoint;
 import ch.nexsol.orthrus.protocol.ai.ReconResult;
+import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
@@ -61,9 +62,13 @@ public class AiJobReconService {
 
 	private final ObjectMapper objectMapper;
 
-	public AiJobReconService(ObjectProvider<AiOrchestratorClient> orchestratorClient, ObjectMapper objectMapper) {
+	private final OAuth2TokenFetcher tokenFetcher;
+
+	public AiJobReconService(ObjectProvider<AiOrchestratorClient> orchestratorClient, ObjectMapper objectMapper,
+			OAuth2TokenFetcher tokenFetcher) {
 		this.orchestratorClient = orchestratorClient;
 		this.objectMapper = objectMapper;
+		this.tokenFetcher = tokenFetcher;
 	}
 
 	/**
@@ -82,7 +87,13 @@ public class AiJobReconService {
 		}
 		ScanConfiguration config = parseConfig(job.getScanConfigurationJson());
 		String host = (config != null) ? config.openapiOverrideHost() : null;
-		return client.recon(job.getTarget(), host, resolveCredentials(config)).onErrorResume((e) -> {
+		// The recon runs before any task is dispatched, so it needs its own OAuth2
+		// tokens.
+		Mono<List<Credential>> credentials = Mono.justOrEmpty(config)
+			.flatMap(this.tokenFetcher::refreshAuth)
+			.map(this::resolveCredentials)
+			.defaultIfEmpty(List.of());
+		return credentials.flatMap((creds) -> client.recon(job.getTarget(), host, creds)).onErrorResume((e) -> {
 			log.warn("Orchestrator recon of {} failed ({}); nodes will use local recon", job.getTarget(),
 					e.getMessage());
 			return Mono.just(new ReconResult(null, List.of(), "Orchestrator recon unavailable: " + e.getMessage()));

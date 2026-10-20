@@ -34,14 +34,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import tools.jackson.databind.ObjectMapper;
 
-import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
-import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
@@ -62,20 +58,13 @@ public class SystemController {
 
 	private final ScanTaskRepository scanTaskRepository;
 
-	private final OAuth2TokenFetcher tokenFetcher;
-
-	private final ObjectMapper objectMapper;
-
 	private final JobEventPublisher jobEventPublisher;
 
 	public SystemController(ScanJobRepository scanJobRepository, SlaveNodeRepository slaveNodeRepository,
-			ScanTaskRepository scanTaskRepository, OAuth2TokenFetcher tokenFetcher, ObjectMapper objectMapper,
-			JobEventPublisher jobEventPublisher) {
+			ScanTaskRepository scanTaskRepository, JobEventPublisher jobEventPublisher) {
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.scanTaskRepository = scanTaskRepository;
-		this.tokenFetcher = tokenFetcher;
-		this.objectMapper = objectMapper;
 		this.jobEventPublisher = jobEventPublisher;
 	}
 
@@ -108,51 +97,19 @@ public class SystemController {
 
 	@PostMapping("/system/jobs/{id}/restart")
 	public Mono<String> restartJob(@PathVariable Long id) {
-		return scanJobRepository.findById(id).flatMap((job) -> {
-			return Mono
-				.fromCallable(() -> objectMapper.readValue(job.getScanConfigurationJson(), ScanConfiguration.class))
-				.flatMap((oldConfig) -> {
-					if (oldConfig.oauth2Config() != null) {
-						return tokenFetcher.fetchTokens(oldConfig.oauth2Config())
-							.defaultIfEmpty(List.of())
-							.flatMap((fetchedTokens) -> {
-								SecurityScheme authScheme = oldConfig.authScheme();
-								SecurityScheme secondaryAuthScheme = oldConfig.secondaryAuthScheme();
-								if (!fetchedTokens.isEmpty()) {
-									authScheme = fetchedTokens.get(0);
-									if (fetchedTokens.size() > 1) {
-										secondaryAuthScheme = fetchedTokens.get(1);
-									}
-								}
-								ScanConfiguration updatedConfig = oldConfig.withAuthSchemes(authScheme,
-										secondaryAuthScheme);
-								return Mono.fromCallable(() -> objectMapper.writeValueAsString(updatedConfig))
-									.flatMap((updatedConfigJson) -> {
-										ScanJobEntity newJob = prepareReplayedJob(job, updatedConfigJson);
-										return scanJobRepository.save(newJob);
-									});
-							});
-					}
-					return Mono.error(new IllegalStateException("No oauth2 config"));
-				})
-				.onErrorResume((e) -> {
-					if (!(e instanceof IllegalStateException)) {
-						log.warn("Failed to parse configuration of job {}; replaying it with the stored config as-is",
-								job.getId(), e);
-					}
-					ScanJobEntity newJob = prepareReplayedJob(job, job.getScanConfigurationJson());
-					return scanJobRepository.save(newJob);
-				});
-		})
+		// The stored configuration is replayed as-is: OAuth2 tokens are issued when the
+		// replay's tasks are dispatched.
+		return scanJobRepository.findById(id)
+			.flatMap((job) -> scanJobRepository.save(prepareReplayedJob(job)))
 			.doOnNext((newJob) -> jobEventPublisher.emit(newJob.getId(),
 					JobEvent.queued(newJob.getId(), newJob.getTarget())))
 			.thenReturn("redirect:/scans/all");
 	}
 
-	private ScanJobEntity prepareReplayedJob(ScanJobEntity job, String updatedConfigJson) {
+	private ScanJobEntity prepareReplayedJob(ScanJobEntity job) {
 		if (job.getStatus() == JobStatus.COMPLETED) {
-			ScanJobEntity replay = new ScanJobEntity(job.getDiscovererId(), job.getTarget(), updatedConfigJson,
-					JobStatus.PENDING, job.getTestPlanId());
+			ScanJobEntity replay = new ScanJobEntity(job.getDiscovererId(), job.getTarget(),
+					job.getScanConfigurationJson(), JobStatus.PENDING, job.getTestPlanId());
 			// Preserve how the scan was run: an AI scan must replay on the AI nodes, not
 			// fall back to a deterministic run. The recon is re-fetched when the job
 			// starts.
@@ -160,7 +117,6 @@ public class SystemController {
 			return replay;
 		}
 		else {
-			job.setScanConfigurationJson(updatedConfigJson);
 			job.setStatus(JobStatus.PENDING);
 			job.setAssignedSlaveId(null);
 			job.setStartedAt(null);

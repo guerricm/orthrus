@@ -123,7 +123,8 @@ public class SlaveApiController {
 				AtomicInteger vulnsCount = new AtomicInteger();
 
 				Disposable disposable = discoverOnce(request, config)
-					.flatMapMany((endpoints) -> scanService.executeScanFamily(endpoints, family, config))
+					.flatMapMany((endpoints) -> scanService.executeScanFamily(withTaskAuth(endpoints, config), family,
+							config))
 					.bufferTimeout(10, Duration.ofSeconds(1))
 					.flatMap((batch) -> {
 						testsCount.addAndGet(batch.size());
@@ -179,6 +180,23 @@ public class SlaveApiController {
 				.cache(DISCOVERY_CACHE_TTL);
 			return new JobDiscovery(result, stop);
 		}).result();
+	}
+
+	/**
+	 * Binds the job's shared discovery to this task's credentials. The discovery is
+	 * cached for the whole job, so its operations carry the tokens of the task that ran
+	 * it, while each task arrives with tokens issued at its own dispatch.
+	 * @param endpoints the operations discovered for the job
+	 * @param config the scan configuration carried by this task
+	 * @return the operations authenticated with this task's primary credentials
+	 */
+	static List<Operation> withTaskAuth(List<Operation> endpoints, ScanConfiguration config) {
+		if (config.authScheme() == null) {
+			return endpoints;
+		}
+		return endpoints.stream()
+			.map((op) -> (op.authScheme() != null) ? op.withAuth(config.authScheme()) : op)
+			.toList();
 	}
 
 	private void taskFinished(Long taskId) {

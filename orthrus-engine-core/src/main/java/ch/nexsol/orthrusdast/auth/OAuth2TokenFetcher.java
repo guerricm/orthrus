@@ -32,6 +32,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import ch.nexsol.orthrusdast.model.OAuth2Config;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
 import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 @Service
@@ -76,6 +77,31 @@ public class OAuth2TokenFetcher {
 
 		log.warn("Unsupported grant type: {}", config.grantType());
 		return Mono.just(List.of());
+	}
+
+	/**
+	 * Returns the configuration with auth schemes issued from its OAuth2 settings. OAuth2
+	 * tokens are short-lived, so they are issued right before each use rather than stored
+	 * with a plan. The configuration is returned unchanged when it has no OAuth2 settings
+	 * or when no token can be obtained.
+	 * @param config the scan configuration
+	 * @return the configuration carrying freshly issued tokens
+	 */
+	public Mono<ScanConfiguration> refreshAuth(ScanConfiguration config) {
+		if (config.oauth2Config() == null) {
+			return Mono.just(config);
+		}
+		return fetchTokens(config.oauth2Config()).map((tokens) -> {
+			if (tokens.isEmpty()) {
+				return config;
+			}
+			SecurityScheme secondary = (tokens.size() > 1) ? tokens.get(1) : config.secondaryAuthScheme();
+			return config.withAuthSchemes(tokens.get(0), secondary);
+		}).onErrorResume((e) -> {
+			log.warn("Could not obtain OAuth2 tokens from {}; only static credentials will be sent: {}",
+					config.oauth2Config().tokenUrl(), e.getMessage());
+			return Mono.just(config);
+		});
 	}
 
 	private Mono<SecurityScheme> fetchSingleToken(OAuth2Config config, String username, String password) {

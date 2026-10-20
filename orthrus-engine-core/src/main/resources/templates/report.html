@@ -748,6 +748,14 @@
                         </div>
                     </td>
                 </tr>
+                <tr th:if="${config.oauth2Config() != null}">
+                    <td><strong th:text="#{report.conditions.oauth2}">Authentication (OAuth2)</strong></td>
+                    <td>
+                        <span th:text="${config.oauth2Config().grantType()}"></span>
+                        <div style="margin-top: 5px; font-family: monospace; font-size: 8pt; word-break: break-all;"
+                            th:text="${config.oauth2Config().tokenUrl()}"></div>
+                    </td>
+                </tr>
                 <tr th:if="${config.secondaryAuthScheme() != null and config.secondaryAuthScheme().type() != null}">
                     <td><strong th:text="#{report.conditions.authSecondary}">Authentication (Secondary)</strong></td>
                     <td>

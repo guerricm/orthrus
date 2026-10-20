@@ -27,9 +27,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-import tools.jackson.databind.ObjectMapper;
 
-import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
@@ -60,14 +58,11 @@ class SystemControllerTest {
 	private ScanTaskRepository scanTaskRepository;
 
 	@Mock
-	private OAuth2TokenFetcher tokenFetcher;
-
-	@Mock
 	private JobEventPublisher jobEventPublisher;
 
 	private SystemController controller() {
 		return new SystemController(this.scanJobRepository, this.slaveNodeRepository, this.scanTaskRepository,
-				this.tokenFetcher, new ObjectMapper(), this.jobEventPublisher);
+				this.jobEventPublisher);
 	}
 
 	private List<ScanJobEntity> captureSavedJobs() {

@@ -17,6 +17,7 @@
 package ch.nexsol.orthrusdast.scheduler;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.mockwebserver.MockResponse;
@@ -34,14 +35,20 @@ import org.mockito.quality.Strictness;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.ScanTaskEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
+import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.JobStatus;
 import ch.nexsol.orthrusdast.model.NodeStatus;
+import ch.nexsol.orthrusdast.model.OAuth2Config;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.repository.ScanJobRepository;
 import ch.nexsol.orthrusdast.repository.ScanTaskRepository;
 import ch.nexsol.orthrusdast.repository.SlaveNodeRepository;
@@ -88,6 +95,11 @@ class JobDispatcherSchedulerTest {
 	@Mock
 	private AiJobReconService aiJobReconService;
 
+	@Mock
+	private OAuth2TokenFetcher tokenFetcher;
+
+	private final ObjectMapper objectMapper = new ObjectMapper();
+
 	private MockWebServer worker;
 
 	private JobDispatcherScheduler dispatcher;
@@ -99,7 +111,7 @@ class JobDispatcherSchedulerTest {
 
 		this.dispatcher = new JobDispatcherScheduler(this.scanJobRepository, this.scanTaskRepository,
 				this.slaveNodeRepository, new OrthrusProperties(), this.jobEventPublisher, this.jobOrchestratorService,
-				this.aiJobReconService, WebClient.builder());
+				this.aiJobReconService, this.tokenFetcher, this.objectMapper, WebClient.builder());
 
 		when(this.jobOrchestratorService.processPendingJobs()).thenReturn(Mono.empty());
 		when(this.aiJobReconService.contextJsonFor(any(ScanJobEntity.class))).thenReturn("{ctx}");
@@ -131,6 +143,40 @@ class JobDispatcherSchedulerTest {
 		assertThat(dispatched.getMethod()).isEqualTo("POST");
 		assertThat(dispatched.getPath()).isEqualTo("/api/v1/slave/tasks");
 		assertThat(dispatched.getBody().readUtf8()).contains("\"phase\":\"INJECTION\"");
+	}
+
+	@Test
+	void aTaskCarriesOauth2TokensIssuedAtDispatchRatherThanThoseStoredWithThePlan() throws Exception {
+		ScanConfiguration stored = oauth2Configuration("EXPIRED_TOKEN");
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(job(stored)));
+		when(this.tokenFetcher.refreshAuth(any(ScanConfiguration.class)))
+			.thenReturn(Mono.just(stored.withAuthSchemes(SecurityScheme.bearer("FRESH_TOKEN"), null)));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("node-a", "openapi,INJECTION"));
+		this.worker.enqueue(new MockResponse().setResponseCode(202));
+
+		this.dispatcher.dispatchPendingJobs();
+
+		RecordedRequest dispatched = this.worker.takeRequest(5, TimeUnit.SECONDS);
+		assertThat(dispatched).isNotNull();
+		String body = dispatched.getBody().readUtf8();
+		assertThat(body).contains("FRESH_TOKEN").doesNotContain("EXPIRED_TOKEN");
+	}
+
+	@Test
+	void aTaskKeepsTheStoredTokensWhenTheyCannotBeRenewed() throws Exception {
+		when(this.scanJobRepository.findById(JOB_ID)).thenReturn(Mono.just(job(oauth2Configuration("STORED_TOKEN"))));
+		when(this.tokenFetcher.refreshAuth(any(ScanConfiguration.class)))
+			.thenReturn(Mono.error(new IllegalStateException("token endpoint down")));
+		givenPendingTasks(task(1L, ScannerFamily.INJECTION));
+		givenFleet(node("node-a", "openapi,INJECTION"));
+		this.worker.enqueue(new MockResponse().setResponseCode(202));
+
+		this.dispatcher.dispatchPendingJobs();
+
+		RecordedRequest dispatched = this.worker.takeRequest(5, TimeUnit.SECONDS);
+		assertThat(dispatched).as("the task is still dispatched").isNotNull();
+		assertThat(dispatched.getBody().readUtf8()).contains("STORED_TOKEN");
 	}
 
 	@Test
@@ -385,6 +431,19 @@ class JobDispatcherSchedulerTest {
 		ScanJobEntity job = new ScanJobEntity("openapi", "https://target.example", "{}", JobStatus.RUNNING, null);
 		job.setId(JOB_ID);
 		return job;
+	}
+
+	private ScanJobEntity job(ScanConfiguration config) {
+		ScanJobEntity job = job();
+		job.setScanConfigurationJson(this.objectMapper.writeValueAsString(config));
+		return job;
+	}
+
+	private static ScanConfiguration oauth2Configuration(String token) {
+		OAuth2Config oauth2 = new OAuth2Config("https://idp.example/token", "client", "secret", "client_credentials",
+				null);
+		return new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "html", SecurityScheme.bearer(token),
+				null, "en", false, GatewayType.AUTO, null, null, oauth2, null, null);
 	}
 
 	private ScanJobEntity aiJob() {

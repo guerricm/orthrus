@@ -46,7 +46,6 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.ai.ScanPlan;
-import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.engine.ScannerCatalog;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
@@ -90,8 +89,6 @@ public class PlanController {
 
 	private final ScanTaskRepository scanTaskRepository;
 
-	private final OAuth2TokenFetcher tokenFetcher;
-
 	private final ObjectMapper objectMapper;
 
 	private final JobEventPublisher jobEventPublisher;
@@ -112,15 +109,14 @@ public class PlanController {
 	private final ObjectProvider<AiOrchestratorClient> aiOrchestratorClient;
 
 	public PlanController(TestPlanRepository testPlanRepository, ScanJobRepository scanJobRepository,
-			SlaveNodeRepository slaveNodeRepository, ScanTaskRepository scanTaskRepository,
-			OAuth2TokenFetcher tokenFetcher, ObjectMapper objectMapper, JobEventPublisher jobEventPublisher,
-			List<EndpointDiscoverer> discoverers, TestPlanPortabilityService planPortabilityService,
-			ScannerCatalog scannerCatalog, ObjectProvider<AiOrchestratorClient> aiOrchestratorClient) {
+			SlaveNodeRepository slaveNodeRepository, ScanTaskRepository scanTaskRepository, ObjectMapper objectMapper,
+			JobEventPublisher jobEventPublisher, List<EndpointDiscoverer> discoverers,
+			TestPlanPortabilityService planPortabilityService, ScannerCatalog scannerCatalog,
+			ObjectProvider<AiOrchestratorClient> aiOrchestratorClient) {
 		this.testPlanRepository = testPlanRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.scanTaskRepository = scanTaskRepository;
-		this.tokenFetcher = tokenFetcher;
 		this.objectMapper = objectMapper;
 		this.jobEventPublisher = jobEventPublisher;
 		this.defaultDiscoverers = discoverers.stream().map(EndpointDiscoverer::getId).sorted().toList();
@@ -379,49 +375,37 @@ public class PlanController {
 
 			final OAuth2Config finalOauth2Config = oauth2Config;
 
-			return Mono.justOrEmpty(finalOauth2Config)
-				.flatMap((config) -> tokenFetcher.fetchTokens(config))
-				.defaultIfEmpty(List.of())
-				.flatMap((fetchedTokens) -> {
-					SecurityScheme authScheme = null;
-					SecurityScheme secondaryAuthScheme = null;
+			// OAuth2 tokens are short-lived: the plan keeps only the OAuth2 settings, and
+			// tokens are issued each time one of its tasks is dispatched.
+			return Mono.defer(() -> {
+				SecurityScheme authScheme = null;
+				SecurityScheme secondaryAuthScheme = null;
 
-					if (bearerToken != null && !bearerToken.isBlank()) {
-						authScheme = SecurityScheme.bearer(bearerToken.trim());
+				if (bearerToken != null && !bearerToken.isBlank()) {
+					authScheme = SecurityScheme.bearer(bearerToken.trim());
+				}
+				if (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank()) {
+					secondaryAuthScheme = SecurityScheme.bearer(bearerTokenSecondary.trim());
+				}
+
+				ScanConfiguration scanConfig = new ScanConfiguration(includeScanners, excludeScanners, concurrency,
+						5000, 10000, false, "html", authScheme, secondaryAuthScheme, "en", includePassed,
+						GatewayType.fromString(gatewayType), appUrl, k8sToken, finalOauth2Config, openapiOverrideHost,
+						gatewayExclusions);
+
+				return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig)).flatMap((configJson) -> {
+					String name = formData.getFirst("name");
+					String description = formData.getFirst("description");
+					if (name == null || name.isBlank()) {
+						name = "Unnamed Plan";
 					}
-					if (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank()) {
-						secondaryAuthScheme = SecurityScheme.bearer(bearerTokenSecondary.trim());
-					}
-
-					if (!fetchedTokens.isEmpty()) {
-						authScheme = fetchedTokens.get(0);
-						if (fetchedTokens.size() > 1) {
-							secondaryAuthScheme = fetchedTokens.get(1);
-						}
-					}
-
-					ScanConfiguration scanConfig = new ScanConfiguration(includeScanners, excludeScanners, concurrency,
-							5000, 10000, false, "html", authScheme, secondaryAuthScheme, "en", includePassed,
-							GatewayType.fromString(gatewayType), appUrl, k8sToken, finalOauth2Config,
-							openapiOverrideHost, gatewayExclusions);
-
-					return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig))
-						.flatMap((configJson) -> {
-							String name = formData.getFirst("name");
-							String description = formData.getFirst("description");
-							if (name == null || name.isBlank()) {
-								name = "Unnamed Plan";
-							}
-							TestPlanEntity plan = new TestPlanEntity(name, description, discovererId, target,
-									configJson);
-							return testPlanRepository.save(plan);
-						})
-						.doOnError((e) -> log.error("Failed to create or save test plan for target: {}", target, e));
-				})
-				.map((savedPlan) -> {
-					exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
-					return "fragments/scan-queued :: empty";
-				});
+					TestPlanEntity plan = new TestPlanEntity(name, description, discovererId, target, configJson);
+					return testPlanRepository.save(plan);
+				}).doOnError((e) -> log.error("Failed to create or save test plan for target: {}", target, e));
+			}).map((savedPlan) -> {
+				exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
+				return "fragments/scan-queued :: empty";
+			});
 		}).onErrorResume((e) -> {
 			model.addAttribute("error", "Scan failed: " + e.getMessage());
 			return Mono.just("fragments/results :: errorPanel");

@@ -40,6 +40,7 @@ import ch.nexsol.orthrusdast.client.MasterApiClient;
 import ch.nexsol.orthrusdast.engine.ScanService;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,6 +87,38 @@ class SlaveApiControllerTest {
 			.thenReturn(Flux.empty());
 		when(this.masterApiClient.completeTask(anyLong(), any(), anyInt(), anyInt())).thenReturn(Mono.empty());
 		when(this.masterApiClient.failTask(anyLong(), anyString())).thenReturn(Mono.empty());
+	}
+
+	@Test
+	void cachedOperationsAreAuthenticatedWithTheTokenTheTaskArrivedWith() {
+		Operation authenticated = Operation.simple("https://target.example/users", HttpMethod.GET)
+			.withAuth(SecurityScheme.bearer("EXPIRED_TOKEN"));
+		ScanConfiguration config = ScanConfiguration.defaults()
+			.withAuthSchemes(SecurityScheme.bearer("FRESH_TOKEN"), null);
+
+		List<Operation> bound = SlaveApiController.withTaskAuth(List.of(authenticated), config);
+
+		assertThat(bound).singleElement()
+			.satisfies((op) -> assertThat(op.authScheme().value()).isEqualTo("FRESH_TOKEN"));
+	}
+
+	@Test
+	void anOperationDiscoveredWithoutCredentialsIsNotGivenAny() {
+		Operation anonymous = Operation.simple("https://target.example/health", HttpMethod.GET);
+		ScanConfiguration config = ScanConfiguration.defaults()
+			.withAuthSchemes(SecurityScheme.bearer("FRESH_TOKEN"), null);
+
+		List<Operation> bound = SlaveApiController.withTaskAuth(List.of(anonymous), config);
+
+		assertThat(bound).singleElement().satisfies((op) -> assertThat(op.authScheme()).isNull());
+	}
+
+	@Test
+	void operationsAreLeftAsDiscoveredWhenTheTaskCarriesNoCredentials() {
+		List<Operation> discovered = List.of(Operation.simple("https://target.example/users", HttpMethod.GET)
+			.withAuth(SecurityScheme.bearer("STATIC_TOKEN")));
+
+		assertThat(SlaveApiController.withTaskAuth(discovered, ScanConfiguration.defaults())).isSameAs(discovered);
 	}
 
 	@Test

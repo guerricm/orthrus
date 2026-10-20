@@ -227,6 +227,8 @@ docker run --rm orthrus-cli:latest -d openapi -t https://api.example.com/v3/api-
   --oauth2-creds "alice:pwd123,bob:pwd456"
 ```
 
+Test Plans and REST API scans store only the OAuth2 settings, never the tokens. Tokens are issued at each run (standard and AI), each time one of the scan's tasks is dispatched to a node, so a plan saved days ago still runs with valid tokens.
+
 ## Using the REST API
 The Master node exposes a comprehensive REST API to trigger and manage scans programmatically.
 

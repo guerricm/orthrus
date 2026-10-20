@@ -28,7 +28,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
+import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.OAuth2Config;
+import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -81,6 +84,48 @@ class OAuth2TokenFetcherTest {
 			assertThat(tokens.get(0).value()).isEqualTo("PRIMARY_TOKEN");
 			assertThat(tokens.get(1).value()).isEqualTo("SECONDARY_TOKEN");
 		}).verifyComplete();
+	}
+
+	@Test
+	void refreshAuthReplacesTheStoredTokenWithAFreshOne() {
+		mockWebServer.enqueue(new MockResponse().setResponseCode(200)
+			.setHeader("Content-Type", "application/json")
+			.setBody("{\"access_token\": \"FRESH_TOKEN\", \"token_type\": \"Bearer\"}"));
+		SecurityScheme secondary = SecurityScheme.bearer("SECONDARY");
+		ScanConfiguration config = config(clientCredentials(), SecurityScheme.bearer("EXPIRED"), secondary);
+
+		StepVerifier.create(fetcher.refreshAuth(config)).assertNext((refreshed) -> {
+			assertThat(refreshed.authScheme().value()).isEqualTo("FRESH_TOKEN");
+			assertThat(refreshed.secondaryAuthScheme()).isEqualTo(secondary);
+		}).verifyComplete();
+	}
+
+	@Test
+	void refreshAuthKeepsTheStoredTokenWhenTheTokenEndpointFails() {
+		mockWebServer.enqueue(new MockResponse().setResponseCode(500));
+		SecurityScheme stored = SecurityScheme.bearer("STORED");
+		ScanConfiguration config = config(clientCredentials(), stored, null);
+
+		StepVerifier.create(fetcher.refreshAuth(config))
+			.assertNext((refreshed) -> assertThat(refreshed.authScheme()).isEqualTo(stored))
+			.verifyComplete();
+	}
+
+	@Test
+	void refreshAuthLeavesAConfigurationWithoutOauth2Untouched() {
+		ScanConfiguration config = config(null, SecurityScheme.bearer("STATIC"), null);
+
+		StepVerifier.create(fetcher.refreshAuth(config)).expectNext(config).verifyComplete();
+		assertThat(mockWebServer.getRequestCount()).isZero();
+	}
+
+	private static ScanConfiguration config(OAuth2Config oauth2, SecurityScheme primary, SecurityScheme secondary) {
+		return new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "json", primary, secondary, "en",
+				false, GatewayType.AUTO, null, null, oauth2, null, null);
+	}
+
+	private OAuth2Config clientCredentials() {
+		return new OAuth2Config(tokenUrl, "test-client", "test-secret", "client_credentials", null);
 	}
 
 	@Test
