@@ -49,7 +49,11 @@ orthrus:
       max-tool-iterations: 12
       # Characters of each probe response body fed back to the model.
       max-response-chars: 1500
-      task-timeout-seconds: 900
+      # Time one agent may spend on one endpoint. A task gets this time for each wave of endpoints
+      # probed in parallel, plus one wave of margin, so its budget grows with the API size.
+      endpoint-timeout-seconds: 300
+      # Ceiling on a whole task, recon included, whatever its endpoint count.
+      task-timeout-seconds: 14400
 
 management:
   endpoints:

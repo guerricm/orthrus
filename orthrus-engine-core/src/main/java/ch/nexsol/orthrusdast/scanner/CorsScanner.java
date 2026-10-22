@@ -61,6 +61,12 @@ public class CorsScanner implements SecurityScanner {
 	}
 
 	@Override
+	public boolean runsWhenForbidden() {
+		// The CORS policy is answered by the preflight, whatever the identity.
+		return true;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			String targetHost = "target.com";

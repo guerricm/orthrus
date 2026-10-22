@@ -62,6 +62,13 @@ public class HttpMethodTamperingScanner implements SecurityScanner {
 	}
 
 	@Override
+	public boolean runsWhenForbidden() {
+		// An unusual method, or a method override, that gets through where the
+		// configured identity is refused is a bypass.
+		return true;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			Flux<Vulnerability> unusualMethodVulns = Flux.fromArray(UNUSUAL_METHODS)

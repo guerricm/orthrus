@@ -61,6 +61,13 @@ public class JwtNoneAlgorithmScanner implements SecurityScanner {
 	}
 
 	@Override
+	public boolean runsWhenForbidden() {
+		// A forged token that gets through where the
+		// configured identity is refused is a bypass.
+		return true;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			if (operation.authScheme() == null || operation.authScheme().type() != SecurityScheme.AuthType.BEARER) {

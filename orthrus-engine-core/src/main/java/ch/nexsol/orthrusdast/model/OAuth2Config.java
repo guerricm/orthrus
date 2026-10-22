@@ -20,8 +20,20 @@ import java.util.List;
 
 /**
  * Configuration for OAuth2 token fetching.
+ *
+ * @param tokenUrl the token endpoint
+ * @param clientId the client id
+ * @param clientSecret the client secret
+ * @param grantType {@code client_credentials} or {@code password}
+ * @param credentials the {@code user:pass} pairs of the password grant
+ * @param scope the space-separated scopes to request, or null to request none and let the
+ * identity provider apply the client's defaults
  */
 public record OAuth2Config(String tokenUrl, String clientId, String clientSecret, String grantType,
-		List<String> credentials // e.g. "user:pass"
-) {
+		List<String> credentials, String scope) {
+
+	public OAuth2Config {
+		scope = (scope != null && !scope.isBlank()) ? scope.strip() : null;
+	}
+
 }

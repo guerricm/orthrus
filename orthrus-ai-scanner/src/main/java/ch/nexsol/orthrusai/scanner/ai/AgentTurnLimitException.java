@@ -17,15 +17,19 @@
 package ch.nexsol.orthrusai.scanner.ai;
 
 /**
- * Thrown by a tool once the agent has used all its tool calls. It is a checked exception
- * on purpose: Spring AI hands runtime exceptions from a tool back to the model as an
- * error message, which would cost one more round trip, whereas a checked one aborts the
- * tool-calling loop.
+ * Thrown by a tool once the agent has used all its tool calls or its time. It is a
+ * checked exception on purpose: Spring AI hands runtime exceptions from a tool back to
+ * the model as an error message, which would cost one more round trip, whereas a checked
+ * one aborts the tool-calling loop.
  */
 public class AgentTurnLimitException extends Exception {
 
 	public AgentTurnLimitException(int maxToolCalls) {
-		super("agent stopped after its " + maxToolCalls + " allowed tool calls");
+		this("agent stopped after its " + maxToolCalls + " allowed tool calls");
+	}
+
+	public AgentTurnLimitException(String reason) {
+		super(reason);
 	}
 
 }

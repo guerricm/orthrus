@@ -198,7 +198,17 @@ public class AiScannerProperties {
 		 */
 		private int maxResponseChars = 1500;
 
-		private long taskTimeoutSeconds = 900;
+		/**
+		 * Time one agent may spend on one endpoint. A task's budget is derived from it
+		 * and the number of endpoints, so every endpoint gets its share whatever the size
+		 * of the API.
+		 */
+		private long endpointTimeoutSeconds = 300;
+
+		/**
+		 * Ceiling on a whole task, recon included, whatever its endpoint count.
+		 */
+		private long taskTimeoutSeconds = 14400;
 
 		public int getMaxHttpCallsPerOperation() {
 			return this.maxHttpCallsPerOperation;
@@ -222,6 +232,14 @@ public class AiScannerProperties {
 
 		public void setMaxResponseChars(int maxResponseChars) {
 			this.maxResponseChars = maxResponseChars;
+		}
+
+		public long getEndpointTimeoutSeconds() {
+			return this.endpointTimeoutSeconds;
+		}
+
+		public void setEndpointTimeoutSeconds(long endpointTimeoutSeconds) {
+			this.endpointTimeoutSeconds = endpointTimeoutSeconds;
 		}
 
 		public long getTaskTimeoutSeconds() {

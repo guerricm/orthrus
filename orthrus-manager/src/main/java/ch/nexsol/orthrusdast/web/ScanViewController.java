@@ -20,7 +20,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,9 +40,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
-import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
-import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
@@ -149,34 +146,8 @@ public class ScanViewController {
 							model.addAttribute("globalGrade", ScanGrade.of(result.riskSummary()));
 
 							if (result.attempts() != null && !result.attempts().isEmpty()) {
-								LinkedHashMap<String, List<ScanAttempt>> grouped = new LinkedHashMap<>();
-								for (ScanAttempt a : result.attempts()) {
-									String key = a.operationMethod() + " " + a.operationUrl();
-									grouped.computeIfAbsent(key, (k) -> new ArrayList<>()).add(a);
-								}
-
-								List<EndpointAttemptGroup> attemptGroupsList = new ArrayList<>();
-								for (Map.Entry<String, List<ScanAttempt>> entry : grouped.entrySet()) {
-									long passed = entry.getValue()
-										.stream()
-										.filter((a) -> AttemptStatus.PASSED == a.status())
-										.count();
-									long failed = entry.getValue()
-										.stream()
-										.filter((a) -> AttemptStatus.FAILED == a.status())
-										.count();
-									long authError = entry.getValue()
-										.stream()
-										.filter((a) -> AttemptStatus.AUTH_ERROR == a.status())
-										.count();
-									long error = entry.getValue()
-										.stream()
-										.filter((a) -> AttemptStatus.ERROR == a.status())
-										.count();
-									attemptGroupsList.add(new EndpointAttemptGroup(entry.getKey(), entry.getValue(),
-											passed, failed, authError, error));
-								}
-								model.addAttribute("attemptGroups", attemptGroupsList);
+								model.addAttribute("attemptGroups",
+										EndpointAttemptGroup.groupByEndpoint(result.attempts()));
 							}
 
 							return Mono.just("scans/details");

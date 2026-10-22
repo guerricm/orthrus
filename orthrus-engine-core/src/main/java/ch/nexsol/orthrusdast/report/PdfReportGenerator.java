@@ -20,11 +20,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import com.openhtmltopdf.extend.FSSupplier;
 import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
@@ -40,9 +36,7 @@ import org.thymeleaf.context.Context;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
-import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrusdast.model.EndpointAttemptGroup;
 import ch.nexsol.orthrusdast.model.ScanGrade;
 import ch.nexsol.orthrusdast.model.ScanResult;
@@ -116,31 +110,7 @@ public class PdfReportGenerator implements ReportGenerator {
 
 				// 4. Execution Details (if --include-passed)
 				if (includePassed && result.attempts() != null && !result.attempts().isEmpty()) {
-					LinkedHashMap<String, List<ScanAttempt>> grouped = new LinkedHashMap<>();
-					for (ScanAttempt a : result.attempts()) {
-						String key = a.operationMethod() + " " + a.operationUrl();
-						grouped.computeIfAbsent(key, (k) -> new ArrayList<>()).add(a);
-					}
-
-					List<EndpointAttemptGroup> attemptGroupsList = new ArrayList<>();
-					for (Map.Entry<String, List<ScanAttempt>> entry : grouped.entrySet()) {
-						long passed = entry.getValue()
-							.stream()
-							.filter((a) -> AttemptStatus.PASSED == a.status())
-							.count();
-						long failed = entry.getValue()
-							.stream()
-							.filter((a) -> AttemptStatus.FAILED == a.status())
-							.count();
-						long authError = entry.getValue()
-							.stream()
-							.filter((a) -> AttemptStatus.AUTH_ERROR == a.status())
-							.count();
-						long error = entry.getValue().stream().filter((a) -> AttemptStatus.ERROR == a.status()).count();
-						attemptGroupsList.add(new EndpointAttemptGroup(entry.getKey(), entry.getValue(), passed, failed,
-								authError, error));
-					}
-					context.setVariable("attemptGroups", attemptGroupsList);
+					context.setVariable("attemptGroups", EndpointAttemptGroup.groupByEndpoint(result.attempts()));
 				}
 
 				context.setVariable("formatter", new ReportFormatter());

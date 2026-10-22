@@ -863,7 +863,7 @@
             </h3>
             <p style="margin-top: 0; font-size: 9pt; color: #777;">
                 <span th:text="#{report.tests.executed}">Tests Executed:</span> <span
-                    th:text="${group.passed() + group.failed() + group.authError() + group.error()}"></span>
+                    th:text="${group.attempts().size()}"></span>
                 | <span class="attempt-pass"><span th:text="#{report.execution.passed}">Passed</span>: <span
                         th:text="${group.passed()}"></span></span>
                 | <span class="attempt-fail"><span th:text="#{report.execution.failed}">Failed</span>: <span
@@ -873,10 +873,20 @@
                             th:text="#{report.execution.authError}">Auth Error</span>: <span
                             th:text="${group.authError()}"></span></span>
                 </span>
+                <span th:if="${group.forbidden() > 0}">
+                    | <span style="color: #f39c12; font-weight: bold;"><span
+                            th:text="#{report.execution.forbidden}">Forbidden</span>: <span
+                            th:text="${group.forbidden()}"></span></span>
+                </span>
                 <span th:if="${group.error() > 0}">
                     | <span style="color: #7f8c8d; font-weight: bold;"><span
                             th:text="#{report.execution.error}">Error</span>: <span
                             th:text="${group.error()}"></span></span>
+                </span>
+                <span th:if="${group.notRun() > 0}">
+                    | <span style="color: #7f8c8d; font-weight: bold;"><span
+                            th:text="#{report.execution.notRun}">Not Run</span>: <span
+                            th:text="${group.notRun()}"></span></span>
                 </span>
             </p>
 
@@ -902,9 +912,15 @@
                             <span th:if="${attempt.status().name() == 'AUTH_ERROR'}"
                                 style="color: #f39c12; font-weight: bold;" th:text="#{report.execution.authError}">AUTH
                                 ERROR</span>
+                            <span th:if="${attempt.status().name() == 'FORBIDDEN'}"
+                                style="color: #f39c12; font-weight: bold;"
+                                th:text="#{report.execution.forbidden}">FORBIDDEN</span>
                             <span th:if="${attempt.status().name() == 'ERROR'}"
                                 style="color: #7f8c8d; font-weight: bold;"
                                 th:text="#{report.execution.error}">ERROR</span>
+                            <span th:if="${attempt.status().name() == 'NOT_RUN'}"
+                                style="color: #7f8c8d; font-weight: bold;"
+                                th:text="#{report.execution.notRun}">NOT RUN</span>
                         </td>
                     </tr>
                 </tbody>

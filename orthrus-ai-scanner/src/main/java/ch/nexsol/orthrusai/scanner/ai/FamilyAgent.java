@@ -20,6 +20,7 @@ import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLException;
@@ -32,13 +33,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrus.protocol.ai.Credentials;
 import ch.nexsol.orthrus.protocol.ai.Endpoint;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.tool.FindingTool;
@@ -70,6 +74,13 @@ public class FamilyAgent {
 
 	private final AgentActivity agentActivity;
 
+	private static final Pattern PATH_TEMPLATE = Pattern.compile("\\{[^/{}]+}");
+
+	private static final String REFUSED_NOTE = "The endpoint answered the baseline request with 403: it accepts "
+			+ "the credentials but refuses this identity. Requests carrying them never reach the endpoint's own "
+			+ "processing, so look only for a way around the refusal (other credentials or none, a forged or "
+			+ "tampered token, another method or a method override) and at what the refused response itself shows.";
+
 	private volatile WebClient insecureWebClient;
 
 	public FamilyAgent(ChatClient scannerChatClient, WebClient.Builder webClientBuilder, ScopeGuard scopeGuard,
@@ -92,12 +103,16 @@ public class FamilyAgent {
 	 * prior knowledge (may be null or blank)
 	 * @param probeConfig the credentials, TLS leniency and timeout to apply to every
 	 * probe
+	 * @param refused whether the endpoint answered the baseline with a 403, so the agent
+	 * is told to look for a way around the refusal
 	 * @return the confirmed findings (possibly empty)
 	 */
-	public List<Vulnerability> scan(String family, Endpoint endpoint, String context, ProbeConfig probeConfig) {
+	public List<Vulnerability> scan(String family, Endpoint endpoint, String context, ProbeConfig probeConfig,
+			boolean refused) {
 		String scannerId = "ai-" + family.toLowerCase();
 		RunContext runContext = new RunContext(endpoint.url(), scannerId, this.budget.getMaxHttpCallsPerOperation(),
-				this.budget.getMaxToolIterations(), this.budget.getMaxResponseChars());
+				this.budget.getMaxToolIterations(), this.budget.getMaxResponseChars(),
+				Duration.ofSeconds(this.budget.getEndpointTimeoutSeconds()));
 		WebClient probeClient = probeConfig.ignoreSslErrors() ? insecureWebClient() : this.probeWebClient;
 		HttpProbeTool httpProbeTool = new HttpProbeTool(probeClient, this.scopeGuard, this.objectMapper, runContext,
 				probeConfig.credentials(), Duration.ofMillis(probeConfig.readTimeoutMs()));
@@ -115,6 +130,9 @@ public class FamilyAgent {
 		if (!authNote.isEmpty()) {
 			userPrompt += "\n\n" + authNote;
 		}
+		if (refused) {
+			userPrompt += "\n\n" + REFUSED_NOTE;
+		}
 		this.agentActivity.started();
 		try {
 			this.chatClient.prompt()
@@ -126,9 +144,9 @@ public class FamilyAgent {
 				.content();
 		}
 		catch (RuntimeException ex) {
-			if (causedBy(ex, AgentTurnLimitException.class)) {
-				log.info("Family agent {} on {} {} used its {} tool calls", family, endpoint.method(), endpoint.url(),
-						this.budget.getMaxToolIterations());
+			AgentTurnLimitException limit = cause(ex, AgentTurnLimitException.class);
+			if (limit != null) {
+				log.info("Family agent {} on {} {}: {}", family, endpoint.method(), endpoint.url(), limit.getMessage());
 			}
 			else if (isInterruption(ex)) {
 				log.info("Family agent {} on {} {} interrupted (task cancelled or budget spent)", family,
@@ -145,6 +163,30 @@ public class FamilyAgent {
 		log.info("Family {} on {} {} used {} HTTP call(s), {} finding(s)", family, endpoint.method(), endpoint.url(),
 				runContext.httpCallsUsed(), runContext.findings().size());
 		return runContext.findings();
+	}
+
+	/**
+	 * Sends the unmodified request once, with the configured credentials, to learn
+	 * whether the endpoint accepts the identity at all. Path templates are filled with a
+	 * placeholder: an authorization layer answers before the identifier is ever looked
+	 * up.
+	 * @param endpoint the endpoint to probe
+	 * @param probeConfig the credentials, TLS leniency and timeout to apply
+	 * @return the response status, or empty when no response came back
+	 */
+	public Mono<Integer> baselineStatus(Endpoint endpoint, ProbeConfig probeConfig) {
+		WebClient client = probeConfig.ignoreSslErrors() ? insecureWebClient() : this.probeWebClient;
+		Duration timeout = Duration.ofMillis(probeConfig.readTimeoutMs());
+		return Mono.defer(() -> {
+			String url = Credentials.withQueryCredentials(PATH_TEMPLATE.matcher(endpoint.url()).replaceAll("1"),
+					probeConfig.credentials());
+			WebClient.RequestBodySpec spec = client.method(HttpMethod.valueOf(endpoint.method())).uri(url);
+			Credentials.applyHeaderAndCookie(spec, probeConfig.credentials());
+			return spec.exchangeToMono((response) -> response.releaseBody().thenReturn(response.statusCode().value()));
+		}).timeout(timeout).onErrorResume((ex) -> {
+			log.debug("Baseline of {} {} got no response: {}", endpoint.method(), endpoint.url(), ex.getMessage());
+			return Mono.empty();
+		});
 	}
 
 	/**
@@ -218,12 +260,16 @@ public class FamilyAgent {
 	}
 
 	private static boolean causedBy(Throwable ex, Class<? extends Throwable> type) {
+		return cause(ex, type) != null;
+	}
+
+	private static <T extends Throwable> T cause(Throwable ex, Class<T> type) {
 		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
 			if (type.isInstance(cause)) {
-				return true;
+				return type.cast(cause);
 			}
 		}
-		return false;
+		return null;
 	}
 
 	/**

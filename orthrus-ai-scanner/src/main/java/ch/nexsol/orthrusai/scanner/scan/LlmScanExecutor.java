@@ -16,7 +16,9 @@
 
 package ch.nexsol.orthrusai.scanner.scan;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,6 +40,7 @@ import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
 import ch.nexsol.orthrusai.scanner.ai.ProbeConfig;
+import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
 
 /**
@@ -54,16 +57,28 @@ public class LlmScanExecutor implements ScanExecutor {
 
 	private static final int ENDPOINT_CONCURRENCY = 3;
 
+	/**
+	 * Families that still test something on an endpoint refusing the identity (403):
+	 * forged tokens, authorization and method bypasses, and properties of the response
+	 * itself (CORS, banners, security headers, transport). The others exercise input
+	 * handling a refused request never reaches.
+	 */
+	private static final Set<String> RUN_WHEN_FORBIDDEN = Set.of("JWT", "BOLA", "CONFIGURATION", "HTTP", "SSL");
+
 	private final ReconService reconService;
 
 	private final FamilyAgent familyAgent;
 
 	private final ObjectMapper objectMapper;
 
-	public LlmScanExecutor(ReconService reconService, FamilyAgent familyAgent, ObjectMapper objectMapper) {
+	private final Duration endpointTimeout;
+
+	public LlmScanExecutor(ReconService reconService, FamilyAgent familyAgent, ObjectMapper objectMapper,
+			AiScannerProperties properties) {
 		this.reconService = reconService;
 		this.familyAgent = familyAgent;
 		this.objectMapper = objectMapper;
+		this.endpointTimeout = Duration.ofSeconds(properties.getAi().getBudget().getEndpointTimeoutSeconds());
 	}
 
 	@Override
@@ -73,13 +88,15 @@ public class LlmScanExecutor implements ScanExecutor {
 
 	/**
 	 * Probes the endpoints until done or stopped. When the stop signal fires, the agents
-	 * still running are interrupted and every endpoint without a verdict is reported as
-	 * an ERROR attempt, so the report shows the coverage was partial instead of silently
+	 * still running are interrupted and every endpoint without a verdict is reported as a
+	 * NOT_RUN attempt, so the report shows the coverage was partial instead of silently
 	 * listing fewer endpoints. The signal bounds the whole task, recon included: a recon
-	 * still running when it fires yields no endpoint at all.
+	 * still running when it fires yields no endpoint at all. Once recon is done, probing
+	 * is also bounded by the endpoint budget: the time given to one endpoint for each
+	 * wave of endpoints probed in parallel, plus one wave of margin for the agents still
+	 * finishing their last turn.
 	 * @param request the dispatched task
-	 * @param stop fires when the task budget is spent; subscribed once, so a timer starts
-	 * when the task does
+	 * @param stop the task ceiling; subscribed once, so a timer starts when the task does
 	 * @return the attempts, one per endpoint
 	 */
 	@Override
@@ -90,11 +107,14 @@ public class LlmScanExecutor implements ScanExecutor {
 			log.info("AI task {} ({}): probing {} endpoint(s){}{}", request.taskId(), family, recon.endpoints().size(),
 					recon.shared() ? " from orchestrator recon" : " from local recon",
 					recon.probeConfig().credentials().isEmpty() ? "" : " (authenticated)");
+			Duration probingBudget = probingBudget(recon.endpoints().size());
+			log.info("AI task {} ({}): {} s to probe, {} s per endpoint", request.taskId(), family,
+					probingBudget.toSeconds(), this.endpointTimeout.toSeconds());
 			Set<Endpoint> done = ConcurrentHashMap.newKeySet();
 			Flux<ScanAttempt> probed = Flux.fromIterable(recon.endpoints())
 				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), recon.probeConfig())
 					.doOnNext((attempt) -> done.add(endpoint)), ENDPOINT_CONCURRENCY)
-				.takeUntilOther(budget);
+				.takeUntilOther(Mono.firstWithSignal(budget, Mono.delay(probingBudget)));
 			Flux<ScanAttempt> notRun = Flux.defer(() -> Flux.fromIterable(recon.endpoints())
 				.filter((endpoint) -> !done.contains(endpoint))
 				.map((endpoint) -> notRunAttempt(family, endpoint)));
@@ -102,9 +122,20 @@ public class LlmScanExecutor implements ScanExecutor {
 		});
 	}
 
+	/**
+	 * The time to probe {@code endpoints} endpoints: one endpoint timeout per wave of
+	 * parallel agents, plus one wave of margin.
+	 * @param endpoints the number of endpoints to probe
+	 * @return the probing budget
+	 */
+	Duration probingBudget(int endpoints) {
+		int waves = (endpoints + ENDPOINT_CONCURRENCY - 1) / ENDPOINT_CONCURRENCY;
+		return this.endpointTimeout.multipliedBy(waves + 1L);
+	}
+
 	private ScanAttempt notRunAttempt(String family, Endpoint endpoint) {
 		return new ScanAttempt("ai-" + family.toLowerCase(), "AI " + family + " Agent (not run: task budget spent)",
-				endpoint.method(), endpoint.url(), AttemptStatus.ERROR, List.of());
+				endpoint.method(), endpoint.url(), AttemptStatus.NOT_RUN, List.of());
 	}
 
 	/**
@@ -150,15 +181,38 @@ public class LlmScanExecutor implements ScanExecutor {
 		}
 	}
 
+	/**
+	 * Probes one endpoint, after the same gate as the deterministic engine: a baseline
+	 * request with the configured credentials. A 401 means they are rejected, so no agent
+	 * runs. A 403 means they are accepted but the identity is refused, so only the
+	 * families probing a way around the refusal, or the refused response itself, run.
+	 * @param family the scanner family name
+	 * @param endpoint the endpoint to probe
+	 * @param context the orchestrator's shared target fingerprint, may be null
+	 * @param probeConfig the credentials, TLS leniency and timeout to apply
+	 * @return the endpoint's single attempt
+	 */
 	private Flux<ScanAttempt> scanEndpoint(String family, Endpoint endpoint, String context, ProbeConfig probeConfig) {
-		return Flux.defer(() -> {
-			List<Vulnerability> findings = this.familyAgent.scan(family, endpoint, context, probeConfig);
-			String scannerId = "ai-" + family.toLowerCase();
-			AttemptStatus status = findings.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED;
-			ScanAttempt attempt = new ScanAttempt(scannerId, "AI " + family + " Agent", endpoint.method(),
-					endpoint.url(), status, findings);
-			return Flux.just(attempt);
-		}).subscribeOn(Schedulers.boundedElastic());
+		return this.familyAgent.baselineStatus(endpoint, probeConfig).defaultIfEmpty(0).flatMapMany((status) -> {
+			if (status == 401) {
+				return Flux.just(attempt(family, endpoint, AttemptStatus.AUTH_ERROR, List.of()));
+			}
+			boolean refused = status == 403;
+			if (refused && !RUN_WHEN_FORBIDDEN.contains(family.toUpperCase(Locale.ROOT))) {
+				return Flux.just(attempt(family, endpoint, AttemptStatus.FORBIDDEN, List.of()));
+			}
+			return Flux.defer(() -> {
+				List<Vulnerability> findings = this.familyAgent.scan(family, endpoint, context, probeConfig, refused);
+				AttemptStatus verdict = findings.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED;
+				return Flux.just(attempt(family, endpoint, verdict, findings));
+			}).subscribeOn(Schedulers.boundedElastic());
+		});
+	}
+
+	private static ScanAttempt attempt(String family, Endpoint endpoint, AttemptStatus status,
+			List<Vulnerability> findings) {
+		return new ScanAttempt("ai-" + family.toLowerCase(Locale.ROOT), "AI " + family + " Agent", endpoint.method(),
+				endpoint.url(), status, findings);
 	}
 
 	private record Recon(List<Endpoint> endpoints, String context, ProbeConfig probeConfig, boolean shared) {

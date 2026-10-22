@@ -19,6 +19,7 @@ package ch.nexsol.orthrusai.scanner.ai.tool;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +36,9 @@ import ch.nexsol.orthrusai.scanner.ai.RunContext;
  * validated fields; this tool builds the {@link Vulnerability} object and stores it.
  * Because the object is assembled here from typed parameters, the model cannot fabricate
  * a malformed finding, and risk levels are constrained to the values the manager
- * understands.
+ * understands. A report that records the absence of a flaw (no evidence, nothing to fix,
+ * or an explicit "no vulnerability found") is refused: models tend to log every test as a
+ * finding, and each one would mark the test as failed in the report.
  */
 public class FindingTool {
 
@@ -46,6 +49,27 @@ public class FindingTool {
 	 * confirmed on its last request can still be recorded.
 	 */
 	private static final int REPORTING_GRACE_CALLS = 3;
+
+	/**
+	 * A field holding only one of these says nothing.
+	 */
+	private static final Pattern PLACEHOLDER = Pattern.compile("^(n/?a|none|nothing|not applicable|-+|\\.+|null)\\.?$",
+			Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * Wording that states there is no flaw.
+	 */
+	private static final Pattern NO_FLAW = Pattern.compile(
+			"not a (vulnerability|finding)|no (vulnerabilit(y|ies)|findings?|issues?) (found|detected|identified|confirmed)"
+					+ "|\\bno findings\\b|not vulnerable|nothing (was )?found|for context only",
+			Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * A remediation saying there is nothing to fix.
+	 */
+	private static final Pattern NOTHING_TO_FIX = Pattern.compile(
+			"no (action|remediation|fix|change)s? (is )?(required|needed)" + "|none (required|needed)",
+			Pattern.CASE_INSENSITIVE);
 
 	private final RunContext runContext;
 
@@ -60,7 +84,7 @@ public class FindingTool {
 	}
 
 	@Tool(description = "Record a confirmed vulnerability. Call this ONLY when the evidence proves the "
-			+ "weakness is real. Do not report speculation.")
+			+ "weakness is real. Do not report speculation, and never use it to record that nothing was found.")
 	public String reportVulnerability(@ToolParam(description = "Short title of the vulnerability") String name,
 			@ToolParam(description = "What the weakness is and where it occurs") String description,
 			@ToolParam(description = "Severity: one of INFO, LOW, MEDIUM, HIGH, CRITICAL") String riskLevel,
@@ -70,6 +94,13 @@ public class FindingTool {
 
 		if (this.runContext.nextToolCall() > this.runContext.maxToolCalls() + REPORTING_GRACE_CALLS) {
 			throw new AgentTurnLimitException(this.runContext.maxToolCalls());
+		}
+		String refusal = nonFindingReason(name, description, evidence, remediation);
+		if (refusal != null) {
+			log.info("Agent report '{}' on {} {} not recorded: {}", name, this.endpointMethod, this.endpointUrl,
+					refusal);
+			return "NOT_RECORDED: " + refusal + ". Report only a confirmed weakness, with its evidence and its fix. "
+					+ "When nothing is found, record nothing and reply DONE.";
 		}
 		RiskLevel risk = normalise(riskLevel, RiskLevel.class, RiskLevel.MEDIUM);
 		Vulnerability.Confidence conf = normalise(confidence, Vulnerability.Confidence.class,
@@ -82,6 +113,33 @@ public class FindingTool {
 		this.runContext.addFinding(finding);
 		log.info("Agent reported vulnerability '{}' [{}] on {} {}", name, risk, this.endpointMethod, this.endpointUrl);
 		return "Recorded finding '" + name + "'. Continue probing or stop if the endpoint is exhausted.";
+	}
+
+	/**
+	 * Why a report records the absence of a flaw rather than a flaw.
+	 * @param name the title
+	 * @param description the description
+	 * @param evidence the evidence
+	 * @param remediation the fix
+	 * @return the reason to refuse it, or null when it reads as a real finding
+	 */
+	static String nonFindingReason(String name, String description, String evidence, String remediation) {
+		if (isBlank(evidence)) {
+			return "it has no evidence";
+		}
+		if (isBlank(remediation) || NOTHING_TO_FIX.matcher(remediation.strip()).find()) {
+			return "it has nothing to fix";
+		}
+		for (String text : new String[] { name, description, evidence }) {
+			if (text != null && NO_FLAW.matcher(text).find()) {
+				return "it states that no flaw was found";
+			}
+		}
+		return null;
+	}
+
+	private static boolean isBlank(String value) {
+		return value == null || value.isBlank() || PLACEHOLDER.matcher(value.strip()).matches();
 	}
 
 	private <E extends Enum<E>> E normalise(String value, Class<E> type, E fallback) {

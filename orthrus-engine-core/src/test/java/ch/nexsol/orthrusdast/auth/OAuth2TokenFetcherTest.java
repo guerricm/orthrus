@@ -77,7 +77,7 @@ class OAuth2TokenFetcherTest {
 		});
 
 		OAuth2Config config = new OAuth2Config(tokenUrl, "test-client", "test-secret", "password",
-				List.of("admin:pass", "user:pass"));
+				List.of("admin:pass", "user:pass"), null);
 
 		StepVerifier.create(fetcher.fetchTokens(config)).assertNext((tokens) -> {
 			assertThat(tokens).hasSize(2);
@@ -125,16 +125,45 @@ class OAuth2TokenFetcherTest {
 	}
 
 	private OAuth2Config clientCredentials() {
-		return new OAuth2Config(tokenUrl, "test-client", "test-secret", "client_credentials", null);
+		return new OAuth2Config(tokenUrl, "test-client", "test-secret", "client_credentials", null, null);
 	}
 
 	@Test
 	void testFetchTokens_EmptyCredentials() {
-		OAuth2Config config = new OAuth2Config(tokenUrl, "test-client", "test-secret", "password", List.of());
+		OAuth2Config config = new OAuth2Config(tokenUrl, "test-client", "test-secret", "password", List.of(), null);
 
 		StepVerifier.create(fetcher.fetchTokens(config))
 			.assertNext((tokens) -> assertThat(tokens).isEmpty())
 			.verifyComplete();
+	}
+
+	@Test
+	void requestsTheConfiguredScope() throws InterruptedException {
+		mockWebServer.enqueue(new MockResponse().setResponseCode(200)
+			.setHeader("Content-Type", "application/json")
+			.setBody("{\"access_token\": \"TOKEN\", \"token_type\": \"Bearer\"}"));
+		OAuth2Config config = new OAuth2Config(tokenUrl, "test-client", "test-secret", "client_credentials", null,
+				"openid chat_room_read");
+
+		StepVerifier.create(fetcher.fetchTokens(config)).expectNextCount(1).verifyComplete();
+		assertThat(mockWebServer.takeRequest().getBody().readUtf8()).contains("scope=openid+chat_room_read");
+	}
+
+	@Test
+	void requestsNoScopeWhenNoneIsConfigured() throws InterruptedException {
+		mockWebServer.enqueue(new MockResponse().setResponseCode(200)
+			.setHeader("Content-Type", "application/json")
+			.setBody("{\"access_token\": \"TOKEN\", \"token_type\": \"Bearer\"}"));
+
+		StepVerifier.create(fetcher.fetchTokens(clientCredentials())).expectNextCount(1).verifyComplete();
+		assertThat(mockWebServer.takeRequest().getBody().readUtf8()).doesNotContain("scope=");
+	}
+
+	@Test
+	void aBlankScopeMeansNoScope() {
+		assertThat(new OAuth2Config(tokenUrl, "c", "s", "client_credentials", null, "  ").scope()).isNull();
+		assertThat(new OAuth2Config(tokenUrl, "c", "s", "client_credentials", null, " openid ").scope())
+			.isEqualTo("openid");
 	}
 
 }

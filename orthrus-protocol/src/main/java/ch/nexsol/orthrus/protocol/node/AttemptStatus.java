@@ -16,8 +16,27 @@
 
 package ch.nexsol.orthrus.protocol.node;
 
+/**
+ * Outcome of one scanner on one endpoint.
+ */
 public enum AttemptStatus {
 
-	PASSED, FAILED, AUTH_ERROR, ERROR
+	/** The test ran and found nothing. */
+	PASSED,
+
+	/** The test ran and found a vulnerability. */
+	FAILED,
+
+	/** The test did not run: the target rejected the credentials (401). */
+	AUTH_ERROR,
+
+	/** The test did not run: the credentials were accepted but lack permission (403). */
+	FORBIDDEN,
+
+	/** The test failed to run. */
+	ERROR,
+
+	/** The test was not run: the task spent its budget before reaching it. */
+	NOT_RUN
 
 }

@@ -59,6 +59,13 @@ public class BflaScanner implements SecurityScanner {
 	}
 
 	@Override
+	public boolean runsWhenForbidden() {
+		// Another method, or a method override, that gets through where the
+		// configured identity is refused is a bypass.
+		return true;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			HttpMethod method = operation.method();

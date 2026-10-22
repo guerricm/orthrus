@@ -16,7 +16,12 @@
 
 package ch.nexsol.orthrusai.scanner.ai.tool;
 
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
@@ -25,8 +30,9 @@ import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The finding tool must record a well-formed finding and never let the model smuggle in a
- * risk level or confidence the manager cannot parse.
+ * The finding tool must record a well-formed finding, never let the model smuggle in a
+ * risk level or confidence the manager cannot parse, and refuse reports that only record
+ * the absence of a flaw.
  */
 class FindingToolTests {
 
@@ -58,6 +64,55 @@ class FindingToolTests {
 		Vulnerability finding = ctx.findings().get(0);
 		assertThat(finding.riskLevel()).isEqualTo(RiskLevel.MEDIUM);
 		assertThat(finding.confidence()).isEqualTo(Vulnerability.Confidence.MEDIUM);
+	}
+
+	@Test
+	void recordsARealFindingWithEvidenceAndAFix() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-configuration", 10);
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}", "PUT");
+
+		String reply = tool.reportVulnerability("Wildcard CORS with Authorization header allowed (no credentials)",
+				"The API responds to any Origin with Access-Control-Allow-Origin: *.", "LOW", "HIGH",
+				"OPTIONS with Origin: https://evil.example.com -> 200, Access-Control-Allow-Origin: *",
+				"Replace the wildcard with an explicit allow-list of trusted origins.");
+
+		assertThat(reply).startsWith("Recorded finding");
+		assertThat(ctx.findings()).hasSize(1);
+	}
+
+	@ParameterizedTest
+	@MethodSource("nonFindings")
+	void refusesAReportThatOnlyRecordsTheAbsenceOfAFlaw(String name, String description, String evidence,
+			String remediation) throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-xss", 10);
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}", "GET");
+
+		String reply = tool.reportVulnerability(name, description, "INFO", "HIGH", evidence, remediation);
+
+		assertThat(reply).startsWith("NOT_RECORDED").contains("reply DONE");
+		assertThat(ctx.findings()).isEmpty();
+	}
+
+	/**
+	 * Reports an agent actually filed against a target that refused every request.
+	 * @return the name, description, evidence and remediation of each
+	 */
+	static Stream<Arguments> nonFindings() {
+		return Stream.of(Arguments.of("No business-logic flaws verifiable", "Not applicable", "not a finding", "n/a"),
+				Arguments.of("No injection flaws observable - requests blocked by authorization",
+						"Not a vulnerability. Recording for context only: the endpoint could not be exercised.",
+						"All PUT requests returned HTTP 403 (insufficient_scope) with empty body.", "None required."),
+				Arguments.of("No injection flaws confirmed on CHAT-SERVICE/rooms/{roomId}",
+						"Testing only - no findings", "No injection found", "N/A"),
+				Arguments.of("XSS probe - no vulnerability found", "n/a", "n/a", "n/a"),
+				Arguments.of("No reflected XSS in roomId path parameter",
+						"GET /CHAT-SERVICE/rooms/{roomId} reflects nothing from the path parameter.",
+						"403, empty body (Content-Length: 0).",
+						"No remediation required for this endpoint; the roomId value is never rendered."),
+				Arguments.of("No XSS vulnerability found on PUT /CHAT-SERVICE/rooms/{roomId}",
+						"No XSS vulnerability exists on this endpoint.", "HTTP 400 with empty body.",
+						"No action required. The endpoint already has adequate protections."),
+				Arguments.of("No confirmed XSS on rooms DELETE endpoint", "", null, ""));
 	}
 
 }

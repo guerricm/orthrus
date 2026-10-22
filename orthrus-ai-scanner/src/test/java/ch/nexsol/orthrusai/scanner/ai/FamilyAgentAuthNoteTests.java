@@ -54,7 +54,7 @@ class FamilyAgentAuthNoteTests {
 		List<Credential> credentials = List.of(new Credential("HEADER", "Authorization", "Bearer super-secret"),
 				new Credential("COOKIE", "session", "s1"));
 
-		this.agent.scan("JWT", this.endpoint, null, new ProbeConfig(credentials, false, 10000));
+		this.agent.scan("JWT", this.endpoint, null, new ProbeConfig(credentials, false, 10000), false);
 
 		String userPrompt = captureUserPrompt();
 		assertThat(userPrompt).contains("HEADER Authorization")
@@ -66,9 +66,24 @@ class FamilyAgentAuthNoteTests {
 
 	@Test
 	void saysNothingAboutAuthWhenNoCredentialsAreConfigured() {
-		this.agent.scan("JWT", this.endpoint, null, ProbeConfig.defaults());
+		this.agent.scan("JWT", this.endpoint, null, ProbeConfig.defaults(), false);
 
 		assertThat(captureUserPrompt()).doesNotContain("Treat the endpoint as authenticated");
+	}
+
+	@Test
+	void anEndpointRefusingTheIdentityPointsTheAgentAtBypassingTheRefusal() {
+		this.agent.scan("JWT", this.endpoint, null, ProbeConfig.defaults(), true);
+
+		assertThat(captureUserPrompt()).contains("answered the baseline request with 403")
+			.contains("a way around the refusal");
+	}
+
+	@Test
+	void anEndpointAcceptingTheIdentityGetsNoRefusalNote() {
+		this.agent.scan("JWT", this.endpoint, null, ProbeConfig.defaults(), false);
+
+		assertThat(captureUserPrompt()).doesNotContain("403");
 	}
 
 	private String captureUserPrompt() {

@@ -106,4 +106,10 @@ class FamilyPromptsTests {
 		return FamilyPrompts.forFamily(family, 12, 40);
 	}
 
+	@Test
+	void forbidsReportingThatNothingWasFound() {
+		assertThat(prompt("XSS")).contains("Never call reportVulnerability to say that a test found nothing")
+			.contains("the absence of a flaw is not a finding");
+	}
+
 }

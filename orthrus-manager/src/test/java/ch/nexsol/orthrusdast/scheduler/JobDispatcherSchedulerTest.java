@@ -441,7 +441,7 @@ class JobDispatcherSchedulerTest {
 
 	private static ScanConfiguration oauth2Configuration(String token) {
 		OAuth2Config oauth2 = new OAuth2Config("https://idp.example/token", "client", "secret", "client_credentials",
-				null);
+				null, null);
 		return new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "html", SecurityScheme.bearer(token),
 				null, "en", false, GatewayType.AUTO, null, null, oauth2, null, null);
 	}

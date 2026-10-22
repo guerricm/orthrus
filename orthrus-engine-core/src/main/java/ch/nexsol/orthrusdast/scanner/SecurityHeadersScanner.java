@@ -60,6 +60,12 @@ public class SecurityHeadersScanner implements SecurityScanner {
 	}
 
 	@Override
+	public boolean runsWhenForbidden() {
+		// Server banners leak on a refusal as much as on a success.
+		return true;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation, ScanConfiguration config, ScanContext context) {
 		// The "normal response" check can reuse the engine baseline; only the
 		// bogus-method

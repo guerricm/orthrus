@@ -16,10 +16,52 @@
 
 package ch.nexsol.orthrusdast.model;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 
+/**
+ * The attempts made on one endpoint, with a count per status.
+ *
+ * @param endpoint the method and URL of the endpoint
+ * @param attempts the attempts made on it
+ * @param passed attempts that found nothing
+ * @param failed attempts that found a vulnerability
+ * @param authError attempts not run because the credentials were rejected (401)
+ * @param forbidden attempts not run because the identity lacks permission (403)
+ * @param error attempts that failed to run
+ * @param notRun attempts left unrun when a task spent its budget
+ */
 public record EndpointAttemptGroup(String endpoint, List<ScanAttempt> attempts, long passed, long failed,
-		long authError, long error) {
+		long authError, long forbidden, long error, long notRun) {
+
+	/**
+	 * Groups attempts by endpoint, keeping the order in which endpoints first appear.
+	 * @param attempts the attempts of a scan
+	 * @return one group per endpoint
+	 */
+	public static List<EndpointAttemptGroup> groupByEndpoint(List<ScanAttempt> attempts) {
+		Map<String, List<ScanAttempt>> grouped = new LinkedHashMap<>();
+		for (ScanAttempt a : attempts) {
+			grouped.computeIfAbsent(a.operationMethod() + " " + a.operationUrl(), (k) -> new ArrayList<>()).add(a);
+		}
+		List<EndpointAttemptGroup> groups = new ArrayList<>();
+		for (Map.Entry<String, List<ScanAttempt>> entry : grouped.entrySet()) {
+			List<ScanAttempt> list = entry.getValue();
+			groups.add(new EndpointAttemptGroup(entry.getKey(), list, count(list, AttemptStatus.PASSED),
+					count(list, AttemptStatus.FAILED), count(list, AttemptStatus.AUTH_ERROR),
+					count(list, AttemptStatus.FORBIDDEN), count(list, AttemptStatus.ERROR),
+					count(list, AttemptStatus.NOT_RUN)));
+		}
+		return groups;
+	}
+
+	private static long count(List<ScanAttempt> attempts, AttemptStatus status) {
+		return attempts.stream().filter((a) -> a.status() == status).count();
+	}
+
 }

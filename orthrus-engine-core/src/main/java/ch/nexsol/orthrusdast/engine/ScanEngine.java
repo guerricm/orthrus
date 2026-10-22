@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -31,6 +32,7 @@ import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
@@ -161,12 +163,22 @@ public class ScanEngine {
 		// so
 		// they do not each re-issue the same unmodified request.
 		return httpClient.send(operation).flatMapMany((response) -> {
-			if (response.statusCode().value() == 401 || response.statusCode().value() == 403) {
-				log.warn("Operation {} {} returned auth error {}. Skipping scanners.", operation.method().name(),
-						operation.url(), response.statusCode().value());
+			int status = response.statusCode().value();
+			if (status == 401) {
+				log.warn("Operation {} {} rejected the credentials (401, {}). Skipping scanners.",
+						operation.method().name(), operation.url(), wwwAuthenticate(response));
 				return Flux.fromIterable(scanners)
-					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-							operation.url(), AttemptStatus.AUTH_ERROR, List.of()));
+					.map((scanner) -> notRun(scanner, operation, AttemptStatus.AUTH_ERROR));
+			}
+			if (status == 403) {
+				// The credentials were accepted but the identity lacks permission: only
+				// the scanners probing a way around the refusal still test something.
+				log.warn("Operation {} {} refused the identity (403, {}). Running only the bypass scanners.",
+						operation.method().name(), operation.url(), wwwAuthenticate(response));
+				ScanContext context = new ScanContext(response);
+				return Flux.fromIterable(scanners)
+					.flatMap((scanner) -> scanner.runsWhenForbidden() ? runScanner(scanner, operation, config, context)
+							: Mono.just(notRun(scanner, operation, AttemptStatus.FORBIDDEN)));
 			}
 
 			// Only share a genuine response as the baseline. A 5xx (including the
@@ -207,6 +219,15 @@ public class ScanEngine {
 				return Mono.just(new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
 						operation.url(), AttemptStatus.ERROR, List.of()));
 			});
+	}
+
+	private static ScanAttempt notRun(SecurityScanner scanner, Operation operation, AttemptStatus status) {
+		return new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(), operation.url(), status,
+				List.of());
+	}
+
+	private static String wwwAuthenticate(ScanHttpResponse response) {
+		return response.headers().getFirst(HttpHeaders.WWW_AUTHENTICATE);
 	}
 
 	private static String hostKey(Operation operation) {

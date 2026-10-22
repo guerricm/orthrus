@@ -21,7 +21,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -94,14 +93,12 @@ public class AiSlaveController {
 		AtomicInteger vulnsCount = new AtomicInteger();
 		AtomicInteger notRunCount = new AtomicInteger();
 
-		AtomicBoolean budgetSpent = new AtomicBoolean();
-
-		// The budget bounds the whole task. Spending it is not a failure: the running
-		// agents are stopped, the endpoints left are reported as not run, and the task
-		// completes with what it found, so the manager keeps the results instead of
-		// requeueing the task to start over.
-		Mono<Long> budget = Mono.delay(Duration.ofSeconds(this.taskTimeoutSeconds))
-			.doOnNext((tick) -> budgetSpent.set(true));
+		// The ceiling bounds the whole task. Reaching it, or the endpoint budget the
+		// executor derives, is not a failure: the running agents are stopped, the
+		// endpoints left are reported as not run, and the task completes with what it
+		// found, so the manager keeps the results instead of requeueing the task to start
+		// over.
+		Mono<Long> budget = Mono.delay(Duration.ofSeconds(this.taskTimeoutSeconds));
 		Disposable disposable = this.scanExecutor.execute(request, budget)
 			.bufferTimeout(10, Duration.ofSeconds(1))
 			.flatMap((batch) -> {
@@ -110,7 +107,7 @@ public class AiSlaveController {
 						vulnsCount.addAndGet(attempt.vulnerabilities().size());
 					}
 					// An endpoint left unprobed is reported, not tested.
-					if (attempt.status() == AttemptStatus.ERROR) {
+					if (attempt.status() == AttemptStatus.NOT_RUN) {
 						notRunCount.incrementAndGet();
 					}
 					else {
@@ -120,12 +117,11 @@ public class AiSlaveController {
 				return this.managerClient.sendTaskAttemptsBatch(request.taskId(), batch);
 			})
 			.then(Mono.defer(() -> {
-				if (budgetSpent.get()) {
+				if (notRunCount.get() > 0) {
 					log.warn(
-							"Task {} ({}) spent its {} s budget: {} endpoint(s) not run; completing with {} "
+							"Task {} ({}) spent its budget: {} endpoint(s) not run; completing with {} "
 									+ "vulnerabilities",
-							request.taskId(), request.phase(), this.taskTimeoutSeconds, notRunCount.get(),
-							vulnsCount.get());
+							request.taskId(), request.phase(), notRunCount.get(), vulnsCount.get());
 				}
 				else {
 					log.info("Task {} ({}) completed: {} tests, {} vulnerabilities", request.taskId(), request.phase(),

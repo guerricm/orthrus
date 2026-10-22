@@ -48,6 +48,8 @@ public final class FamilyPrompts {
 			endpoint exposes no object identifier in its path, query or body.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
+			- Never call reportVulnerability to say that a test found nothing, could not run or does not \
+			apply: the absence of a flaw is not a finding. In that case record nothing and reply DONE.
 			- Rate each finding by its proven impact, on this scale, so the same weakness never gets \
 			two different levels:
 			INFO: no security impact on its own (server banner or version disclosure).

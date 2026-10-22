@@ -205,7 +205,9 @@
                         <span class="badge bg-success" th:text="${group.passed()} + ' Passed'"></span>
                         <span th:if="${group.failed() > 0}" class="badge bg-danger" th:text="${group.failed()} + ' Failed'"></span>
                         <span th:if="${group.authError() > 0}" class="badge bg-warning text-dark" th:text="${group.authError()} + ' Auth Errors'"></span>
+                        <span th:if="${group.forbidden() > 0}" class="badge bg-warning text-dark" th:text="${group.forbidden()} + ' Forbidden'"></span>
                         <span th:if="${group.error() > 0}" class="badge bg-secondary" th:text="${group.error()} + ' Errors'"></span>
+                        <span th:if="${group.notRun() > 0}" class="badge bg-secondary" th:text="${group.notRun()} + ' Not Run'"></span>
                     </div>
                     <table class="table table-dark table-sm table-bordered border-secondary" style="font-size: 0.9em;">
                         <thead>
@@ -222,7 +224,7 @@
                                     <span th:text="${attempt.scannerName() != null ? attempt.scannerName() : '-'}"></span>
                                 </td>
                                 <td class="bg-transparent border-secondary">
-                                    <span th:class="'badge ' + (${attempt.status().name() == 'PASSED'} ? 'bg-success' : (${attempt.status().name() == 'FAILED'} ? 'bg-danger' : 'bg-warning text-dark'))" th:text="${attempt.status()}"></span>
+                                    <span th:class="'badge ' + (${attempt.status().name() == 'PASSED'} ? 'bg-success' : (${attempt.status().name() == 'FAILED'} ? 'bg-danger' : (${attempt.status().name() == 'NOT_RUN' or attempt.status().name() == 'ERROR'} ? 'bg-secondary' : 'bg-warning text-dark')))" th:text="${attempt.status()}"></span>
                                 </td>
                             </tr>
                         </tbody>

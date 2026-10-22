@@ -16,6 +16,7 @@
 
 package ch.nexsol.orthrusai.scanner.ai;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,8 +25,9 @@ import ch.nexsol.orthrus.protocol.node.Vulnerability;
 
 /**
  * Per-endpoint state shared with the tools an agent calls during one scan. It carries the
- * scope, the HTTP-call budget, and the findings the agent reports, so tool instances stay
- * stateless beyond this context and one agent run cannot spill into another.
+ * scope, the HTTP-call and time budgets, and the findings the agent reports, so tool
+ * instances stay stateless beyond this context and one agent run cannot spill into
+ * another.
  */
 public class RunContext {
 
@@ -39,6 +41,8 @@ public class RunContext {
 
 	private final int maxResponseChars;
 
+	private final long deadlineNanos;
+
 	private final AtomicInteger httpCalls = new AtomicInteger();
 
 	private final AtomicInteger toolCalls = new AtomicInteger();
@@ -46,7 +50,7 @@ public class RunContext {
 	private final List<Vulnerability> findings = new CopyOnWriteArrayList<>();
 
 	public RunContext(String targetUrl, String scannerId, int maxHttpCalls) {
-		this(targetUrl, scannerId, maxHttpCalls, 12, 1500);
+		this(targetUrl, scannerId, maxHttpCalls, 12, 1500, null);
 	}
 
 	/**
@@ -56,13 +60,18 @@ public class RunContext {
 	 * @param maxToolCalls the tool calls the agent may make, each costing one model round
 	 * trip
 	 * @param maxResponseChars the characters of each response body fed back to the model
+	 * @param timeLimit how long the agent may spend on the endpoint, counted from now;
+	 * null or zero for no limit
 	 */
-	public RunContext(String targetUrl, String scannerId, int maxHttpCalls, int maxToolCalls, int maxResponseChars) {
+	public RunContext(String targetUrl, String scannerId, int maxHttpCalls, int maxToolCalls, int maxResponseChars,
+			Duration timeLimit) {
 		this.targetUrl = targetUrl;
 		this.scannerId = scannerId;
 		this.maxHttpCalls = maxHttpCalls;
 		this.maxToolCalls = maxToolCalls;
 		this.maxResponseChars = maxResponseChars;
+		this.deadlineNanos = (timeLimit != null && timeLimit.isPositive()) ? System.nanoTime() + timeLimit.toNanos()
+				: Long.MAX_VALUE;
 	}
 
 	public String targetUrl() {
@@ -79,6 +88,14 @@ public class RunContext {
 	 */
 	public boolean tryConsumeHttpCall() {
 		return this.httpCalls.incrementAndGet() <= this.maxHttpCalls;
+	}
+
+	/**
+	 * Whether the time given to this endpoint is spent.
+	 * @return true once the time limit has passed
+	 */
+	public boolean timeUp() {
+		return this.deadlineNanos != Long.MAX_VALUE && System.nanoTime() - this.deadlineNanos >= 0;
 	}
 
 	/**

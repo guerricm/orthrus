@@ -62,6 +62,14 @@ public class BrokenAuthenticationScanner implements SecurityScanner {
 	}
 
 	@Override
+	public boolean runsWhenForbidden() {
+		// A request without credentials, or with invalid ones, that gets through where
+		// the
+		// configured identity is refused is a bypass.
+		return true;
+	}
+
+	@Override
 	public Flux<Vulnerability> scan(Operation operation) {
 		return Flux.defer(() -> {
 			log.debug("Scanning for Broken Authentication: {}", operation.url());

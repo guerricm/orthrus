@@ -95,7 +95,7 @@ class AgentLoopLimitsTests {
 		FamilyAgent agent = new FamilyAgent(chatClient, WebClient.builder(), new ScopeGuard(), new ObjectMapper(),
 				properties, activity);
 
-		agent.scan("INJECTION", new Endpoint("GET", this.target), null, ProbeConfig.defaults());
+		agent.scan("INJECTION", new Endpoint("GET", this.target), null, ProbeConfig.defaults(), false);
 
 		assertThat(this.probes).as("one probe per allowed tool call").hasValue(MAX_TOOL_CALLS);
 		assertThat(this.chatRequests).as("one LLM round trip per tool call, plus the one that hit the limit")

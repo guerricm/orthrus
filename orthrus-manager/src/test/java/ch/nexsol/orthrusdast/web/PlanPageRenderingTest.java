@@ -110,6 +110,16 @@ class PlanPageRenderingTest {
 		assertThat(renderPlans("/plans")).contains("/plans/export");
 	}
 
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	void theNewPlanFormRequestsTheOpenidScopeByDefault() {
+		String body = renderPlans("/plans/new");
+
+		int field = body.indexOf("id=\"oauth2Scope\"");
+		assertThat(field).as("scope field present").isGreaterThan(-1);
+		assertThat(body.substring(field, body.indexOf('>', field))).contains("value=\"openid\"");
+	}
+
 	private String renderPlans(String uri) {
 		return this.webTestClient.get()
 			.uri(uri)

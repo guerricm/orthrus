@@ -179,6 +179,13 @@ docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 - `-o, --out=<outputFile>`: Output file path (default: stdout).
 - `--lang=<language>`: Report language (`en`, `fr`).
 - `--include-passed`: Include passed tests in the report.
+  Each test in the execution details has one status: `PASSED` (ran, found nothing), `FAILED` (ran,
+  found a vulnerability), `AUTH_ERROR` (not run: the baseline request got a 401, the credentials were
+  rejected), `FORBIDDEN` (not run: the baseline got a 403, the credentials were accepted but lack the
+  permission, e.g. `insufficient_scope`; on such an endpoint only the scanners probing a way around the
+  refusal still run: `broken-auth`, `jwt-none-alg`, `jwt-blank-secret`, `bfla`, `method-tampering`,
+  `cors` and `security-headers`), `ERROR` (failed to run) or `NOT_RUN` (an AI task spent its
+  budget before reaching the endpoint).
 - `--app-url=<appUrl>`: Public Application URL for Gateway Discovery (e.g. `http://myapp.com`).
 - `--gateway-type=<gatewayType>`: Gateway type: `auto`, `traefik`, `kong`, `spring-cloud-gateway`, `haproxy`, `k8s`.
 - `--host=<overrideHost>`: Override host URL.
@@ -190,6 +197,11 @@ docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
 - `--oauth2-client-secret=<oauth2ClientSecret>`: OAuth2 Client Secret.
 - `--oauth2-grant=<oauth2Grant>`: OAuth2 Grant Type (`password`, `client_credentials`).
 - `--oauth2-creds=<oauth2Creds>`: Comma-separated list of `user:pass` credentials.
+- `--oauth2-scope=<oauth2Scope>`: Space-separated scopes to request with the token (e.g. `openid`). None
+  by default, so the identity provider applies the client's default scopes. In the manager, the plan
+  form's OAuth2 Scope field is prefilled with `openid` when the plan has no OAuth2 settings yet. A
+  target answering 403 `insufficient_scope` usually needs the missing scope requested here (and granted
+  to the client by the identity provider).
 - `--include=<includeScanners>`: Comma-separated list of scanners to include.
 - `--exclude=<excludeScanners>`: Comma-separated list of scanners to exclude.
 - `-h, --help`: Show help message and exit.
@@ -319,7 +331,8 @@ and runs without them.
   advertises the scanner families it should own (`orthrus.ai.families`), and runs each dispatched
   family task with an LLM agent that **generates its own payloads** (no static payload lists),
   forges requests through a scope-guarded, budget-capped HTTP tool, and records only confirmed
-  findings. It advertises an `AI-EXECUTOR` capability so the manager can route AI runs to it. When
+  findings: a report with no evidence, nothing to fix, or stating that no flaw was found is refused,
+  so a test that found nothing stays PASSED. It advertises an `AI-EXECUTOR` capability so the manager can route AI runs to it. When
   the task carries the orchestrator's shared recon it works from those endpoints and context; with
   no orchestrator it falls back to its own local recon, so it still runs standalone.
 - **`orthrus-ai-orchestrator`** — the planning **and recon** brain. It never launches a scan; it
@@ -359,14 +372,23 @@ deterministic fallback (an echo executor / a static planner), so the wiring is t
 model credentials. Guard-rails: the agents' only network access is a tool restricted to the target
 host, capped by a per-endpoint HTTP-call budget, a per-endpoint tool-call limit
 (`ORTHRUS_AI_BUDGET_MAX_TOOL_ITERATIONS`, 12 by default: every tool call costs one model round trip, and
-the agent is stopped once it has used them) and a per-task timeout
-(`ORTHRUS_AI_BUDGET_TASK_TIMEOUT_SECONDS`, 900 by default) that bounds the whole task: once it is
-spent, no further endpoint is started, the agents still running are interrupted, and the task
-completes with the findings gathered so far (it is not failed, so the manager does not requeue it
-to start over). Every endpoint left unprobed then appears in the report's execution details as an
-ERROR attempt "not run: task budget spent", so partial coverage is visible; such attempts are not
-counted as tests. The budget also bounds the node's own recon when the task carries none. Size it to the target:
-with a large local model an agent can take minutes per endpoint.
+the agent is stopped once it has used them) and a time budget given per endpoint
+(`ORTHRUS_AI_BUDGET_ENDPOINT_TIMEOUT_SECONDS`, 300 by default). Once an agent has spent its time on an
+endpoint, its next request is refused so it records what it confirmed, and any further one stops it.
+A task's probing budget follows from it: the endpoint time for each wave of three endpoints probed in
+parallel, plus one wave of margin (31 endpoints at 300 s: 12 waves, one hour), so a large API is not
+cut short by a fixed task timeout. `ORTHRUS_AI_BUDGET_TASK_TIMEOUT_SECONDS` (14400 by default) remains
+a ceiling on the whole task, recon included. Once a budget is spent, no further endpoint is started,
+the agents still running are interrupted, and the task completes with the findings gathered so far
+(it is not failed, so the manager does not requeue it to start over). Every endpoint left unprobed then
+appears in the report's execution details as a NOT_RUN attempt "not run: task budget spent", so partial
+coverage is visible; such attempts are not counted as tests. Size the endpoint time to the model: with
+a large local model an agent can take minutes per endpoint. Before an agent starts on an endpoint, the node sends the
+unmodified request once with the configured credentials, the same gate as the deterministic engine: a
+401 reports the endpoint as `AUTH_ERROR` without running the agent, and a 403 reports it as
+`FORBIDDEN` for the families that need the endpoint to process input (INJECTION, XSS, LOGIC). The JWT,
+BOLA, CONFIGURATION, HTTP and SSL agents still run on a 403, told to look only for a way around the
+refusal and at the refused response itself.
 
 Latency levers: on Ollama the hidden reasoning of thinking models (Qwen3...) is turned off
 (`ORTHRUS_AI_SCANNER_THINK=false`, the default; it multiplied each agent turn by about 20 on a 27B

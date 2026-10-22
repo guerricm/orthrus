@@ -58,6 +58,17 @@ public interface SecurityScanner {
 	}
 
 	/**
+	 * Whether this scanner still has something to test when the target refuses the
+	 * configured identity with a 403. Most scanners exercise how the endpoint processes
+	 * input, which a refused request never reaches; those that probe a way around the
+	 * refusal, or a property of the response itself, return true.
+	 * @return true to run against an endpoint that answers 403; false by default
+	 */
+	default boolean runsWhenForbidden() {
+		return false;
+	}
+
+	/**
 	 * Executes the scan with the shared per-operation context. Scanners that can reuse
 	 * the baseline response the engine already captured should override this; the default
 	 * ignores the context and falls back to the configuration-aware entry point.

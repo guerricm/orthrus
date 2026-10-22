@@ -19,6 +19,7 @@ package ch.nexsol.orthrusai.scanner.ai.tool;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,10 +40,10 @@ import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
 
 /**
  * The agent's only way to touch the network. It forges the request the model asks for,
- * but only against the in-scope target and only while the HTTP budget lasts, then returns
- * a compact, token-friendly view of the response for the model to reason about. Bridging
- * the reactive client with a blocking call is safe here: the whole agent runs on a
- * bounded-elastic thread.
+ * but only against the in-scope target and only while the HTTP and time budgets last,
+ * then returns a compact, token-friendly view of the response for the model to reason
+ * about. Bridging the reactive client with a blocking call is safe here: the whole agent
+ * runs on a bounded-elastic thread.
  */
 public class HttpProbeTool {
 
@@ -62,6 +63,8 @@ public class HttpProbeTool {
 	private final List<Credential> credentials;
 
 	private final Duration readTimeout;
+
+	private final AtomicBoolean timeUpNotified = new AtomicBoolean();
 
 	public HttpProbeTool(WebClient webClient, ScopeGuard scopeGuard, ObjectMapper objectMapper, RunContext runContext) {
 		this(webClient, scopeGuard, objectMapper, runContext, List.of(), Duration.ofSeconds(15));
@@ -97,6 +100,14 @@ public class HttpProbeTool {
 		if (!this.scopeGuard.inScope(url, this.runContext.targetUrl())) {
 			return "REFUSED: '" + url + "' is out of scope. Only the target host " + this.runContext.targetUrl()
 					+ " may be probed." + note;
+		}
+		if (this.runContext.timeUp()) {
+			// The first call past the deadline lets the agent record what it confirmed;
+			// any further call ends the loop.
+			if (!this.timeUpNotified.compareAndSet(false, true)) {
+				throw new AgentTurnLimitException("agent stopped after the time given to the endpoint");
+			}
+			return "TIME_EXCEEDED: the time for this endpoint is spent. Report your findings and stop.";
 		}
 		if (!this.runContext.tryConsumeHttpCall()) {
 			return "BUDGET_EXCEEDED: the HTTP request budget for this endpoint is spent. "

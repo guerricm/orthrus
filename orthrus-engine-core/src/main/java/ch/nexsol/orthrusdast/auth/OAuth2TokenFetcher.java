@@ -120,6 +120,9 @@ public class OAuth2TokenFetcher {
 			formData.add("username", username);
 			formData.add("password", password);
 		}
+		if (config.scope() != null) {
+			formData.add("scope", config.scope());
+		}
 
 		return webClient.post()
 			.uri(config.tokenUrl())

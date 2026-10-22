@@ -29,10 +29,12 @@ import reactor.netty.http.server.HttpServer;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.ai.Credential;
+import ch.nexsol.orthrusai.scanner.ai.AgentTurnLimitException;
 import ch.nexsol.orthrusai.scanner.ai.RunContext;
 import ch.nexsol.orthrusai.scanner.ai.ScopeGuard;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * The HTTP tool must actually reach the in-scope target, refuse out-of-scope hosts
@@ -147,6 +149,26 @@ class HttpProbeToolTests {
 		String second = tool.sendRequest(this.target, "GET", null, null);
 
 		assertThat(second).startsWith("BUDGET_EXCEEDED");
+	}
+
+	@Test
+	void onceTheEndpointTimeIsSpentAsksToReportThenStops() throws Exception {
+		RunContext ctx = new RunContext(this.target, "ai-injection", 5, 12, 1500, Duration.ofMillis(1));
+		HttpProbeTool tool = new HttpProbeTool(this.webClient, this.scopeGuard, this.objectMapper, ctx);
+		Thread.sleep(5);
+
+		String first = tool.sendRequest(this.target, "GET", null, null);
+
+		assertThat(first).startsWith("TIME_EXCEEDED");
+		assertThat(ctx.httpCallsUsed()).isZero();
+		assertThatExceptionOfType(AgentTurnLimitException.class)
+			.isThrownBy(() -> tool.sendRequest(this.target, "GET", null, null));
+	}
+
+	@Test
+	void noTimeLimitNeverExpires() {
+		assertThat(new RunContext(this.target, "ai-injection", 5).timeUp()).isFalse();
+		assertThat(new RunContext(this.target, "ai-injection", 5, 12, 1500, Duration.ZERO).timeUp()).isFalse();
 	}
 
 }

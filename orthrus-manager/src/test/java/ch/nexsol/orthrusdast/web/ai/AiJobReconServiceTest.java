@@ -138,7 +138,8 @@ class AiJobReconServiceTest {
 		when(this.client.recon(any(), any(), anyList())).thenReturn(Mono.just(new ReconResult(null, List.of(), "")));
 		ScanConfiguration oauth2Plan = new ScanConfiguration(List.of(), List.of(), 10, 5000, 10000, false, "html", null,
 				null, "en", false, GatewayType.AUTO, null, null,
-				new OAuth2Config("https://idp.test/token", "client", "secret", "client_credentials", null), null, null);
+				new OAuth2Config("https://idp.test/token", "client", "secret", "client_credentials", null, null), null,
+				null);
 		when(this.tokenFetcher.refreshAuth(any(ScanConfiguration.class)))
 			.thenReturn(Mono.just(oauth2Plan.withAuthSchemes(SecurityScheme.bearer("fresh-token"), null)));
 

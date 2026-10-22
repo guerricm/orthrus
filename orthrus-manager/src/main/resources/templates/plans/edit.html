@@ -267,6 +267,14 @@
                                                         name="oauth2ClientSecret">
                                                 </div>
                                                 <div class="col-md-12">
+                                                    <label for="oauth2Scope" class="form-label">OAuth2 Scope</label>
+                                                    <input type="text" class="form-control" id="oauth2Scope"
+                                                        name="oauth2Scope" th:value="${config?.oauth2Config() != null ? config.oauth2Config().scope() : 'openid'}">
+                                                    <div class="form-text text-white-50">Space-separated scopes
+                                                        requested with the token; leave empty to let the identity
+                                                        provider apply the client's defaults</div>
+                                                </div>
+                                                <div class="col-md-12">
                                                     <label for="oauth2Creds" class="form-label">OAuth2 Credentials (for
                                                         Password Grant)</label>
                                                     <input type="text" class="form-control" id="oauth2Creds"
@@ -443,6 +451,7 @@
                         document.getElementById('oauth2ClientSecret').value = '';
                         document.getElementById('oauth2Grant').value = '';
                         document.getElementById('oauth2Creds').value = '';
+                        document.getElementById('oauth2Scope').value = '';
                     }
                 });
             });

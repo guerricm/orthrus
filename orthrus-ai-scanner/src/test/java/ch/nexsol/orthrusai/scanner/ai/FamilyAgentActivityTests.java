@@ -61,7 +61,7 @@ class FamilyAgentActivityTests {
 				return "done";
 			});
 
-		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
+		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults(), false);
 
 		assertThat(seenDuringLoop).hasValue(1);
 		assertThat(this.activity.active()).isZero();
@@ -72,7 +72,7 @@ class FamilyAgentActivityTests {
 		when(this.chatClient.prompt().system(anyString()).user(anyString()).tools(any(), any()).call().content())
 			.thenThrow(new IllegalStateException("model 'mistral' not found"));
 
-		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
+		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults(), false);
 
 		assertThat(this.activity.active()).isZero();
 	}
@@ -82,7 +82,7 @@ class FamilyAgentActivityTests {
 		when(this.chatClient.prompt().system(anyString()).user(anyString()).tools(any(), any()).call().content())
 			.thenThrow(new IllegalStateException(new InterruptedException()));
 
-		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
+		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults(), false);
 
 		assertThat(output).contains("interrupted (task cancelled or budget spent)").doesNotContain("failed on");
 		assertThat(this.activity.active()).isZero();
@@ -93,7 +93,7 @@ class FamilyAgentActivityTests {
 		when(this.chatClient.prompt().system(anyString()).user(anyString()).tools(any(), any()).call().content())
 			.thenThrow(new IllegalStateException("model 'mistral' not found"));
 
-		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults());
+		this.agent.scan("INJECTION", this.endpoint, null, ProbeConfig.defaults(), false);
 
 		assertThat(output).contains("failed on GET").contains("model 'mistral' not found");
 	}

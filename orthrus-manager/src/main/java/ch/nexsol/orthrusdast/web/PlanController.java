@@ -363,14 +363,15 @@ public class PlanController {
 			String oauth2Grant = formData.getFirst("oauth2Grant");
 			String oauth2ClientId = formData.getFirst("oauth2ClientId");
 			String oauth2ClientSecret = formData.getFirst("oauth2ClientSecret");
+			String oauth2Scope = formData.getFirst("oauth2Scope");
 			String oauth2CredsStr = formData.getFirst("oauth2Creds");
 			List<String> oauth2Creds = (oauth2CredsStr != null && !oauth2CredsStr.isBlank())
 					? Arrays.stream(oauth2CredsStr.split(",")).map(String::trim).collect(Collectors.toList()) : null;
 
 			OAuth2Config oauth2Config = null;
 			if (oauth2Url != null && !oauth2Url.isBlank() && oauth2Grant != null && !oauth2Grant.isBlank()) {
-				oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant,
-						oauth2Creds);
+				oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds,
+						oauth2Scope);
 			}
 
 			final OAuth2Config finalOauth2Config = oauth2Config;
@@ -531,6 +532,7 @@ public class PlanController {
 				String oauth2Grant = formData.getFirst("oauth2Grant");
 				String oauth2ClientId = formData.getFirst("oauth2ClientId");
 				String oauth2ClientSecret = formData.getFirst("oauth2ClientSecret");
+				String oauth2Scope = formData.getFirst("oauth2Scope");
 				String oauth2CredsStr = formData.getFirst("oauth2Creds");
 				List<String> oauth2Creds = (oauth2CredsStr != null && !oauth2CredsStr.isBlank())
 						? Arrays.stream(oauth2CredsStr.split(",")).map(String::trim).collect(Collectors.toList())
@@ -548,8 +550,8 @@ public class PlanController {
 								&& !oauth2Grant.isBlank()) {
 							String secret = (oauth2ClientSecret != null && !oauth2ClientSecret.isBlank())
 									? oauth2ClientSecret : ((oauth2Config != null) ? oauth2Config.clientSecret() : "");
-							oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, secret, oauth2Grant,
-									oauth2Creds);
+							oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, secret, oauth2Grant, oauth2Creds,
+									oauth2Scope);
 						}
 						else if (oauth2Url != null && oauth2Url.isBlank()) {
 							oauth2Config = null;

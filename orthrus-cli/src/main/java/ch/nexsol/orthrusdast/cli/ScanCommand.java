@@ -117,6 +117,10 @@ public class ScanCommand implements Callable<Integer> {
 	@Option(names = { "--oauth2-creds" }, description = "Comma-separated list of user:pass credentials", split = ",")
 	List<String> oauth2Creds;
 
+	@Option(names = { "--oauth2-scope" },
+			description = "Space-separated OAuth2 scopes to request (e.g. \"openid\"); none by default")
+	String oauth2Scope;
+
 	@Option(names = { "-c", "--concurrency" }, description = "Number of concurrent threads for scanning (default: 10)",
 			defaultValue = "10")
 	int concurrency;
@@ -151,7 +155,8 @@ public class ScanCommand implements Callable<Integer> {
 		OAuth2Config oauth2Config = null;
 		if (oauth2Url != null && oauth2Grant != null) {
 			log.info("Fetching OAuth2 tokens from {}", oauth2Url);
-			oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds);
+			oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds,
+					oauth2Scope);
 			List<SecurityScheme> fetchedTokens = tokenFetcher.fetchTokens(oauth2Config).block();
 
 			if (fetchedTokens != null && !fetchedTokens.isEmpty()) {

@@ -97,7 +97,7 @@ class OllamaFamilyAgentIT {
 		Endpoint endpoint = new Endpoint("GET", url);
 
 		List<Vulnerability> findings = this.familyAgent.scan("XSS", endpoint, null,
-				ch.nexsol.orthrusai.scanner.ai.ProbeConfig.defaults());
+				ch.nexsol.orthrusai.scanner.ai.ProbeConfig.defaults(), false);
 
 		log.info("=== Ollama XSS agent: {} request(s) to target, {} finding(s) ===", this.requestsReceived.get(),
 				findings.size());

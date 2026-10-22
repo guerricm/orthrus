@@ -173,7 +173,7 @@ public class MasterInternalApiController {
 					}
 					// An attempt that never ran, whether a scanner error or an endpoint
 					// left unprobed when a budget is spent, is listed but not counted.
-					if (attempt.status() != AttemptStatus.ERROR) {
+					if (attempt.status() != AttemptStatus.ERROR && attempt.status() != AttemptStatus.NOT_RUN) {
 						testsInBatch++;
 					}
 				}

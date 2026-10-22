@@ -97,7 +97,7 @@ class FamilyAgentProbeMetricsTests {
 		FamilyAgent agent = new FamilyAgent(chatClient, WebClient.builder().observationRegistry(registry),
 				new ScopeGuard(), new ObjectMapper(), new AiScannerProperties(), new AgentActivity());
 
-		agent.scan("INJECTION", new Endpoint("GET", target), null, ProbeConfig.defaults());
+		agent.scan("INJECTION", new Endpoint("GET", target), null, ProbeConfig.defaults(), false);
 
 		assertThat(probeResult.get()).as("the probe reached the target").startsWith("HTTP 200");
 		assertThat(observations).as("no HTTP client observation for agent probes").hasValue(0);

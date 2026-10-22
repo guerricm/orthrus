@@ -169,7 +169,7 @@ public class TestPlanPortabilityService {
 		List<String> credentials = (oauth.credentials() != null)
 				? oauth.credentials().stream().map(TestPlanPortabilityService::maskCredential).toList() : null;
 		return new OAuth2Config(oauth.tokenUrl(), oauth.clientId(), maskSecret(oauth.clientSecret()), oauth.grantType(),
-				credentials);
+				credentials, oauth.scope());
 	}
 
 	/**
@@ -209,7 +209,7 @@ public class TestPlanPortabilityService {
 					&& credentials.size() != oauth.credentials().size();
 			masked = masked || isMasked(oauth.clientSecret()) || droppedCredentials;
 			strippedOauth = new OAuth2Config(oauth.tokenUrl(), oauth.clientId(), stripMask(oauth.clientSecret()),
-					oauth.grantType(), credentials);
+					oauth.grantType(), credentials, oauth.scope());
 		}
 
 		ScanConfiguration stripped = new ScanConfiguration(config.includeScanners(), config.excludeScanners(),

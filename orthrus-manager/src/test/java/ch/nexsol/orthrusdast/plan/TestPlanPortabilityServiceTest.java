@@ -80,6 +80,7 @@ class TestPlanPortabilityServiceTest {
 		assertThat(exported.clientSecret()).isEqualTo(TestPlanPortabilityService.MASK);
 		assertThat(exported.clientId()).isEqualTo("orthrus-client");
 		assertThat(exported.tokenUrl()).isEqualTo("https://idp.example/token");
+		assertThat(exported.scope()).isEqualTo("openid");
 	}
 
 	@Test
@@ -152,6 +153,7 @@ class TestPlanPortabilityServiceTest {
 		assertThat(imported.excludeScanners()).containsExactly("ssti");
 		assertThat(imported.oauth2Config().tokenUrl()).isEqualTo("https://idp.example/token");
 		assertThat(imported.oauth2Config().clientId()).isEqualTo("orthrus-client");
+		assertThat(imported.oauth2Config().scope()).isEqualTo("openid");
 		assertThat(this.saved.get(0).getTarget()).isEqualTo("https://api.example");
 	}
 
@@ -206,7 +208,7 @@ class TestPlanPortabilityServiceTest {
 						SecurityScheme.ParamLocation.HEADER),
 				"en", false, GatewayType.AUTO, "https://app.example", "k8s-token",
 				new OAuth2Config("https://idp.example/token", "orthrus-client", SECRET, "password",
-						List.of("alice:alice-pw", "bob:bob-pw")),
+						List.of("alice:alice-pw", "bob:bob-pw"), "openid"),
 				null, null);
 	}
 

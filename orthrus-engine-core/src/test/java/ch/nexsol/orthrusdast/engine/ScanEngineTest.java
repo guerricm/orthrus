@@ -30,7 +30,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
+import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
@@ -39,6 +41,7 @@ import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -118,6 +121,98 @@ class ScanEngineTest {
 
 		// Assert max concurrency is bounded close to configured value
 		assertThat(maxScans.get()).isBetween(5, 6);
+	}
+
+	@Test
+	void aBaselineRejectingTheCredentialsMarksEveryScannerAsAuthError() {
+		AtomicInteger runs = new AtomicInteger();
+
+		StepVerifier.create(scanWithBaseline(HttpStatus.UNAUTHORIZED, false, runs))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.AUTH_ERROR))
+			.verifyComplete();
+		assertThat(runs).hasValue(0);
+	}
+
+	@Test
+	void aBaselineRefusingThePermissionMarksAScannerNeedingAccessAsForbidden() {
+		AtomicInteger runs = new AtomicInteger();
+
+		StepVerifier.create(scanWithBaseline(HttpStatus.FORBIDDEN, false, runs))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.FORBIDDEN))
+			.verifyComplete();
+		assertThat(runs).hasValue(0);
+	}
+
+	@Test
+	void aBaselineAnsweringRunsTheScanners() {
+		AtomicInteger runs = new AtomicInteger();
+
+		StepVerifier.create(scanWithBaseline(HttpStatus.NOT_FOUND, false, runs))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.PASSED))
+			.verifyComplete();
+		assertThat(runs).hasValue(1);
+	}
+
+	@Test
+	void aBaselineRefusingThePermissionStillRunsTheBypassScanners() {
+		AtomicInteger runs = new AtomicInteger();
+
+		StepVerifier.create(scanWithBaseline(HttpStatus.FORBIDDEN, true, runs))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.PASSED))
+			.verifyComplete();
+		assertThat(runs).hasValue(1);
+	}
+
+	@Test
+	void aBaselineRejectingTheCredentialsSkipsEvenTheBypassScanners() {
+		AtomicInteger runs = new AtomicInteger();
+
+		StepVerifier.create(scanWithBaseline(HttpStatus.UNAUTHORIZED, true, runs))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.AUTH_ERROR))
+			.verifyComplete();
+		assertThat(runs).hasValue(0);
+	}
+
+	private static Flux<ScanAttempt> scanWithBaseline(HttpStatus baseline, boolean runsWhenForbidden,
+			AtomicInteger runs) {
+		SecurityScanner scanner = new SecurityScanner() {
+			@Override
+			public String getId() {
+				return "counting";
+			}
+
+			@Override
+			public String getName() {
+				return "Counting Scanner";
+			}
+
+			@Override
+			public ScannerFamily getFamily() {
+				return ScannerFamily.MISC;
+			}
+
+			@Override
+			public boolean runsWhenForbidden() {
+				return runsWhenForbidden;
+			}
+
+			@Override
+			public Flux<Vulnerability> scan(Operation operation) {
+				return Flux.defer(() -> {
+					runs.incrementAndGet();
+					return Flux.empty();
+				});
+			}
+		};
+		ScanHttpClient httpClient = Mockito.mock(ScanHttpClient.class);
+		Mockito.when(httpClient.send(ArgumentMatchers.any()))
+			.thenReturn(Mono.just(new ScanHttpResponse(baseline, new HttpHeaders(), "", 0L)));
+		Operation op = new Operation("http://localhost/rooms/1", HttpMethod.GET, Map.of(), Map.of(), null, List.of(),
+				List.of(), null, null, null);
+		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 1, 5000, 10000, false, "json", null,
+				null, "en", false, GatewayType.AUTO, null, null, null, null, null);
+		return new ScanEngine(List.of(scanner), httpClient).runScannersOnOperations(List.of(op), ScannerFamily.MISC,
+				config);
 	}
 
 }

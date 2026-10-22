@@ -51,7 +51,7 @@ class FamilyAgentShapeTests {
 				List.of(new Endpoint.Parameter("id", "path", "integer", true)),
 				"Pet { id: integer, name: string (required), status: string }");
 
-		this.agent.scan("INJECTION", endpoint, null, ProbeConfig.defaults());
+		this.agent.scan("INJECTION", endpoint, null, ProbeConfig.defaults(), false);
 
 		assertThat(captureUserPrompt()).contains("Operation shape from the API spec")
 			.contains("path parameter id (integer, required)")
@@ -60,7 +60,8 @@ class FamilyAgentShapeTests {
 
 	@Test
 	void saysNothingAboutShapeWhenReconFoundNone() {
-		this.agent.scan("INJECTION", new Endpoint("GET", "http://app.test/api/health"), null, ProbeConfig.defaults());
+		this.agent.scan("INJECTION", new Endpoint("GET", "http://app.test/api/health"), null, ProbeConfig.defaults(),
+				false);
 
 		assertThat(captureUserPrompt()).doesNotContain("Operation shape");
 	}
