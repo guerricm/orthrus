@@ -148,7 +148,7 @@ class HttpProbeToolTests {
 		tool.sendRequest(this.target, "GET", null, null);
 		String second = tool.sendRequest(this.target, "GET", null, null);
 
-		assertThat(second).startsWith("BUDGET_EXCEEDED");
+		assertThat(second).startsWith("BUDGET_SPENT").contains("not a server response");
 	}
 
 	@Test
@@ -159,7 +159,7 @@ class HttpProbeToolTests {
 
 		String first = tool.sendRequest(this.target, "GET", null, null);
 
-		assertThat(first).startsWith("TIME_EXCEEDED");
+		assertThat(first).startsWith("BUDGET_SPENT").contains("not a server response");
 		assertThat(ctx.httpCallsUsed()).isZero();
 		assertThatExceptionOfType(AgentTurnLimitException.class)
 			.isThrownBy(() -> tool.sendRequest(this.target, "GET", null, null));

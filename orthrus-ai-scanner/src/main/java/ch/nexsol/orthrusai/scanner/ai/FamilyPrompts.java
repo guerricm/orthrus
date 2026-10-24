@@ -48,6 +48,7 @@ public final class FamilyPrompts {
 			endpoint exposes no object identifier in its path, query or body.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
 			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
+			- Base every finding on an actual HTTP response the tool returned (its status line, headers, 			body, and for timing its "Time: <ms>" line). The tool-control replies — BUDGET_SPENT, 			ERROR, REFUSED, NOT_RECORDED, LAST_REQUEST — are not server responses and prove nothing; 			never read a time-based or any other flaw into them. In particular, "budget spent" or a 			failed request is not a slow server and is not evidence of SQL/time-based injection.
 			- Never call reportVulnerability to say that a test found nothing, could not run or does not \
 			apply: the absence of a flaw is not a finding. In that case record nothing and reply DONE.
 			- Rate each finding by its proven impact, on this scale, so the same weakness never gets \
@@ -66,7 +67,7 @@ public final class FamilyPrompts {
 			raise it.
 			- Your budget for this endpoint is %d tool calls and %d HTTP requests; spend them on \
 			confirming, not exploring. Send one baseline, then go straight for the payloads most \
-			likely to prove a flaw. When a tool says a budget is spent, report your findings and stop.
+			likely to prove a flaw. When a tool replies that the budget is spent, that is a control 			message, not a result: report what you already proved and stop.
 			- Only the target host is reachable; never attempt other hosts.
 			- Report only your own family's subject. Each subject belongs to exactly one family, \
 			so a weakness outside your focus is another agent's job: leave it alone and do not report it.
@@ -74,11 +75,13 @@ public final class FamilyPrompts {
 			text is discarded, only recorded findings are kept.
 			""";
 
-	private static final Map<String, String> BY_FAMILY = Map.ofEntries(Map.entry("INJECTION", """
-			Focus: injection flaws (SQL, NoSQL, command, XXE, SSTI, code). Probe every parameter, \
-			header and body field. Use error-based, boolean and time-based signals to confirm."""), Map.entry("XSS", """
-			Focus: cross-site scripting. Test reflection of your markers in HTML, JSON and header \
-			contexts, and whether special characters are returned unencoded in an executable context."""),
+	private static final Map<String, String> BY_FAMILY = Map.ofEntries(Map.entry("INJECTION",
+			"""
+					Focus: injection flaws (SQL, NoSQL, command, XXE, SSTI, code). Probe every parameter, \
+					header and body field. Use error-based, boolean and time-based signals to confirm. For a 			time-based signal, compare the "Time: <ms>" of a real response to the baseline's; a tool-control 			reply (BUDGET_SPENT, ERROR) is never a time measurement."""),
+			Map.entry("XSS", """
+					Focus: cross-site scripting. Test reflection of your markers in HTML, JSON and header \
+					contexts, and whether special characters are returned unencoded in an executable context."""),
 			Map.entry("CONFIGURATION", """
 					Focus: server misconfiguration. Check permissive CORS (reflected or wildcard origins \
 					with credentials), server version disclosure (Server, X-Powered-By and similar \

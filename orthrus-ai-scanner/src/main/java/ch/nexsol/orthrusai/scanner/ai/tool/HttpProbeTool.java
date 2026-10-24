@@ -107,11 +107,14 @@ public class HttpProbeTool {
 			if (!this.timeUpNotified.compareAndSet(false, true)) {
 				throw new AgentTurnLimitException("agent stopped after the time given to the endpoint");
 			}
-			return "TIME_EXCEEDED: the time for this endpoint is spent. Report your findings and stop.";
+			return "BUDGET_SPENT: the probing budget for this endpoint is used up (no request was sent). "
+					+ "This is a tool-control message, not a server response, and is not evidence of any flaw. "
+					+ "Report what you already confirmed and stop.";
 		}
 		if (!this.runContext.tryConsumeHttpCall()) {
-			return "BUDGET_EXCEEDED: the HTTP request budget for this endpoint is spent. "
-					+ "Report your findings and stop." + note;
+			return "BUDGET_SPENT: the HTTP request budget for this endpoint is used up (no request was sent). "
+					+ "This is a tool-control message, not a server response, and is not evidence of any flaw. "
+					+ "Report what you already confirmed and stop." + note;
 		}
 
 		HttpMethod httpMethod = HttpMethod.valueOf((method != null) ? method.trim().toUpperCase() : "GET");
@@ -130,7 +133,12 @@ public class HttpProbeTool {
 		}
 		catch (RuntimeException ex) {
 			log.debug("Probe {} {} failed: {}", httpMethod, url, ex.getMessage());
-			return "ERROR: request failed: " + ex.getMessage() + note;
+			// A real network timeout or connection error lands here (e.g. a request that
+			// hung past the read timeout). It is a tool-control message, not a server
+			// response: a slow or absent answer here is not, on its own, proof of a
+			// time-based flaw.
+			return "ERROR: the request could not be completed (" + ex.getMessage()
+					+ "). This is a tool-control message, not a server response." + note;
 		}
 	}
 

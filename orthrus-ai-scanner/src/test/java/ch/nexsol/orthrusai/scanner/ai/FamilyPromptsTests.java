@@ -112,4 +112,11 @@ class FamilyPromptsTests {
 			.contains("the absence of a flaw is not a finding");
 	}
 
+	@Test
+	void forbidsReadingAFlawIntoToolControlReplies() {
+		assertThat(prompt("INJECTION")).contains("tool-control replies")
+			.contains("BUDGET_SPENT")
+			.contains("not a slow server");
+	}
+
 }

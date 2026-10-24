@@ -80,6 +80,35 @@ class FindingToolTests {
 		assertThat(ctx.findings()).hasSize(1);
 	}
 
+	@Test
+	void refusesAFindingWhoseEvidenceRestsOnAControlMarker() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-injection", 10);
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}/participants", "POST");
+
+		// The agent mistook the tool's "budget spent" reply for a 5-minute server delay.
+		String reply = tool.reportVulnerability("SQL Injection in roomId (Time-Based Blind)",
+				"roomId is injectable via WAITFOR DELAY", "CRITICAL", "HIGH",
+				"Baseline /rooms/1/participants 403 in 15ms; after WAITFOR DELAY the tool returned "
+						+ "BUDGET_SPENT (no response within the budget), confirming time-based SQLi.",
+				"Use parameterized queries.");
+
+		assertThat(reply).startsWith("NOT_RECORDED").contains("tool-control message");
+		assertThat(ctx.findings()).isEmpty();
+	}
+
+	@Test
+	void stillRecordsATimeBasedFindingBackedByARealResponseTime() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-injection", 10);
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/items", "GET");
+
+		String reply = tool.reportVulnerability("SQL Injection (Time-Based Blind)", "id is injectable", "HIGH", "HIGH",
+				"Baseline responded Time: 20 ms; the SLEEP(5) payload responded Time: 5040 ms, a reproducible delay.",
+				"Use parameterized queries.");
+
+		assertThat(reply).startsWith("Recorded finding");
+		assertThat(ctx.findings()).hasSize(1);
+	}
+
 	@ParameterizedTest
 	@MethodSource("nonFindings")
 	void refusesAReportThatOnlyRecordsTheAbsenceOfAFlaw(String name, String description, String evidence,

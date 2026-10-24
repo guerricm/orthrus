@@ -65,6 +65,13 @@ public class FindingTool {
 			Pattern.CASE_INSENSITIVE);
 
 	/**
+	 * Tool-control replies the agent may mistake for a server response. Evidence resting
+	 * on one of these proves nothing, so a finding citing it is refused.
+	 */
+	private static final Pattern CONTROL_MARKER = Pattern
+		.compile("\\b(BUDGET_SPENT|BUDGET_EXCEEDED|TIME_EXCEEDED|NOT_RECORDED|LAST_REQUEST)\\b");
+
+	/**
 	 * A remediation saying there is nothing to fix.
 	 */
 	private static final Pattern NOTHING_TO_FIX = Pattern.compile(
@@ -126,6 +133,10 @@ public class FindingTool {
 	static String nonFindingReason(String name, String description, String evidence, String remediation) {
 		if (isBlank(evidence)) {
 			return "it has no evidence";
+		}
+		if (evidence != null && CONTROL_MARKER.matcher(evidence).find()) {
+			return "its evidence rests on a tool-control message (e.g. a spent budget or a failed request), "
+					+ "which is not a server response and proves nothing";
 		}
 		if (isBlank(remediation) || NOTHING_TO_FIX.matcher(remediation.strip()).find()) {
 			return "it has nothing to fix";
