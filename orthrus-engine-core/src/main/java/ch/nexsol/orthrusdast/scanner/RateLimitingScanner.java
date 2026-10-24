@@ -28,6 +28,7 @@ import ch.nexsol.orthrus.protocol.node.CWEReference;
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusdast.http.ScanHttpClient;
+import ch.nexsol.orthrusdast.http.ScanHttpResponse;
 import ch.nexsol.orthrusdast.model.Operation;
 
 /**
@@ -38,7 +39,15 @@ public class RateLimitingScanner implements SecurityScanner {
 
 	private final ScanHttpClient httpClient;
 
-	private static final int REQUEST_COUNT = 30; // Number of rapid requests to send
+	private static final int REQUEST_COUNT = 250;
+
+	// Headers that prove a rate limiter sits in front of the endpoint, even when our
+	// probe
+	// did not exhaust its budget. Spring Cloud Gateway, the IETF RateLimit draft and most
+	// WAFs expose at least one of these. Matching is case-insensitive (HttpHeaders).
+	private static final List<String> RATE_LIMIT_HEADERS = List.of("X-RateLimit-Limit", "X-RateLimit-Remaining",
+			"X-RateLimit-Burst-Capacity", "X-RateLimit-Replenish-Rate", "X-RateLimit-Requested-Tokens",
+			"RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "RateLimit-Policy", "Retry-After");
 
 	public RateLimitingScanner(ScanHttpClient httpClient) {
 		this.httpClient = httpClient;
@@ -76,18 +85,29 @@ public class RateLimitingScanner implements SecurityScanner {
 			}
 
 			// Send up to 250 requests to try and hit a rate limit
-			return Flux.range(1, 250)
+			return Flux.range(1, REQUEST_COUNT)
 				.concatMap((i) -> httpClient.send(operation, false))
 				.takeUntil((response) -> response.statusCode().value() == 429)
 				.last()
 				.flatMapMany((lastResponse) -> {
 					if (lastResponse.statusCode().value() != 429) {
+						if (advertisesRateLimiting(lastResponse)) {
+							// A rate limiter is clearly in place (it advertises its
+							// budget in
+							// the response headers); our probe simply did not send fast
+							// enough
+							// to exhaust it. Reporting "missing" here is a false
+							// positive, so
+							// record nothing.
+							return Flux.<Vulnerability>empty();
+						}
 						Vulnerability vuln = createVulnerabilityWithTrace("Missing Rate Limiting",
-								"The endpoint does not seem to enforce rate limiting. 250 rapid requests were sent without receiving a 429 Too Many Requests response.",
+								"The endpoint does not seem to enforce rate limiting. " + REQUEST_COUNT
+										+ " rapid requests were sent without receiving a 429 Too Many Requests response.",
 								RiskLevel.MEDIUM, Vulnerability.Confidence.LOW, operation, CWEReference.CWE_799,
 								List.of("CAPEC-115"), 5.3,
-								"After 250 requests, the server returned status " + lastResponse.statusCode().value()
-										+ " instead of 429.",
+								"After " + REQUEST_COUNT + " requests, the server returned status "
+										+ lastResponse.statusCode().value() + " instead of 429.",
 								"Implement rate limiting using a gateway, WAF, or application logic (e.g. token bucket algorithm).",
 								operation, lastResponse, "API Endpoint (Network)",
 								"Unauthorized Access / Data Exposure");
@@ -130,6 +150,17 @@ public class RateLimitingScanner implements SecurityScanner {
 					}
 				});
 		});
+	}
+
+	/**
+	 * Whether the response advertises a rate limiter through its headers. When it does, a
+	 * probe that failed to draw a 429 only means the budget was not exhausted, not that
+	 * rate limiting is absent.
+	 * @param response the last response of the probe burst
+	 * @return true when a rate-limiting header is present
+	 */
+	private static boolean advertisesRateLimiting(ScanHttpResponse response) {
+		return RATE_LIMIT_HEADERS.stream().anyMatch(response::hasHeader);
 	}
 
 }
