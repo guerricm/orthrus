@@ -160,7 +160,7 @@ Once the Master is running, navigate to `http://localhost:8080` to access the We
 
 - **Interactive Dashboard**: View statistics and a history of all executed scans.
 - **Easy Configuration**: A "New Scan" form lets you select discovery modules, target URLs, and authentication methods.
-- **Live Execution & Reporting**: See scan progress in real-time, view detailed findings with their respective risk grades (A to F), and export results directly as a **PDF**.
+- **Live Execution & Reporting**: See scan progress in real-time, view detailed findings with their respective risk grades (A to F), and export results directly as a **PDF**. Downloads are named `orthrus-report-<plan>-<yyyyMMdd-HHmmss>.pdf` after the plan that ran and the UTC start of the scan (the target host stands in for the plan on an ad-hoc scan), so a folder of reports sorts by scan and nothing gets overwritten.
 - **Integrated User Manual**: A detailed guide is accessible directly from the interface (`/manual`) explaining discovery modes and security grading.
 
 

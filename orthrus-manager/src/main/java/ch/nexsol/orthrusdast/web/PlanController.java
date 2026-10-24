@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -277,7 +276,7 @@ public class PlanController {
 	public Mono<ResponseEntity<TestPlanExport>> exportTestPlan(@PathVariable Long id) {
 		return this.testPlanRepository.findById(id)
 			.map((plan) -> asDownload(this.planPortabilityService.export(List.of(plan)),
-					"orthrus-plan-" + slugify(plan.getName()) + ".json"))
+					"orthrus-plan-" + WebFormUtils.slugify(plan.getName(), "plan") + ".json"))
 			.switchIfEmpty(Mono.error(new IllegalArgumentException("Test plan not found")));
 	}
 
@@ -322,14 +321,6 @@ public class PlanController {
 			.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
 			.contentType(MediaType.APPLICATION_JSON)
 			.body(export);
-	}
-
-	private static String slugify(String name) {
-		if (name == null || name.isBlank()) {
-			return "plan";
-		}
-		String slug = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
-		return slug.isBlank() ? "plan" : slug;
 	}
 
 	@PostMapping("/plans/{id}/run")
