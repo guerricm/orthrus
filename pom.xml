@@ -209,11 +209,12 @@
                             <enabled>true</enabled>
                         </layers>
                         <image>
-                            <!-- Pin the run image: the builder's default (0.0.150) ships a lifecycle
-                                 whose architecture can mismatch the run image, failing the creator
-                                 with "exec format error" (paketo-buildpacks/builder-noble-java-tiny#344).
-                                 0.0.200 resolves the platform correctly. -->
-                            <runImage>docker.io/paketobuildpacks/ubuntu-noble-run-tiny:0.0.200</runImage>
+                            <!-- Pin the platform of every pulled image (builder, run, buildpacks).
+                                 The multi-arch builder otherwise resolves to linux/arm64 on the
+                                 amd64 CI runner, so the lifecycle creator fails with "exec format
+                                 error" (paketo-buildpacks/builder-noble-java-tiny#344). Keep this in
+                                 step with the runner architecture. -->
+                            <imagePlatform>linux/amd64</imagePlatform>
                             <!-- Declaring buildpacks replaces the builder's default order, so the
                                  Java buildpack is listed first; the health checker adds a tiny,
                                  localhost-only HTTP probe (thc) at /workspace/health-check, since
