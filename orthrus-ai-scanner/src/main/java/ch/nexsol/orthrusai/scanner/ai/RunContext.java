@@ -49,6 +49,17 @@ public class RunContext {
 
 	private final List<Vulnerability> findings = new CopyOnWriteArrayList<>();
 
+	/**
+	 * One line per request the probe tool actually sent, so a finding can show what was
+	 * really sent instead of the agent's prose.
+	 */
+	private final List<String> requestLog = new CopyOnWriteArrayList<>();
+
+	/**
+	 * Only the last requests are kept, enough to back a finding without unbounded growth.
+	 */
+	private static final int MAX_LOGGED_REQUESTS = 20;
+
 	public RunContext(String targetUrl, String scannerId, int maxHttpCalls) {
 		this(targetUrl, scannerId, maxHttpCalls, 12, 1500, null);
 	}
@@ -120,6 +131,27 @@ public class RunContext {
 
 	public void addFinding(Vulnerability finding) {
 		this.findings.add(finding);
+	}
+
+	/**
+	 * Records one line describing a request the probe tool actually sent. Oldest lines
+	 * are dropped past the cap. Never carries credentials: the caller logs the URL as the
+	 * agent gave it, before any credential is attached.
+	 * @param line the request description
+	 */
+	public void recordRequest(String line) {
+		this.requestLog.add(line);
+		while (this.requestLog.size() > MAX_LOGGED_REQUESTS) {
+			this.requestLog.remove(0);
+		}
+	}
+
+	/**
+	 * The requests the probe tool actually sent, oldest first.
+	 * @return the recorded request lines (possibly empty)
+	 */
+	public List<String> requestLog() {
+		return List.copyOf(this.requestLog);
 	}
 
 	public List<Vulnerability> findings() {

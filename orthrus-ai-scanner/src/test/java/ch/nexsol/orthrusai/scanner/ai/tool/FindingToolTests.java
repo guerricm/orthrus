@@ -81,6 +81,32 @@ class FindingToolTests {
 	}
 
 	@Test
+	void theFindingCarriesTheRequestsActuallyRecordedNotTheEndpointTemplate() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-injection", 10);
+		ctx.recordRequest("GET http://app.test/api/rooms/1/participants -> HTTP 403 in 15 ms");
+		ctx.recordRequest("GET http://app.test/api/rooms/1'\u0020OR'1'='1/participants -> HTTP 400 in 12 ms");
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}/participants", "GET");
+
+		tool.reportVulnerability("Finding", "desc", "LOW", "HIGH", "reflected marker in the 400 body", "fix");
+
+		Vulnerability finding = ctx.findings().get(0);
+		assertThat(finding.requestDetails()).contains("rooms/1/participants -> HTTP 403")
+			.contains("-> HTTP 400")
+			.doesNotContain("{roomId}");
+	}
+
+	@Test
+	void theRequestDetailsFallBackToTheTemplateWhenNothingWasSent() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-xss", 10);
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}", "PUT");
+
+		tool.reportVulnerability("Finding", "desc", "LOW", "HIGH", "evidence", "fix");
+
+		assertThat(ctx.findings().get(0).requestDetails())
+			.isEqualTo("PUT http://app.test/api/rooms/{roomId} " + "(no request was recorded)");
+	}
+
+	@Test
 	void refusesAFindingWhoseEvidenceRestsOnAControlMarker() throws Exception {
 		RunContext ctx = new RunContext("http://app.test/api", "ai-injection", 10);
 		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}/participants", "POST");

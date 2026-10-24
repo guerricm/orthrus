@@ -127,12 +127,15 @@ public class HttpProbeTool {
 				spec.bodyValue(body);
 			}
 			long startNanos = System.nanoTime();
-			return spec.exchangeToMono((response) -> render(response, startNanos))
+			String body0 = (body != null && !body.isBlank()) ? body : null;
+			return spec.exchangeToMono((response) -> render(response, startNanos, httpMethod.name(), url, body0))
 				.timeout(this.readTimeout)
 				.block(this.readTimeout.plusSeconds(5)) + note;
 		}
 		catch (RuntimeException ex) {
 			log.debug("Probe {} {} failed: {}", httpMethod, url, ex.getMessage());
+			this.runContext.recordRequest(
+					httpMethod.name() + " " + url + " -> no response (" + ex.getClass().getSimpleName() + ")");
 			// A real network timeout or connection error lands here (e.g. a request that
 			// hung past the read timeout). It is a tool-control message, not a server
 			// response: a slow or absent answer here is not, on its own, proof of a
@@ -161,9 +164,11 @@ public class HttpProbeTool {
 		}
 	}
 
-	private Mono<String> render(ClientResponse response, long startNanos) {
+	private Mono<String> render(ClientResponse response, long startNanos, String method, String url, String body) {
 		return response.bodyToMono(String.class).defaultIfEmpty("").map((responseBody) -> {
 			long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+			this.runContext.recordRequest(method + " " + url + ((body != null) ? " (with body)" : "") + " -> HTTP "
+					+ response.statusCode().value() + " in " + elapsedMs + " ms");
 			StringBuilder sb = new StringBuilder();
 			sb.append("HTTP ").append(response.statusCode().value()).append('\n');
 			sb.append("Time: ").append(elapsedMs).append(" ms\n");

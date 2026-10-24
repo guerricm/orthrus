@@ -115,7 +115,7 @@ public class FindingTool {
 
 		Vulnerability finding = new Vulnerability(UUID.randomUUID().toString(), name, description, risk, conf,
 				this.runContext.scannerId(), this.endpointUrl, this.endpointMethod, null, List.of(), List.of(), null,
-				evidence, remediation, this.endpointMethod + " " + this.endpointUrl, null, "API Endpoint (Network)",
+				evidence, remediation, requestTrace(), null, "API Endpoint (Network)",
 				"Unauthorized Access / Data Exposure");
 		this.runContext.addFinding(finding);
 		log.info("Agent reported vulnerability '{}' [{}] on {} {}", name, risk, this.endpointMethod, this.endpointUrl);
@@ -151,6 +151,20 @@ public class FindingTool {
 
 	private static boolean isBlank(String value) {
 		return value == null || value.isBlank() || PLACEHOLDER.matcher(value.strip()).matches();
+	}
+
+	/**
+	 * The requests the agent actually sent, as the finding's request details, so the
+	 * report shows what was probed rather than the endpoint template the agent may
+	 * describe loosely. Falls back to the template when no request was recorded.
+	 * @return the request trace
+	 */
+	private String requestTrace() {
+		List<String> log = this.runContext.requestLog();
+		if (log.isEmpty()) {
+			return this.endpointMethod + " " + this.endpointUrl + " (no request was recorded)";
+		}
+		return String.join("\n", log);
 	}
 
 	private <E extends Enum<E>> E normalise(String value, Class<E> type, E fallback) {
