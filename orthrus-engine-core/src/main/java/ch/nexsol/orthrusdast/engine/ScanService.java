@@ -89,8 +89,24 @@ public class ScanService {
 	 */
 	public Flux<ScanAttempt> executeScanFamily(List<ch.nexsol.orthrusdast.model.Operation> operations,
 			ch.nexsol.orthrusdast.scanner.ScannerFamily family, ScanConfiguration config) {
+		return executeScanFamily(operations, family, config, null);
+	}
+
+	/**
+	 * Execute a scan for a specific family on pre-discovered operations, able to renew
+	 * the credentials mid-scan.
+	 * @param operations the operations to scan
+	 * @param family the scanner family
+	 * @param config the scan configuration
+	 * @param credentialsRefresher issues fresh credentials when the target refuses the
+	 * current ones, or null when none can be issued
+	 * @return the flux of scan attempts
+	 */
+	public Flux<ScanAttempt> executeScanFamily(List<ch.nexsol.orthrusdast.model.Operation> operations,
+			ch.nexsol.orthrusdast.scanner.ScannerFamily family, ScanConfiguration config,
+			CredentialsRefresher credentialsRefresher) {
 		log.info("Executing scan for family '{}' on {} operations", family, operations.size());
-		return scanEngine.runScannersOnOperations(operations, family, config);
+		return scanEngine.runScannersOnOperations(operations, family, config, credentialsRefresher);
 	}
 
 	/**

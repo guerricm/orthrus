@@ -105,6 +105,22 @@ public class ScanEngine {
 	 */
 	public Flux<ScanAttempt> runScannersOnOperations(List<Operation> operations,
 			ch.nexsol.orthrusdast.scanner.ScannerFamily family, ScanConfiguration config) {
+		return runScannersOnOperations(operations, family, config, null);
+	}
+
+	/**
+	 * Runs specific family of scanners on pre-discovered operations, able to renew the
+	 * credentials mid-scan.
+	 * @param operations the operations
+	 * @param family the scanner family to run
+	 * @param config the configuration
+	 * @param credentialsRefresher issues fresh credentials when the target refuses the
+	 * current ones, or null when none can be issued
+	 * @return the flux of scan attempts
+	 */
+	public Flux<ScanAttempt> runScannersOnOperations(List<Operation> operations,
+			ch.nexsol.orthrusdast.scanner.ScannerFamily family, ScanConfiguration config,
+			CredentialsRefresher credentialsRefresher) {
 		log.info("Starting scan engine for family: {} with concurrency: {}", family, config.concurrency());
 
 		List<SecurityScanner> activeScanners = allScanners.stream()
@@ -115,11 +131,16 @@ public class ScanEngine {
 		log.info("Active scanners for family {}: {}", family,
 				activeScanners.stream().map(SecurityScanner::getId).toList());
 
-		return scanAll(operations, activeScanners, config);
+		return scanAll(operations, activeScanners, config, credentialsRefresher);
 	}
 
 	private Flux<ScanAttempt> scanAll(List<Operation> operations, List<SecurityScanner> scanners,
 			ScanConfiguration config) {
+		return scanAll(operations, scanners, config, null);
+	}
+
+	private Flux<ScanAttempt> scanAll(List<Operation> operations, List<SecurityScanner> scanners,
+			ScanConfiguration config, CredentialsRefresher credentialsRefresher) {
 		List<SecurityScanner> operationScanners = scanners.stream()
 			.filter((s) -> s.getScope() != ScannerScope.HOST)
 			.toList();
@@ -128,7 +149,7 @@ public class ScanEngine {
 			.toList();
 
 		Flux<ScanAttempt> perOperation = Flux.fromIterable(operations)
-			.flatMap((op) -> scanOperation(op, operationScanners, config), config.concurrency());
+			.flatMap((op) -> scanOperation(op, operationScanners, config, credentialsRefresher), config.concurrency());
 
 		Flux<ScanAttempt> perHost = Flux.empty();
 		if (!hostScanners.isEmpty()) {
@@ -154,7 +175,7 @@ public class ScanEngine {
 	}
 
 	private Flux<ScanAttempt> scanOperation(Operation operation, List<SecurityScanner> scanners,
-			ScanConfiguration config) {
+			ScanConfiguration config, CredentialsRefresher credentialsRefresher) {
 		if (scanners.isEmpty()) {
 			return Flux.empty();
 		}
@@ -162,40 +183,85 @@ public class ScanEngine {
 		// A single baseline request per operation, shared with scanners via ScanContext
 		// so
 		// they do not each re-issue the same unmodified request.
-		return httpClient.send(operation).flatMapMany((response) -> {
-			int status = response.statusCode().value();
-			if (status == 401) {
-				log.warn("Operation {} {} rejected the credentials (401, {}). Skipping scanners.",
-						operation.method().name(), operation.url(), wwwAuthenticate(response));
+		return httpClient.send(operation)
+			.flatMapMany((response) -> dispatch(operation, scanners, config, response, credentialsRefresher))
+			.onErrorResume((e) -> {
+				log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
+				return Flux.fromIterable(scanners)
+					.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
+							operation.url(), AttemptStatus.ERROR, List.of()));
+			});
+	}
+
+	/**
+	 * Decides what the baseline response means for this operation's scanners. A 401 is
+	 * retried once with freshly issued credentials when a refresher is available, since a
+	 * long scan can outlive the token it started with.
+	 * @param operation the operation being scanned
+	 * @param scanners the scanners to run on it
+	 * @param config the scan configuration
+	 * @param response the baseline response
+	 * @param credentialsRefresher issues fresh credentials on a 401, or null
+	 * @return the attempts for this operation
+	 */
+	private Flux<ScanAttempt> dispatch(Operation operation, List<SecurityScanner> scanners, ScanConfiguration config,
+			ScanHttpResponse response, CredentialsRefresher credentialsRefresher) {
+		int status = response.statusCode().value();
+		if (status == 401) {
+			if (credentialsRefresher != null) {
+				return retryWithFreshCredentials(operation, scanners, config, response, credentialsRefresher);
+			}
+			log.warn("Operation {} {} rejected the credentials (401, {}). Skipping scanners.",
+					operation.method().name(), operation.url(), wwwAuthenticate(response));
+			return Flux.fromIterable(scanners).map((scanner) -> notRun(scanner, operation, AttemptStatus.AUTH_ERROR));
+		}
+		if (status == 403) {
+			// The credentials were accepted but the identity lacks permission: only
+			// the scanners probing a way around the refusal still test something.
+			log.warn("Operation {} {} refused the identity (403, {}). Running only the bypass scanners.",
+					operation.method().name(), operation.url(), wwwAuthenticate(response));
+			ScanContext forbidden = new ScanContext(response);
+			return Flux.fromIterable(scanners)
+				.flatMap((scanner) -> scanner.runsWhenForbidden() ? runScanner(scanner, operation, config, forbidden)
+						: Mono.just(notRun(scanner, operation, AttemptStatus.FORBIDDEN)));
+		}
+
+		// Only share a genuine response as the baseline. A 5xx (including the
+		// synthetic
+		// 503 produced when the baseline request failed) is unreliable as a timing or
+		// body baseline — sharing it would, for instance, feed a 60s synthetic
+		// latency
+		// into time-based injection detection — so scanners fall back to their own
+		// probe.
+		ScanContext context = (status >= 500) ? new ScanContext(null) : new ScanContext(response);
+		return Flux.fromIterable(scanners).flatMap((scanner) -> runScanner(scanner, operation, config, context));
+	}
+
+	/**
+	 * Issues the credentials again and replays the baseline once. The scanners then run
+	 * against the operation carrying the fresh credentials, so the whole operation is
+	 * tested with them rather than with the token the scan started with.
+	 * @param operation the operation whose credentials were refused
+	 * @param scanners the scanners to run on it
+	 * @param config the scan configuration
+	 * @param refused the response that refused the credentials
+	 * @param credentialsRefresher issues the fresh credentials
+	 * @return the attempts for this operation
+	 */
+	private Flux<ScanAttempt> retryWithFreshCredentials(Operation operation, List<SecurityScanner> scanners,
+			ScanConfiguration config, ScanHttpResponse refused, CredentialsRefresher credentialsRefresher) {
+		log.info("Operation {} {} rejected the credentials (401, {}); issuing fresh ones", operation.method().name(),
+				operation.url(), wwwAuthenticate(refused));
+		return credentialsRefresher.refresh().flatMapMany((schemes) -> {
+			if (schemes.isEmpty()) {
+				log.warn("No fresh credentials could be issued for {} {}. Skipping scanners.",
+						operation.method().name(), operation.url());
 				return Flux.fromIterable(scanners)
 					.map((scanner) -> notRun(scanner, operation, AttemptStatus.AUTH_ERROR));
 			}
-			if (status == 403) {
-				// The credentials were accepted but the identity lacks permission: only
-				// the scanners probing a way around the refusal still test something.
-				log.warn("Operation {} {} refused the identity (403, {}). Running only the bypass scanners.",
-						operation.method().name(), operation.url(), wwwAuthenticate(response));
-				ScanContext context = new ScanContext(response);
-				return Flux.fromIterable(scanners)
-					.flatMap((scanner) -> scanner.runsWhenForbidden() ? runScanner(scanner, operation, config, context)
-							: Mono.just(notRun(scanner, operation, AttemptStatus.FORBIDDEN)));
-			}
-
-			// Only share a genuine response as the baseline. A 5xx (including the
-			// synthetic
-			// 503 produced when the baseline request failed) is unreliable as a timing or
-			// body baseline — sharing it would, for instance, feed a 60s synthetic
-			// latency
-			// into time-based injection detection — so scanners fall back to their own
-			// probe.
-			ScanContext context = (response.statusCode().value() >= 500) ? new ScanContext(null)
-					: new ScanContext(response);
-			return Flux.fromIterable(scanners).flatMap((scanner) -> runScanner(scanner, operation, config, context));
-		}).onErrorResume((e) -> {
-			log.error("Baseline request failed for operation {}: {}", operation.url(), e.getMessage());
-			return Flux.fromIterable(scanners)
-				.map((scanner) -> new ScanAttempt(scanner.getId(), scanner.getName(), operation.method().name(),
-						operation.url(), AttemptStatus.ERROR, List.of()));
+			Operation refreshed = operation.withAuth(schemes.get(0));
+			return httpClient.send(refreshed)
+				.flatMapMany((response) -> dispatch(refreshed, scanners, config, response, null));
 		});
 	}
 

@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ import ch.nexsol.orthrusdast.ingestion.EndpointDiscoverer;
 import ch.nexsol.orthrusdast.model.GatewayType;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 import ch.nexsol.orthrusdast.scanner.SecurityScanner;
 
@@ -213,6 +215,78 @@ class ScanEngineTest {
 				null, "en", false, GatewayType.AUTO, null, null, null, null, null);
 		return new ScanEngine(List.of(scanner), httpClient).runScannersOnOperations(List.of(op), ScannerFamily.MISC,
 				config);
+	}
+
+	@Test
+	void aRefusedTokenIsReIssuedAndTheScannersRunWithTheFreshOne() {
+		AtomicInteger runs = new AtomicInteger();
+		AtomicReference<String> tokenSeen = new AtomicReference<>();
+		ScanHttpClient httpClient = Mockito.mock(ScanHttpClient.class);
+		// The dispatched token is refused; the re-issued one is accepted.
+		Mockito.when(httpClient.send(ArgumentMatchers.any())).thenAnswer((invocation) -> {
+			Operation sent = invocation.getArgument(0);
+			tokenSeen.set((sent.authScheme() != null) ? sent.authScheme().value() : null);
+			HttpStatus status = "fresh".equals(tokenSeen.get()) ? HttpStatus.NOT_FOUND : HttpStatus.UNAUTHORIZED;
+			return Mono.just(new ScanHttpResponse(status, new HttpHeaders(), "", 0L));
+		});
+		CredentialsRefresher refresher = () -> Mono.just(List.of(SecurityScheme.bearer("fresh")));
+
+		StepVerifier.create(scanWith(httpClient, countingScanner(runs), refresher))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.PASSED))
+			.verifyComplete();
+		assertThat(runs).hasValue(1);
+		assertThat(tokenSeen.get()).isEqualTo("fresh");
+	}
+
+	@Test
+	void aRefresherWithNothingToIssueLeavesTheOperationAsAuthError() {
+		AtomicInteger runs = new AtomicInteger();
+		ScanHttpClient httpClient = Mockito.mock(ScanHttpClient.class);
+		Mockito.when(httpClient.send(ArgumentMatchers.any()))
+			.thenReturn(Mono.just(new ScanHttpResponse(HttpStatus.UNAUTHORIZED, new HttpHeaders(), "", 0L)));
+		CredentialsRefresher refresher = () -> Mono.just(List.of());
+
+		StepVerifier.create(scanWith(httpClient, countingScanner(runs), refresher))
+			.assertNext((attempt) -> assertThat(attempt.status()).isEqualTo(AttemptStatus.AUTH_ERROR))
+			.verifyComplete();
+		assertThat(runs).hasValue(0);
+	}
+
+	private static SecurityScanner countingScanner(AtomicInteger runs) {
+		return new SecurityScanner() {
+			@Override
+			public String getId() {
+				return "counting";
+			}
+
+			@Override
+			public String getName() {
+				return "Counting Scanner";
+			}
+
+			@Override
+			public ScannerFamily getFamily() {
+				return ScannerFamily.MISC;
+			}
+
+			@Override
+			public Flux<Vulnerability> scan(Operation operation) {
+				return Flux.defer(() -> {
+					runs.incrementAndGet();
+					return Flux.empty();
+				});
+			}
+		};
+	}
+
+	private static Flux<ScanAttempt> scanWith(ScanHttpClient httpClient, SecurityScanner scanner,
+			CredentialsRefresher refresher) {
+		Operation op = new Operation("http://localhost/rooms/1", HttpMethod.GET, Map.of(), Map.of(), null, List.of(),
+				List.of(), SecurityScheme.bearer("stale"), null, null);
+		ScanConfiguration config = new ScanConfiguration(List.of(), List.of(), 1, 5000, 10000, false, "json", null,
+				null, "en", false, GatewayType.AUTO, null, null, null, null, null);
+		return new ScanEngine(List.of(scanner), httpClient).runScannersOnOperations(List.of(op), ScannerFamily.MISC,
+				config, refresher);
 	}
 
 }

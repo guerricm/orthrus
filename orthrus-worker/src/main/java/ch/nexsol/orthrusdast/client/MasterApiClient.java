@@ -18,6 +18,8 @@ package ch.nexsol.orthrusdast.client;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,10 +34,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.node.NodeClient;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrusdast.config.OrthrusProperties;
 import ch.nexsol.orthrusdast.engine.ScanService;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
  * This worker's side of the master's internal API. The protocol itself lives in the
@@ -101,6 +105,44 @@ public class MasterApiClient {
 	 */
 	public void markOffline() {
 		this.nodeClient.markOffline();
+	}
+
+	/**
+	 * Issues the job's credentials again through the manager, as the auth schemes a scan
+	 * applies. Used when the target starts refusing the token the task was dispatched
+	 * with: OAuth2 tokens are short-lived and a long task can outlive its own.
+	 * @param jobId the job this node is running a task for
+	 * @return the primary scheme followed by the secondary one, empty when none could be
+	 * issued
+	 */
+	public Mono<List<SecurityScheme>> fetchAuthSchemes(Long jobId) {
+		return this.nodeClient.fetchCredentials(jobId).map(MasterApiClient::toSchemes);
+	}
+
+	/**
+	 * Turns the manager's plain credential tuples back into the auth schemes the scanners
+	 * apply. Mirrors how the manager resolved them.
+	 * @param credentials the issued credentials
+	 * @return the matching schemes, in the same order
+	 */
+	static List<SecurityScheme> toSchemes(List<Credential> credentials) {
+		return credentials.stream().map(MasterApiClient::toScheme).filter(Objects::nonNull).toList();
+	}
+
+	private static SecurityScheme toScheme(Credential credential) {
+		String location = (credential.location() != null) ? credential.location().toUpperCase(Locale.ROOT) : "HEADER";
+		String name = credential.name();
+		String value = credential.value();
+		if (value == null || name == null) {
+			return null;
+		}
+		return switch (location) {
+			case "QUERY" -> SecurityScheme.apiKeyQuery(value, name);
+			case "COOKIE" -> new SecurityScheme(SecurityScheme.AuthType.API_KEY, value, null, name,
+					SecurityScheme.ParamLocation.COOKIE);
+			default -> value.regionMatches(true, 0, "Bearer ", 0, "Bearer ".length())
+					? SecurityScheme.bearer(value.substring("Bearer ".length())) : SecurityScheme.apiKey(value, name);
+		};
 	}
 
 	/**

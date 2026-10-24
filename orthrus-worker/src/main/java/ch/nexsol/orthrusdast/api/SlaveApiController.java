@@ -47,9 +47,11 @@ import tools.jackson.databind.ObjectMapper;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrusdast.client.MasterApiClient;
+import ch.nexsol.orthrusdast.engine.CredentialsRefresher;
 import ch.nexsol.orthrusdast.engine.ScanService;
 import ch.nexsol.orthrusdast.model.Operation;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
+import ch.nexsol.orthrusdast.model.SecurityScheme;
 import ch.nexsol.orthrusdast.scanner.ScannerFamily;
 
 @RestController
@@ -124,7 +126,7 @@ public class SlaveApiController {
 
 				Disposable disposable = discoverOnce(request, config)
 					.flatMapMany((endpoints) -> scanService.executeScanFamily(withTaskAuth(endpoints, config), family,
-							config))
+							config, credentialsRefresher(request, config)))
 					.bufferTimeout(10, Duration.ofSeconds(1))
 					.flatMap((batch) -> {
 						testsCount.addAndGet(batch.size());
@@ -190,6 +192,26 @@ public class SlaveApiController {
 	 * @param config the scan configuration carried by this task
 	 * @return the operations authenticated with this task's primary credentials
 	 */
+	/**
+	 * How this task renews its credentials when the target starts refusing them. A task
+	 * is dispatched with freshly issued OAuth2 tokens, but it can run longer than they
+	 * live; the manager holds the OAuth2 settings, so it is asked for new ones. The call
+	 * is shared for a minute, so operations hitting the expired token at the same time
+	 * cause one re-issue rather than one each. A job without OAuth2 settings gets no
+	 * refresher: its credentials are static and retrying would change nothing.
+	 * @param request the dispatched task
+	 * @param config the task's configuration
+	 * @return the refresher, or null when the job has nothing to re-issue
+	 */
+	private CredentialsRefresher credentialsRefresher(ScanTaskRequest request, ScanConfiguration config) {
+		if (request.jobId() == null || config.oauth2Config() == null) {
+			return null;
+		}
+		Mono<List<SecurityScheme>> shared = this.masterApiClient.fetchAuthSchemes(request.jobId())
+			.cache(Duration.ofMinutes(1));
+		return () -> shared;
+	}
+
 	static List<Operation> withTaskAuth(List<Operation> endpoints, ScanConfiguration config) {
 		if (config.authScheme() == null) {
 			return endpoints;

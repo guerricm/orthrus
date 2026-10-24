@@ -83,7 +83,7 @@ class SlaveApiControllerTest {
 				this.discoveryRuns.incrementAndGet();
 				return discovered;
 			}));
-		when(this.scanService.executeScanFamily(any(), any(ScannerFamily.class), any(ScanConfiguration.class)))
+		when(this.scanService.executeScanFamily(any(), any(ScannerFamily.class), any(ScanConfiguration.class), any()))
 			.thenReturn(Flux.empty());
 		when(this.masterApiClient.completeTask(anyLong(), any(), anyInt(), anyInt())).thenReturn(Mono.empty());
 		when(this.masterApiClient.failTask(anyLong(), anyString())).thenReturn(Mono.empty());
@@ -138,7 +138,7 @@ class SlaveApiControllerTest {
 		verify(this.scanService, timeout(5000).times(1)).executeDiscovery(anyString(), anyString(),
 				any(ScanConfiguration.class));
 		verify(this.scanService, timeout(5000).times(families.size())).executeScanFamily(any(),
-				any(ScannerFamily.class), any(ScanConfiguration.class));
+				any(ScannerFamily.class), any(ScanConfiguration.class), any());
 	}
 
 	@Test

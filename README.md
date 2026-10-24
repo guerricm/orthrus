@@ -202,6 +202,13 @@ docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
   form's OAuth2 Scope field is prefilled with `openid` when the plan has no OAuth2 settings yet. A
   target answering 403 `insufficient_scope` usually needs the missing scope requested here (and granted
   to the client by the identity provider).
+  OAuth2 tokens are issued when a task is dispatched and are short-lived, so a task that runs longer
+  than its token would start getting 401s halfway through. When that happens the node asks the manager
+  for freshly issued credentials (`GET /api/internal/jobs/{id}/credentials`, behind the same shared
+  secret as the rest of the internal API) and retries the endpoint once, so a long scan stays
+  authenticated. The OAuth2 client secret never leaves the manager. Both the deterministic workers and
+  the AI nodes do this; a standalone CLI run has no manager to ask, so a 401 stays final there.
+
   The manager's plan editor can check a plan before saving it: **Test configuration** dry-runs the
   chosen discovery mode against the target with the form's settings and reports how many operations
   were found (or why the target did not answer), and **Validate OAuth2** requests a token with the
