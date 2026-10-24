@@ -167,7 +167,14 @@ class FindingToolTests {
 				Arguments.of("No XSS vulnerability found on PUT /CHAT-SERVICE/rooms/{roomId}",
 						"No XSS vulnerability exists on this endpoint.", "HTTP 400 with empty body.",
 						"No action required. The endpoint already has adequate protections."),
-				Arguments.of("No confirmed XSS on rooms DELETE endpoint", "", null, ""));
+				Arguments.of("No confirmed XSS on rooms DELETE endpoint", "", null, ""),
+				Arguments.of("Server version / gateway banner disclosure",
+						"No Server or X-Powered-By headers are present on the target. The gateway is not "
+								+ "identifiable from response headers. No version banner disclosure was found.",
+						"Baseline PUT /CHAT-SERVICE/rooms/1 # no Server, X-Powered-By, or similar headers.",
+						"Not applicable - no version banners found."),
+				Arguments.of("Unauthenticated injection exposure blocked only by 403 scope check", "No", "No", "No"),
+				Arguments.of("x", "y", "z", "w"));
 	}
 
 }

@@ -61,7 +61,8 @@ public class FindingTool {
 	 */
 	private static final Pattern NO_FLAW = Pattern.compile(
 			"not a (vulnerability|finding)|no (vulnerabilit(y|ies)|findings?|issues?) (found|detected|identified|confirmed)"
-					+ "|\\bno findings\\b|not vulnerable|nothing (was )?found|for context only",
+					+ "|\\bno findings\\b|not vulnerable|nothing (was )?found|for context only|not identifiable"
+					+ "|no [^.]{0,40}(disclosure|banner|leak|exposure)[^.]{0,20}(found|present|detected|observed)",
 			Pattern.CASE_INSENSITIVE);
 
 	/**
@@ -74,9 +75,9 @@ public class FindingTool {
 	/**
 	 * A remediation saying there is nothing to fix.
 	 */
-	private static final Pattern NOTHING_TO_FIX = Pattern.compile(
-			"no (action|remediation|fix|change)s? (is )?(required|needed)" + "|none (required|needed)",
-			Pattern.CASE_INSENSITIVE);
+	private static final Pattern NOTHING_TO_FIX = Pattern
+		.compile("^(n/?a|not applicable)\\b|no (action|remediation|fix|change)s? (is )?(required|needed)"
+				+ "|none (required|needed)", Pattern.CASE_INSENSITIVE);
 
 	private final RunContext runContext;
 
@@ -150,7 +151,13 @@ public class FindingTool {
 	}
 
 	private static boolean isBlank(String value) {
-		return value == null || value.isBlank() || PLACEHOLDER.matcher(value.strip()).matches();
+		if (value == null) {
+			return true;
+		}
+		String stripped = value.strip();
+		// A one- or two-character field ("No", "x", "-") is never real evidence or a real
+		// fix; the agent used it as a placeholder.
+		return stripped.length() < 3 || PLACEHOLDER.matcher(stripped).matches();
 	}
 
 	/**
