@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,7 @@ import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
 import ch.nexsol.orthrusai.scanner.ai.ProbeConfig;
+import ch.nexsol.orthrusai.scanner.client.ManagerClient;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
 
@@ -73,12 +75,15 @@ public class LlmScanExecutor implements ScanExecutor {
 
 	private final Duration endpointTimeout;
 
+	private final ManagerClient managerClient;
+
 	public LlmScanExecutor(ReconService reconService, FamilyAgent familyAgent, ObjectMapper objectMapper,
-			AiScannerProperties properties) {
+			AiScannerProperties properties, ManagerClient managerClient) {
 		this.reconService = reconService;
 		this.familyAgent = familyAgent;
 		this.objectMapper = objectMapper;
 		this.endpointTimeout = Duration.ofSeconds(properties.getAi().getBudget().getEndpointTimeoutSeconds());
+		this.managerClient = managerClient;
 	}
 
 	@Override
@@ -111,8 +116,11 @@ public class LlmScanExecutor implements ScanExecutor {
 			log.info("AI task {} ({}): {} s to probe, {} s per endpoint", request.taskId(), family,
 					probingBudget.toSeconds(), this.endpointTimeout.toSeconds());
 			Set<Endpoint> done = ConcurrentHashMap.newKeySet();
+			// Shared across the endpoints of this task: a token refused mid-task is
+			// re-issued once and every later endpoint probes with the fresh one.
+			AtomicReference<ProbeConfig> probeConfig = new AtomicReference<>(recon.probeConfig());
 			Flux<ScanAttempt> probed = Flux.fromIterable(recon.endpoints())
-				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), recon.probeConfig())
+				.flatMap((endpoint) -> scanEndpoint(family, endpoint, recon.context(), probeConfig, request.jobId())
 					.doOnNext((attempt) -> done.add(endpoint)), ENDPOINT_CONCURRENCY)
 				.takeUntilOther(Mono.firstWithSignal(budget, Mono.delay(probingBudget)));
 			Flux<ScanAttempt> notRun = Flux.defer(() -> Flux.fromIterable(recon.endpoints())
@@ -183,29 +191,66 @@ public class LlmScanExecutor implements ScanExecutor {
 
 	/**
 	 * Probes one endpoint, after the same gate as the deterministic engine: a baseline
-	 * request with the configured credentials. A 401 means they are rejected, so no agent
-	 * runs. A 403 means they are accepted but the identity is refused, so only the
-	 * families probing a way around the refusal, or the refused response itself, run.
+	 * request with the configured credentials. A 401 means they are rejected; since
+	 * OAuth2 tokens are short-lived and a task can outlive the one it was dispatched
+	 * with, the manager is asked for fresh credentials and the baseline is retried once
+	 * before the endpoint is given up on. A 403 means they are accepted but the identity
+	 * is refused, so only the families probing a way around the refusal, or the refused
+	 * response itself, run.
 	 * @param family the scanner family name
 	 * @param endpoint the endpoint to probe
 	 * @param context the orchestrator's shared target fingerprint, may be null
-	 * @param probeConfig the credentials, TLS leniency and timeout to apply
+	 * @param probeConfig the settings to probe with, shared across the task's endpoints
+	 * @param jobId the job this task belongs to, used to re-issue credentials
 	 * @return the endpoint's single attempt
 	 */
-	private Flux<ScanAttempt> scanEndpoint(String family, Endpoint endpoint, String context, ProbeConfig probeConfig) {
-		return this.familyAgent.baselineStatus(endpoint, probeConfig).defaultIfEmpty(0).flatMapMany((status) -> {
-			if (status == 401) {
-				return Flux.just(attempt(family, endpoint, AttemptStatus.AUTH_ERROR, List.of()));
+	private Flux<ScanAttempt> scanEndpoint(String family, Endpoint endpoint, String context,
+			AtomicReference<ProbeConfig> probeConfig, Long jobId) {
+		ProbeConfig dispatched = probeConfig.get();
+		return this.familyAgent.baselineStatus(endpoint, dispatched)
+			.defaultIfEmpty(0)
+			.flatMap((status) -> (status == 401) ? refreshedBaseline(endpoint, probeConfig, dispatched, jobId)
+					: Mono.just(status))
+			.flatMapMany((status) -> {
+				ProbeConfig current = probeConfig.get();
+				if (status == 401) {
+					return Flux.just(attempt(family, endpoint, AttemptStatus.AUTH_ERROR, List.of()));
+				}
+				boolean refused = status == 403;
+				if (refused && !RUN_WHEN_FORBIDDEN.contains(family.toUpperCase(Locale.ROOT))) {
+					return Flux.just(attempt(family, endpoint, AttemptStatus.FORBIDDEN, List.of()));
+				}
+				return Flux.defer(() -> {
+					List<Vulnerability> findings = this.familyAgent.scan(family, endpoint, context, current, refused);
+					AttemptStatus verdict = findings.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED;
+					return Flux.just(attempt(family, endpoint, verdict, findings));
+				}).subscribeOn(Schedulers.boundedElastic());
+			});
+	}
+
+	/**
+	 * Asks the manager to issue fresh credentials and probes the baseline again. The
+	 * update is conditional, so endpoints probing in parallel against the same expired
+	 * token settle on one refresh instead of overwriting each other.
+	 * @param endpoint the endpoint being probed
+	 * @param probeConfig the shared settings to update
+	 * @param refused the settings whose credentials were refused
+	 * @param jobId the job this task belongs to
+	 * @return the status of the second baseline
+	 */
+	private Mono<Integer> refreshedBaseline(Endpoint endpoint, AtomicReference<ProbeConfig> probeConfig,
+			ProbeConfig refused, Long jobId) {
+		if (jobId == null) {
+			return Mono.just(401);
+		}
+		log.info("Credentials refused on {} {}; asking the manager to issue fresh ones", endpoint.method(),
+				endpoint.url());
+		return this.managerClient.fetchCredentials(jobId).flatMap((credentials) -> {
+			if (credentials.isEmpty()) {
+				return Mono.just(401);
 			}
-			boolean refused = status == 403;
-			if (refused && !RUN_WHEN_FORBIDDEN.contains(family.toUpperCase(Locale.ROOT))) {
-				return Flux.just(attempt(family, endpoint, AttemptStatus.FORBIDDEN, List.of()));
-			}
-			return Flux.defer(() -> {
-				List<Vulnerability> findings = this.familyAgent.scan(family, endpoint, context, probeConfig, refused);
-				AttemptStatus verdict = findings.isEmpty() ? AttemptStatus.PASSED : AttemptStatus.FAILED;
-				return Flux.just(attempt(family, endpoint, verdict, findings));
-			}).subscribeOn(Schedulers.boundedElastic());
+			probeConfig.compareAndSet(refused, refused.withCredentials(credentials));
+			return this.familyAgent.baselineStatus(endpoint, probeConfig.get()).defaultIfEmpty(0);
 		});
 	}
 

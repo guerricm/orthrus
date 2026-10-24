@@ -28,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
+
 /**
  * The node side of the manager's internal API: registration, heartbeat and task
  * reporting. Every kind of node (deterministic worker, AI scanner) speaks this exact
@@ -224,6 +226,27 @@ public class NodeClient {
 			.retrieve()
 			.bodyToMono(Void.class)
 			.timeout(REPORT_TIMEOUT);
+	}
+
+	/**
+	 * Asks the manager for freshly issued credentials for a job. Used when the ones the
+	 * task was dispatched with are refused: the manager re-issues the job's OAuth2 tokens
+	 * and returns them, so a task outliving its token keeps probing authenticated.
+	 * @param jobId the job the task belongs to
+	 * @return the credentials, or an empty list when the job has none or the manager
+	 * cannot be reached
+	 */
+	public Mono<List<Credential>> fetchCredentials(Long jobId) {
+		return this.webClient.get()
+			.uri(this.managerUrl + "/api/internal/jobs/" + jobId + "/credentials")
+			.retrieve()
+			.bodyToMono(JobCredentials.class)
+			.timeout(REPORT_TIMEOUT)
+			.map(JobCredentials::credentials)
+			.onErrorResume((e) -> {
+				log.warn("Could not refresh the credentials of job {}: {}", jobId, e.getMessage());
+				return Mono.just(List.of());
+			});
 	}
 
 	/**

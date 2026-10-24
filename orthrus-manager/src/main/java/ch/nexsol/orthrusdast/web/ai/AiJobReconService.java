@@ -16,7 +16,6 @@
 
 package ch.nexsol.orthrusdast.web.ai;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -30,10 +29,10 @@ import ch.nexsol.orthrus.protocol.ai.AiScanContext;
 import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.ai.Endpoint;
 import ch.nexsol.orthrus.protocol.ai.ReconResult;
+import ch.nexsol.orthrusdast.auth.JobCredentialsService;
 import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.model.ScanConfiguration;
-import ch.nexsol.orthrusdast.model.SecurityScheme;
 
 /**
  * The two halves of what an AI job needs before its tasks can run on a node.
@@ -91,7 +90,7 @@ public class AiJobReconService {
 		// tokens.
 		Mono<List<Credential>> credentials = Mono.justOrEmpty(config)
 			.flatMap(this.tokenFetcher::refreshAuth)
-			.map(this::resolveCredentials)
+			.map(JobCredentialsService::resolve)
 			.defaultIfEmpty(List.of());
 		return credentials.flatMap((creds) -> client.recon(job.getTarget(), host, creds)).onErrorResume((e) -> {
 			log.warn("Orchestrator recon of {} failed ({}); nodes will use local recon", job.getTarget(),
@@ -120,8 +119,8 @@ public class AiJobReconService {
 		boolean ignoreSsl = config != null && config.ignoreSslErrors();
 		int connect = (config != null && config.httpConnectTimeoutMs() > 0) ? config.httpConnectTimeoutMs() : 5000;
 		int read = (config != null && config.httpReadTimeoutMs() > 0) ? config.httpReadTimeoutMs() : 10000;
-		AiScanContext scanContext = new AiScanContext(recon.baseUrl(), endpoints, context, resolveCredentials(config),
-				ignoreSsl, connect, read);
+		AiScanContext scanContext = new AiScanContext(recon.baseUrl(), endpoints, context,
+				JobCredentialsService.resolve(config), ignoreSsl, connect, read);
 		try {
 			return this.objectMapper.writeValueAsString(scanContext);
 		}
@@ -154,47 +153,6 @@ public class AiJobReconService {
 			return "Operator selected these scanners to focus on: " + String.join(", ", include) + ".";
 		}
 		return "";
-	}
-
-	/**
-	 * Turns the primary and secondary auth schemes into plain credentials the node
-	 * attaches to every request.
-	 * @param config the scan configuration, or null
-	 * @return the resolved credentials (possibly empty)
-	 */
-	private List<Credential> resolveCredentials(ScanConfiguration config) {
-		List<Credential> credentials = new ArrayList<>();
-		if (config == null) {
-			return credentials;
-		}
-		addCredential(credentials, config.authScheme());
-		addCredential(credentials, config.secondaryAuthScheme());
-		return credentials;
-	}
-
-	private void addCredential(List<Credential> credentials, SecurityScheme scheme) {
-		if (scheme == null || scheme.value() == null || scheme.value().isBlank()) {
-			return;
-		}
-		SecurityScheme.ParamLocation location = (scheme.paramLocation() != null) ? scheme.paramLocation()
-				: SecurityScheme.ParamLocation.HEADER;
-		switch (location) {
-			case QUERY -> {
-				if (scheme.paramName() != null) {
-					credentials.add(new Credential("QUERY", scheme.paramName(), scheme.value()));
-				}
-			}
-			case COOKIE -> {
-				String name = (scheme.paramName() != null) ? scheme.paramName() : scheme.headerName();
-				if (name != null) {
-					credentials.add(new Credential("COOKIE", name, scheme.value()));
-				}
-			}
-			default -> {
-				String name = (scheme.headerName() != null) ? scheme.headerName() : "Authorization";
-				credentials.add(new Credential("HEADER", name, scheme.toAuthorizationHeaderValue()));
-			}
-		}
 	}
 
 	private ScanConfiguration parseConfig(String json) {

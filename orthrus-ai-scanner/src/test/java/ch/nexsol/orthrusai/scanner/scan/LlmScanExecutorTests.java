@@ -22,9 +22,11 @@ import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.ai.Endpoint;
 import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.RiskLevel;
@@ -32,6 +34,8 @@ import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.ScanTaskRequest;
 import ch.nexsol.orthrus.protocol.node.Vulnerability;
 import ch.nexsol.orthrusai.scanner.ai.FamilyAgent;
+import ch.nexsol.orthrusai.scanner.ai.ProbeConfig;
+import ch.nexsol.orthrusai.scanner.client.ManagerClient;
 import ch.nexsol.orthrusai.scanner.config.AiScannerProperties;
 import ch.nexsol.orthrusai.scanner.recon.ReconService;
 
@@ -39,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -56,6 +61,8 @@ class LlmScanExecutorTests {
 
 	private final FamilyAgent familyAgent = mock(FamilyAgent.class);
 
+	private final ManagerClient managerClient = mock(ManagerClient.class);
+
 	private final LlmScanExecutor executor = executor(300);
 
 	@BeforeEach
@@ -66,7 +73,8 @@ class LlmScanExecutorTests {
 	private LlmScanExecutor executor(long endpointTimeoutSeconds) {
 		AiScannerProperties properties = new AiScannerProperties();
 		properties.getAi().getBudget().setEndpointTimeoutSeconds(endpointTimeoutSeconds);
-		return new LlmScanExecutor(this.reconService, this.familyAgent, new ObjectMapper(), properties);
+		return new LlmScanExecutor(this.reconService, this.familyAgent, new ObjectMapper(), properties,
+				this.managerClient);
 	}
 
 	@Test
@@ -233,6 +241,7 @@ class LlmScanExecutorTests {
 		Endpoint endpoint = new Endpoint("GET", "http://app.test/api/rooms/{roomId}");
 		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(endpoint)));
 		when(this.familyAgent.baselineStatus(eq(endpoint), any())).thenReturn(Mono.just(401));
+		when(this.managerClient.fetchCredentials(1L)).thenReturn(Mono.just(List.of()));
 		var task = new ScanTaskRequest(1L, 1L, "JWT", "openapi", "http://app.test", "{}", null);
 
 		List<ScanAttempt> attempts = this.executor.execute(task).collectList().block(Duration.ofSeconds(4));
@@ -279,6 +288,55 @@ class LlmScanExecutorTests {
 		List<ScanAttempt> attempts = this.executor.execute(task).collectList().block(Duration.ofSeconds(4));
 
 		assertThat(attempts).singleElement().extracting(ScanAttempt::status).isEqualTo(AttemptStatus.PASSED);
+	}
+
+	@Test
+	void aRefusedTokenIsReIssuedByTheManagerAndTheEndpointIsStillProbed() {
+		Endpoint endpoint = new Endpoint("GET", "http://app.test/api/rooms");
+		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(endpoint)));
+		// The dispatched token has expired; the one the manager issues is accepted.
+		when(this.familyAgent.baselineStatus(eq(endpoint), any())).thenReturn(Mono.just(401), Mono.just(200));
+		when(this.managerClient.fetchCredentials(1L))
+			.thenReturn(Mono.just(List.of(new Credential("HEADER", "Authorization", "Bearer fresh"))));
+		when(this.familyAgent.scan(eq("INJECTION"), eq(endpoint), any(), any(), eq(false))).thenReturn(List.of());
+		var task = new ScanTaskRequest(1L, 1L, "INJECTION", "openapi", "http://app.test", "{}", null);
+
+		List<ScanAttempt> attempts = this.executor.execute(task).collectList().block(Duration.ofSeconds(4));
+
+		assertThat(attempts).singleElement().extracting(ScanAttempt::status).isEqualTo(AttemptStatus.PASSED);
+		ArgumentCaptor<ProbeConfig> used = ArgumentCaptor.forClass(ProbeConfig.class);
+		verify(this.familyAgent).scan(eq("INJECTION"), eq(endpoint), any(), used.capture(), eq(false));
+		assertThat(used.getValue().credentials()).extracting(Credential::value).containsExactly("Bearer fresh");
+	}
+
+	@Test
+	void anEndpointStillRefusedAfterARefreshIsReportedAsAuthError() {
+		Endpoint endpoint = new Endpoint("GET", "http://app.test/api/rooms");
+		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(endpoint)));
+		when(this.familyAgent.baselineStatus(eq(endpoint), any())).thenReturn(Mono.just(401));
+		when(this.managerClient.fetchCredentials(1L))
+			.thenReturn(Mono.just(List.of(new Credential("HEADER", "Authorization", "Bearer fresh"))));
+		var task = new ScanTaskRequest(1L, 1L, "INJECTION", "openapi", "http://app.test", "{}", null);
+
+		List<ScanAttempt> attempts = this.executor.execute(task).collectList().block(Duration.ofSeconds(4));
+
+		assertThat(attempts).singleElement().extracting(ScanAttempt::status).isEqualTo(AttemptStatus.AUTH_ERROR);
+		verify(this.familyAgent, never()).scan(any(), any(), any(), any(), anyBoolean());
+	}
+
+	@Test
+	void aManagerWithNoCredentialsToIssueLeavesTheEndpointAsAuthError() {
+		Endpoint endpoint = new Endpoint("GET", "http://app.test/api/rooms");
+		when(this.reconService.discover("http://app.test")).thenReturn(Mono.just(List.of(endpoint)));
+		when(this.familyAgent.baselineStatus(eq(endpoint), any())).thenReturn(Mono.just(401));
+		when(this.managerClient.fetchCredentials(1L)).thenReturn(Mono.just(List.of()));
+		var task = new ScanTaskRequest(1L, 1L, "INJECTION", "openapi", "http://app.test", "{}", null);
+
+		List<ScanAttempt> attempts = this.executor.execute(task).collectList().block(Duration.ofSeconds(4));
+
+		assertThat(attempts).singleElement().extracting(ScanAttempt::status).isEqualTo(AttemptStatus.AUTH_ERROR);
+		verify(this.familyAgent, never()).baselineStatus(eq(endpoint),
+				argThat((c) -> c != null && !c.credentials().isEmpty()));
 	}
 
 }

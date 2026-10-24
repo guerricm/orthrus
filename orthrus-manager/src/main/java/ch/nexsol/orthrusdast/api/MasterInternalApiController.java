@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,8 +33,10 @@ import reactor.core.publisher.Mono;
 import ch.nexsol.orthrus.protocol.node.AttemptStatus;
 import ch.nexsol.orthrus.protocol.node.CompleteTaskRequest;
 import ch.nexsol.orthrus.protocol.node.FailTaskRequest;
+import ch.nexsol.orthrus.protocol.node.JobCredentials;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrus.protocol.node.SlaveRegistration;
+import ch.nexsol.orthrusdast.auth.JobCredentialsService;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
@@ -62,9 +65,12 @@ public class MasterInternalApiController {
 
 	private final ScanTaskRepository scanTaskRepository;
 
+	private final JobCredentialsService jobCredentialsService;
+
 	public MasterInternalApiController(SlaveNodeRepository slaveNodeRepository, ScanJobRepository scanJobRepository,
 			ScanResultService scanResultService, JobOrchestratorService jobOrchestratorService,
-			ScanTaskRepository scanTaskRepository) {
+			ScanTaskRepository scanTaskRepository, JobCredentialsService jobCredentialsService) {
+		this.jobCredentialsService = jobCredentialsService;
 		this.slaveNodeRepository = slaveNodeRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.scanResultService = scanResultService;
@@ -160,6 +166,20 @@ public class MasterInternalApiController {
 	 * @param batch the batch of attempts
 	 * @return a mono of response entity
 	 */
+	/**
+	 * Issues freshly minted credentials for a job. A node calls this when the credentials
+	 * it was dispatched with stop being accepted: OAuth2 tokens are short-lived and a
+	 * long task can outlive the one it started with. The OAuth2 settings never leave the
+	 * manager, so re-issuing has to happen here.
+	 * @param id the job the calling node is running a task for
+	 * @return the credentials to attach from now on, possibly empty
+	 */
+	@GetMapping("/jobs/{id}/credentials")
+	public Mono<ResponseEntity<JobCredentials>> issueJobCredentials(@PathVariable Long id) {
+		return this.jobCredentialsService.issueFor(id)
+			.map((credentials) -> ResponseEntity.ok(new JobCredentials(credentials)));
+	}
+
 	@PostMapping("/tasks/{id}/attempts")
 	public Mono<ResponseEntity<Void>> postTaskAttemptsBatch(@PathVariable Long id,
 			@RequestBody List<ScanAttempt> batch) {

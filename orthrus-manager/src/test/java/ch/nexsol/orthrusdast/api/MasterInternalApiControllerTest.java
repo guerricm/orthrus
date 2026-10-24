@@ -32,6 +32,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import ch.nexsol.orthrus.protocol.node.SlaveRegistration;
+import ch.nexsol.orthrusdast.auth.JobCredentialsService;
 import ch.nexsol.orthrusdast.engine.JobOrchestratorService;
 import ch.nexsol.orthrusdast.engine.ScanResultService;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
@@ -75,12 +76,16 @@ class MasterInternalApiControllerTest {
 	@Mock
 	private ScanTaskRepository scanTaskRepository;
 
+	@Mock
+	private JobCredentialsService jobCredentialsService;
+
 	private MasterInternalApiController controller;
 
 	@BeforeEach
 	void setUp() {
 		this.controller = new MasterInternalApiController(this.slaveNodeRepository, this.scanJobRepository,
-				this.scanResultService, this.jobOrchestratorService, this.scanTaskRepository);
+				this.scanResultService, this.jobOrchestratorService, this.scanTaskRepository,
+				this.jobCredentialsService);
 
 		when(this.jobOrchestratorService.recoverTasksOfSlave(anyString(), anyString())).thenReturn(Mono.empty());
 		when(this.slaveNodeRepository.insertSlaveNode(anyString(), anyString(), any(), anyString(), any()))

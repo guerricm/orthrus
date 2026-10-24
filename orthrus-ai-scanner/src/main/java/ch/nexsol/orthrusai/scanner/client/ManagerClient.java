@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import ch.nexsol.orthrus.protocol.ai.Credential;
 import ch.nexsol.orthrus.protocol.node.NodeClient;
 import ch.nexsol.orthrus.protocol.node.ScanAttempt;
 import ch.nexsol.orthrusai.scanner.ai.AgentActivity;
@@ -89,6 +90,17 @@ public class ManagerClient {
 	 */
 	public void markOffline() {
 		this.nodeClient.markOffline();
+	}
+
+	/**
+	 * Asks the manager to issue fresh credentials for a job, used when the ones the task
+	 * started with are refused.
+	 * @param jobId the job this node is running a task for
+	 * @return the credentials, empty when the job has none or the manager cannot be
+	 * reached
+	 */
+	public Mono<List<Credential>> fetchCredentials(Long jobId) {
+		return this.nodeClient.fetchCredentials(jobId);
 	}
 
 	/**

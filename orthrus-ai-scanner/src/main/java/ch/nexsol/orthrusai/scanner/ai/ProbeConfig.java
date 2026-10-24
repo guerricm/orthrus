@@ -35,4 +35,15 @@ public record ProbeConfig(List<Credential> credentials, boolean ignoreSslErrors,
 	public static ProbeConfig defaults() {
 		return new ProbeConfig(List.of(), false, 10000);
 	}
+
+	/**
+	 * The same settings with other credentials, used when the manager issues fresh ones
+	 * because the token this task started with expired.
+	 * @param freshCredentials the credentials to use from now on
+	 * @return the updated settings
+	 */
+	public ProbeConfig withCredentials(List<Credential> freshCredentials) {
+		return new ProbeConfig(freshCredentials, ignoreSslErrors(), readTimeoutMs());
+	}
+
 }
