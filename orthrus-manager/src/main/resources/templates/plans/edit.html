@@ -282,6 +282,15 @@
                                                     <div class="form-text text-white-50">Comma-separated list of
                                                         username:password</div>
                                                 </div>
+                                                <div class="col-md-12">
+                                                    <button type="button" class="btn btn-outline-info" hx-post="/plans/check-oauth2"
+                                                        hx-include="[name='oauth2Url'],[name='oauth2Grant'],[name='oauth2ClientId'],[name='oauth2ClientSecret'],[name='oauth2Scope'],[name='oauth2Creds']"
+                                                        hx-target="#oauth2CheckResult" hx-swap="innerHTML" hx-indicator="#oauth2CheckLoading">
+                                                        Validate OAuth2
+                                                    </button>
+                                                    <span id="oauth2CheckLoading" class="htmx-indicator ms-2 text-info">Requesting a token…</span>
+                                                    <div id="oauth2CheckResult" class="mt-2"></div>
+                                                </div>
                                             </div>
 
                                             <h5 class="mt-4 mb-3 text-primary">Scanner Selection</h5>
@@ -339,7 +348,14 @@
 
                             </div>
 
+                            <div id="configCheckResult" class="mt-4"></div>
                             <div class="mt-4 text-end border-top border-secondary pt-4">
+                                <button type="button" class="btn btn-outline-info btn-lg px-4 me-3" hx-post="/plans/check-config"
+                                    hx-include="closest form" hx-target="#configCheckResult" hx-swap="innerHTML"
+                                    hx-indicator="#configCheckLoading">
+                                    Test configuration
+                                </button>
+                                <span id="configCheckLoading" class="htmx-indicator me-3 text-info">Discovering…</span>
                                 <a href="/plans" class="btn btn-outline-secondary btn-lg px-4 me-3">Cancel</a>
                                 <button type="submit" id="saveBtn" class="btn btn-primary btn-lg px-5">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"

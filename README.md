@@ -202,6 +202,12 @@ docker run --rm orthrus-cli:latest -d <DISCOVERER> -t <TARGET_URL> [OPTIONS]
   form's OAuth2 Scope field is prefilled with `openid` when the plan has no OAuth2 settings yet. A
   target answering 403 `insufficient_scope` usually needs the missing scope requested here (and granted
   to the client by the identity provider).
+  The manager's plan editor can check a plan before saving it: **Test configuration** dry-runs the
+  chosen discovery mode against the target with the form's settings and reports how many operations
+  were found (or why the target did not answer), and **Validate OAuth2** requests a token with the
+  Option B settings and reports whether one was issued, until when, and with which `scope` claim. The
+  token value itself is never displayed. When editing an existing plan with the secret field left
+  blank, the stored secret is used, as a plan update would.
 - `--include=<includeScanners>`: Comma-separated list of scanners to include.
 - `--exclude=<excludeScanners>`: Comma-separated list of scanners to exclude.
 - `-h, --help`: Show help message and exit.

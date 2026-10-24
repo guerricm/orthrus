@@ -17,11 +17,16 @@
 package ch.nexsol.orthrusdast.web;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -34,6 +39,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,6 +52,7 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 import ch.nexsol.orthrus.protocol.ai.ScanPlan;
+import ch.nexsol.orthrusdast.auth.OAuth2TokenFetcher;
 import ch.nexsol.orthrusdast.engine.ScannerCatalog;
 import ch.nexsol.orthrusdast.entity.ScanJobEntity;
 import ch.nexsol.orthrusdast.entity.SlaveNodeEntity;
@@ -99,6 +106,23 @@ public class PlanController {
 	 */
 	private final List<String> defaultDiscoverers;
 
+	/**
+	 * The same discoverers by id, to dry-run a plan's discovery from the editor.
+	 */
+	private final Map<String, EndpointDiscoverer> discoverersById;
+
+	private final OAuth2TokenFetcher tokenFetcher;
+
+	/**
+	 * Bound on a configuration check, so an unreachable target does not hang the editor.
+	 */
+	private static final Duration CHECK_TIMEOUT = Duration.ofSeconds(30);
+
+	/**
+	 * Operations listed in a successful configuration check.
+	 */
+	private static final int CHECK_SAMPLE_SIZE = 8;
+
 	private final TestPlanPortabilityService planPortabilityService;
 
 	private final ScannerCatalog scannerCatalog;
@@ -112,7 +136,7 @@ public class PlanController {
 			SlaveNodeRepository slaveNodeRepository, ScanTaskRepository scanTaskRepository, ObjectMapper objectMapper,
 			JobEventPublisher jobEventPublisher, List<EndpointDiscoverer> discoverers,
 			TestPlanPortabilityService planPortabilityService, ScannerCatalog scannerCatalog,
-			ObjectProvider<AiOrchestratorClient> aiOrchestratorClient) {
+			ObjectProvider<AiOrchestratorClient> aiOrchestratorClient, OAuth2TokenFetcher tokenFetcher) {
 		this.testPlanRepository = testPlanRepository;
 		this.scanJobRepository = scanJobRepository;
 		this.slaveNodeRepository = slaveNodeRepository;
@@ -120,6 +144,9 @@ public class PlanController {
 		this.objectMapper = objectMapper;
 		this.jobEventPublisher = jobEventPublisher;
 		this.defaultDiscoverers = discoverers.stream().map(EndpointDiscoverer::getId).sorted().toList();
+		this.discoverersById = discoverers.stream()
+			.collect(Collectors.toMap(EndpointDiscoverer::getId, Function.identity(), (a, b) -> a));
+		this.tokenFetcher = tokenFetcher;
 		this.planPortabilityService = planPortabilityService;
 		this.scannerCatalog = scannerCatalog;
 		this.aiOrchestratorClient = aiOrchestratorClient;
@@ -338,79 +365,221 @@ public class PlanController {
 		return exchange.getFormData().flatMap((formData) -> {
 			String target = formData.getFirst("target");
 			String discovererId = formData.getFirst("discovererId");
-			String bearerToken = formData.getFirst("bearerToken");
-			String bearerTokenSecondary = formData.getFirst("bearerTokenSecondary");
-			boolean includePassed = "true".equals(formData.getFirst("includePassed"));
-
-			String gatewayType = formData.getFirst("gatewayType");
-			String appUrl = formData.getFirst("appUrl");
-			String k8sToken = formData.getFirst("k8sToken");
-			String openapiOverrideHost = formData.getFirst("openapiOverrideHost");
-			GatewayExclusions gatewayExclusions = WebFormUtils.gatewayExclusions(
-					formData.getFirst("gatewayExcludedRouteIds"), formData.getFirst("gatewayExcludedPaths"));
-
-			List<String> rawIncludeScanners = formData.get("includeScanners");
-			final List<String> includeScanners = (rawIncludeScanners != null) ? rawIncludeScanners : List.of();
-			final List<String> excludeScanners = List.of();
-
-			final int concurrency = WebFormUtils.parseIntOrDefault(formData.getFirst("concurrency"), 10);
-
 			if (target == null || discovererId == null) {
 				return Mono.error(new IllegalArgumentException("Missing target or discovererId"));
 			}
 
-			String oauth2Url = formData.getFirst("oauth2Url");
-			String oauth2Grant = formData.getFirst("oauth2Grant");
-			String oauth2ClientId = formData.getFirst("oauth2ClientId");
-			String oauth2ClientSecret = formData.getFirst("oauth2ClientSecret");
-			String oauth2Scope = formData.getFirst("oauth2Scope");
-			String oauth2CredsStr = formData.getFirst("oauth2Creds");
-			List<String> oauth2Creds = (oauth2CredsStr != null && !oauth2CredsStr.isBlank())
-					? Arrays.stream(oauth2CredsStr.split(",")).map(String::trim).collect(Collectors.toList()) : null;
-
-			OAuth2Config oauth2Config = null;
-			if (oauth2Url != null && !oauth2Url.isBlank() && oauth2Grant != null && !oauth2Grant.isBlank()) {
-				oauth2Config = new OAuth2Config(oauth2Url, oauth2ClientId, oauth2ClientSecret, oauth2Grant, oauth2Creds,
-						oauth2Scope);
-			}
-
-			final OAuth2Config finalOauth2Config = oauth2Config;
-
 			// OAuth2 tokens are short-lived: the plan keeps only the OAuth2 settings, and
 			// tokens are issued each time one of its tasks is dispatched.
-			return Mono.defer(() -> {
-				SecurityScheme authScheme = null;
-				SecurityScheme secondaryAuthScheme = null;
+			ScanConfiguration scanConfig = scanConfigurationFrom(formData);
 
-				if (bearerToken != null && !bearerToken.isBlank()) {
-					authScheme = SecurityScheme.bearer(bearerToken.trim());
+			return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig)).flatMap((configJson) -> {
+				String name = formData.getFirst("name");
+				String description = formData.getFirst("description");
+				if (name == null || name.isBlank()) {
+					name = "Unnamed Plan";
 				}
-				if (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank()) {
-					secondaryAuthScheme = SecurityScheme.bearer(bearerTokenSecondary.trim());
-				}
-
-				ScanConfiguration scanConfig = new ScanConfiguration(includeScanners, excludeScanners, concurrency,
-						5000, 10000, false, "html", authScheme, secondaryAuthScheme, "en", includePassed,
-						GatewayType.fromString(gatewayType), appUrl, k8sToken, finalOauth2Config, openapiOverrideHost,
-						gatewayExclusions);
-
-				return Mono.fromCallable(() -> objectMapper.writeValueAsString(scanConfig)).flatMap((configJson) -> {
-					String name = formData.getFirst("name");
-					String description = formData.getFirst("description");
-					if (name == null || name.isBlank()) {
-						name = "Unnamed Plan";
-					}
-					TestPlanEntity plan = new TestPlanEntity(name, description, discovererId, target, configJson);
-					return testPlanRepository.save(plan);
-				}).doOnError((e) -> log.error("Failed to create or save test plan for target: {}", target, e));
-			}).map((savedPlan) -> {
-				exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
-				return "fragments/scan-queued :: empty";
-			});
+				TestPlanEntity plan = new TestPlanEntity(name, description, discovererId, target, configJson);
+				return testPlanRepository.save(plan);
+			})
+				.doOnError((e) -> log.error("Failed to create or save test plan for target: {}", target, e))
+				.map((savedPlan) -> {
+					exchange.getResponse().getHeaders().add("HX-Redirect", "/plans");
+					return "fragments/scan-queued :: empty";
+				});
 		}).onErrorResume((e) -> {
 			model.addAttribute("error", "Scan failed: " + e.getMessage());
 			return Mono.just("fragments/results :: errorPanel");
 		});
+	}
+
+	/**
+	 * Builds the scan configuration a plan form describes. Shared by plan creation and
+	 * the configuration check, so what is checked is exactly what would be saved.
+	 * @param formData the submitted form
+	 * @return the configuration
+	 */
+	private static ScanConfiguration scanConfigurationFrom(MultiValueMap<String, String> formData) {
+		String bearerToken = formData.getFirst("bearerToken");
+		String bearerTokenSecondary = formData.getFirst("bearerTokenSecondary");
+		boolean includePassed = "true".equals(formData.getFirst("includePassed"));
+
+		GatewayExclusions gatewayExclusions = WebFormUtils
+			.gatewayExclusions(formData.getFirst("gatewayExcludedRouteIds"), formData.getFirst("gatewayExcludedPaths"));
+		List<String> rawIncludeScanners = formData.get("includeScanners");
+		List<String> includeScanners = (rawIncludeScanners != null) ? rawIncludeScanners : List.of();
+		int concurrency = WebFormUtils.parseIntOrDefault(formData.getFirst("concurrency"), 10);
+
+		SecurityScheme authScheme = (bearerToken != null && !bearerToken.isBlank())
+				? SecurityScheme.bearer(bearerToken.trim()) : null;
+		SecurityScheme secondaryAuthScheme = (bearerTokenSecondary != null && !bearerTokenSecondary.isBlank())
+				? SecurityScheme.bearer(bearerTokenSecondary.trim()) : null;
+
+		return new ScanConfiguration(includeScanners, List.of(), concurrency, 5000, 10000, false, "html", authScheme,
+				secondaryAuthScheme, "en", includePassed, GatewayType.fromString(formData.getFirst("gatewayType")),
+				formData.getFirst("appUrl"), formData.getFirst("k8sToken"), oauth2ConfigFrom(formData),
+				formData.getFirst("openapiOverrideHost"), gatewayExclusions);
+	}
+
+	/**
+	 * The OAuth2 settings a plan form describes, or null when the token URL or the grant
+	 * is missing.
+	 * @param formData the submitted form
+	 * @return the OAuth2 settings, or null
+	 */
+	private static OAuth2Config oauth2ConfigFrom(MultiValueMap<String, String> formData) {
+		String oauth2Url = formData.getFirst("oauth2Url");
+		String oauth2Grant = formData.getFirst("oauth2Grant");
+		if (oauth2Url == null || oauth2Url.isBlank() || oauth2Grant == null || oauth2Grant.isBlank()) {
+			return null;
+		}
+		String oauth2CredsStr = formData.getFirst("oauth2Creds");
+		List<String> oauth2Creds = (oauth2CredsStr != null && !oauth2CredsStr.isBlank())
+				? Arrays.stream(oauth2CredsStr.split(",")).map(String::trim).collect(Collectors.toList()) : null;
+		return new OAuth2Config(oauth2Url.trim(), formData.getFirst("oauth2ClientId"),
+				formData.getFirst("oauth2ClientSecret"), oauth2Grant, oauth2Creds, formData.getFirst("oauth2Scope"));
+	}
+
+	/**
+	 * Dry-runs the discovery a plan form describes, without saving anything: the chosen
+	 * discoverer is run against the target with the form's settings, and the editor is
+	 * told whether the target answered and how many operations were found.
+	 * @param exchange the form submission
+	 * @param model the view model
+	 * @return the check fragment
+	 */
+	@PostMapping("/plans/check-config")
+	public Mono<String> checkConfiguration(ServerWebExchange exchange, Model model) {
+		return exchange.getFormData().flatMap((formData) -> {
+			String target = formData.getFirst("target");
+			String discovererId = formData.getFirst("discovererId");
+			if (target == null || target.isBlank()) {
+				return Mono.just(configCheck(model, false, "Enter a target first.", List.of()));
+			}
+			EndpointDiscoverer discoverer = (discovererId != null) ? this.discoverersById.get(discovererId) : null;
+			if (discoverer == null) {
+				return Mono.just(configCheck(model, false, "Choose a discovery mode first.", List.of()));
+			}
+			ScanConfiguration config = scanConfigurationFrom(formData);
+			return discoverer.discover(target.trim(), config).timeout(CHECK_TIMEOUT).map((operations) -> {
+				if (operations.isEmpty()) {
+					return configCheck(
+							model, false, "The target answered but no operation was discovered with the '"
+									+ discovererId + "' discovery mode. Check the target and the discovery settings.",
+							List.of());
+				}
+				List<String> sample = operations.stream()
+					.limit(CHECK_SAMPLE_SIZE)
+					.map((op) -> op.method().name() + " " + op.templateUrl())
+					.toList();
+				return configCheck(model, true,
+						operations.size() + " operation(s) discovered with the '" + discovererId + "' discovery mode.",
+						sample);
+			}).onErrorResume((e) -> {
+				log.info("Configuration check of {} failed: {}", target, e.getMessage());
+				return Mono.just(configCheck(model, false, "Discovery failed: " + describe(e), List.of()));
+			});
+		});
+	}
+
+	private static String configCheck(Model model, boolean ok, String message, List<String> sample) {
+		model.addAttribute("configCheck", new ConfigCheck(ok, message, sample));
+		return "fragments/plan-offcanvas :: configCheck";
+	}
+
+	/**
+	 * Issues a token with the OAuth2 settings a plan form describes, so the operator can
+	 * confirm them before saving. When the form carries a plan id and no client secret,
+	 * the stored secret is used, as a plan update would. The token value is never shown:
+	 * the editor is told whether a token was issued, until when, and with which scopes.
+	 * @param exchange the form submission
+	 * @param model the view model
+	 * @return the check fragment
+	 */
+	@PostMapping("/plans/check-oauth2")
+	public Mono<String> checkOauth2(ServerWebExchange exchange, Model model) {
+		return exchange.getFormData().flatMap((formData) -> {
+			OAuth2Config submitted = oauth2ConfigFrom(formData);
+			if (submitted == null) {
+				return Mono
+					.just(oauth2Check(model, false, "Enter the token URL and choose a grant type first.", List.of()));
+			}
+			return withStoredSecret(submitted, formData.getFirst("planId"))
+				.flatMap((config) -> this.tokenFetcher.fetchTokens(config).timeout(CHECK_TIMEOUT))
+				.map((tokens) -> {
+					if (tokens.isEmpty()) {
+						return oauth2Check(model, false,
+								"No token was issued. With the password grant, enter at least one user:password.",
+								List.of());
+					}
+					List<TokenSummary> summaries = tokens.stream().map(this::summarize).toList();
+					return oauth2Check(model, true, tokens.size() + " token(s) issued.", summaries);
+				})
+				.onErrorResume((e) -> {
+					log.info("OAuth2 check against {} failed: {}", submitted.tokenUrl(), e.getMessage());
+					return Mono.just(oauth2Check(model, false, "Token request failed: " + describe(e), List.of()));
+				});
+		});
+	}
+
+	private static String oauth2Check(Model model, boolean ok, String message, List<TokenSummary> tokens) {
+		model.addAttribute("oauth2Check", new Oauth2Check(ok, message, tokens));
+		return "fragments/plan-offcanvas :: oauth2Check";
+	}
+
+	/**
+	 * Completes submitted OAuth2 settings with the secret stored on a plan when the form
+	 * left the secret blank, mirroring how a plan update keeps it.
+	 * @param submitted the settings from the form
+	 * @param planId the plan being edited, or null when creating one
+	 * @return the settings to request a token with
+	 */
+	private Mono<OAuth2Config> withStoredSecret(OAuth2Config submitted, String planId) {
+		boolean secretGiven = submitted.clientSecret() != null && !submitted.clientSecret().isBlank();
+		if (secretGiven || planId == null || planId.isBlank()) {
+			return Mono.just(submitted);
+		}
+		return testPlanRepository.findById(Long.valueOf(planId))
+			.flatMap((plan) -> Mono
+				.fromCallable(() -> objectMapper.readValue(plan.getScanConfigurationJson(), ScanConfiguration.class)))
+			.map((stored) -> (stored.oauth2Config() != null && stored.oauth2Config().clientSecret() != null)
+					? new OAuth2Config(submitted.tokenUrl(), submitted.clientId(), stored.oauth2Config().clientSecret(),
+							submitted.grantType(), submitted.credentials(), submitted.scope())
+					: submitted)
+			.onErrorResume((e) -> Mono.just(submitted))
+			.defaultIfEmpty(submitted);
+	}
+
+	/**
+	 * What the editor may show about an issued token: its expiry and scopes when it is a
+	 * JWT, nothing else. The payload is only decoded, never trusted.
+	 * @param token the issued token
+	 * @return the summary
+	 */
+	private TokenSummary summarize(SecurityScheme token) {
+		String value = token.value();
+		String[] parts = (value != null) ? value.split("\\.") : new String[0];
+		if (parts.length != 3) {
+			return new TokenSummary(false, null, null);
+		}
+		try {
+			byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
+			Map<?, ?> claims = objectMapper.readValue(payload, Map.class);
+			Object exp = claims.get("exp");
+			String expiresAt = (exp instanceof Number n) ? Instant.ofEpochSecond(n.longValue()).toString() : null;
+			Object scope = claims.get("scope");
+			return new TokenSummary(true, expiresAt, (scope != null) ? scope.toString() : null);
+		}
+		catch (RuntimeException ex) {
+			return new TokenSummary(false, null, null);
+		}
+	}
+
+	private static String describe(Throwable e) {
+		if (e instanceof TimeoutException) {
+			return "no answer within " + CHECK_TIMEOUT.toSeconds() + " s";
+		}
+		return (e.getMessage() != null) ? e.getMessage() : e.getClass().getSimpleName();
 	}
 
 	@GetMapping("/api/plans/{id}/details")
@@ -606,6 +775,24 @@ public class PlanController {
 	 */
 	public record AiSuggestion(String discovererId, List<String> families, List<String> scannerIds, int concurrency,
 			boolean includePassed, String rationale) {
+	}
+
+	/**
+	 * Outcome of a configuration check shown in the editor.
+	 */
+	public record ConfigCheck(boolean ok, String message, List<String> sample) {
+	}
+
+	/**
+	 * Outcome of an OAuth2 check shown in the editor.
+	 */
+	public record Oauth2Check(boolean ok, String message, List<TokenSummary> tokens) {
+	}
+
+	/**
+	 * What is shown about one issued token.
+	 */
+	public record TokenSummary(boolean jwt, String expiresAt, String scope) {
 	}
 
 }

@@ -299,6 +299,16 @@
                                     <input type="text" class="form-control" id="oauth2Creds" name="oauth2Creds" th:value="${config?.oauth2Config()?.credentials() != null ? #strings.listJoin(config.oauth2Config().credentials(), ',') : ''}">
                                     <div class="form-text text-white-50">Comma-separated list of username:password</div>
                                 </div>
+                                <div class="col-md-12">
+                                    <input type="hidden" name="planId" th:value="${plan.id}">
+                                    <button type="button" class="btn btn-outline-info" hx-post="/plans/check-oauth2"
+                                        hx-include="[name='oauth2Url'],[name='oauth2Grant'],[name='oauth2ClientId'],[name='oauth2ClientSecret'],[name='oauth2Scope'],[name='oauth2Creds'],[name='planId']"
+                                        hx-target="#oauth2CheckResult" hx-swap="innerHTML" hx-indicator="#oauth2CheckLoading">
+                                        Validate OAuth2
+                                    </button>
+                                    <span id="oauth2CheckLoading" class="htmx-indicator ms-2 text-info">Requesting a token…</span>
+                                    <div id="oauth2CheckResult" class="mt-2"></div>
+                                </div>
                             </div>
 
                             <h5 class="mt-4 mb-3 text-primary">Scanner Selection</h5>
@@ -341,8 +351,17 @@
                 </div>
             </div>
 
+            <div id="configCheckResult" class="mt-4"></div>
             <div class="mt-4 border-top border-secondary pt-4">
                 <div class="row g-3 align-items-stretch">
+                    <div class="col-12">
+                        <button type="button" class="btn btn-outline-info w-100" hx-post="/plans/check-config"
+                            hx-include="closest form" hx-target="#configCheckResult" hx-swap="innerHTML"
+                            hx-indicator="#configCheckLoading">
+                            Test configuration
+                            <span id="configCheckLoading" class="htmx-indicator ms-2">Discovering…</span>
+                        </button>
+                    </div>
                     <div class="col-6">
                         <button type="button" class="btn btn-outline-secondary btn-lg w-100 h-100" 
                                 th:attr="hx-get=@{/api/plans/{id}/details(id=${plan.id})}" 
@@ -416,6 +435,34 @@
             <div class="small text-white-50 mt-1" th:if="${suggestion.families() != null and !suggestion.families().isEmpty()}">
                 Families: <span th:text="${#strings.listJoin(suggestion.families(), ', ')}">INJECTION, XSS</span>
             </div>
+        </div>
+    </div>
+
+    <!-- Configuration check result, swapped into #configCheckResult. -->
+    <div th:fragment="configCheck">
+        <div th:if="${configCheck}" th:class="'alert py-2 mb-0 ' + (${configCheck.ok()} ? 'alert-success' : 'alert-danger')" role="alert">
+            <strong th:text="${configCheck.ok()} ? 'Configuration OK.' : 'Configuration check failed.'">Configuration OK.</strong>
+            <span th:text="${configCheck.message()}">message</span>
+            <ul class="small mb-0 mt-1" th:if="${!configCheck.sample().isEmpty()}">
+                <li th:each="op : ${configCheck.sample()}"><code th:text="${op}">GET /pets</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- OAuth2 check result, swapped into #oauth2CheckResult. Never carries a token value. -->
+    <div th:fragment="oauth2Check">
+        <div th:if="${oauth2Check}" th:class="'alert py-2 mb-0 ' + (${oauth2Check.ok()} ? 'alert-success' : 'alert-danger')" role="alert">
+            <strong th:text="${oauth2Check.ok()} ? 'OAuth2 OK.' : 'OAuth2 check failed.'">OAuth2 OK.</strong>
+            <span th:text="${oauth2Check.message()}">message</span>
+            <ul class="small mb-0 mt-1" th:if="${!oauth2Check.tokens().isEmpty()}">
+                <li th:each="token : ${oauth2Check.tokens()}">
+                    <span th:if="${token.jwt()}">
+                        scope: <code th:text="${token.scope() != null ? token.scope() : '(none)'}">openid</code>,
+                        expires <span th:text="${token.expiresAt() != null ? token.expiresAt() : 'n/a'}">2026-01-01T00:00:00Z</span>
+                    </span>
+                    <span th:unless="${token.jwt()}">opaque token (not a JWT), scopes cannot be read</span>
+                </li>
+            </ul>
         </div>
     </div>
 
