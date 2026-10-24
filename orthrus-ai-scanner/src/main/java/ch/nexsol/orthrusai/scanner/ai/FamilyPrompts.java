@@ -47,7 +47,11 @@ public final class FamilyPrompts {
 			present in the request, the response or the credentials you were given, or BOLA when the \
 			endpoint exposes no object identifier in its path, query or body.
 			- Send a baseline request first to learn how the endpoint behaves, then mutate.
-			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess.
+			- Confirm before reporting: a finding needs concrete request/response evidence, not a guess. \
+			Report only what you proved, not what might be true: do not file a finding that is hedged \
+			with "could", "may", "might", "potentially", "suggests" or "if an attacker had ..." — if you \
+			could not reach the weakness (for example every request was refused with 403), there is \
+			nothing to report.
 			- Base every finding on an actual HTTP response the tool returned (its status line, headers, 			body, and for timing its "Time: <ms>" line). The tool-control replies — BUDGET_SPENT, 			ERROR, REFUSED, NOT_RECORDED, LAST_REQUEST — are not server responses and prove nothing; 			never read a time-based or any other flaw into them. In particular, "budget spent" or a 			failed request is not a slow server and is not evidence of SQL/time-based injection.
 			- Never call reportVulnerability to say that a test found nothing, could not run or does not \
 			apply: the absence of a flaw is not a finding. In that case record nothing and reply DONE.
@@ -86,8 +90,12 @@ public final class FamilyPrompts {
 					Focus: server misconfiguration. Check permissive CORS (reflected or wildcard origins \
 					with credentials), server version disclosure (Server, X-Powered-By and similar \
 					banners), verbose stack traces and errors, content-type handling, directory/debug \
-					endpoints and cookies without HttpOnly or SameSite. Security headers belong to HTTP; \
-					HSTS and the Secure cookie flag belong to SSL."""), Map.entry("LOGIC", """
+					endpoints and cookies without HttpOnly or SameSite. A "verbose error" means the body \
+					leaks internals an attacker can use: a stack trace, an exception class name, a SQL \
+					fragment, a file-system path or a framework/server version. A standard framework error \
+					body (timestamp, the path the client already requested, status, error label, a \
+					correlation/request id) is NOT a leak; do not report it. Security headers belong to \
+					HTTP; HSTS and the Secure cookie flag belong to SSL."""), Map.entry("LOGIC", """
 					Focus: business-logic and abuse flaws (mass assignment, missing rate limiting, \
 					pagination and resource-exhaustion abuse, parameter tampering)."""), Map.entry("JWT", """
 					Focus: JSON Web Token weaknesses. Inspect any token: try the "none" algorithm, \
@@ -98,8 +106,10 @@ public final class FamilyPrompts {
 					probe admin/privileged operations without the required role."""), Map.entry("HTTP", """
 					Focus: HTTP-protocol issues. Check missing/weak security headers (CSP, \
 					X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Cache-Control on sensitive \
-					responses), dangerous methods (TRACE, PUT, DELETE) and redirect handling. HSTS belongs \
-					to SSL; CORS and server banners belong to CONFIGURATION."""), Map.entry("SSL", """
+					responses), dangerous methods (TRACE, PUT, DELETE) and redirect handling. \
+					X-XSS-Protection: 0 is the current recommendation (the header is deprecated and 0 \
+					disables a buggy legacy filter), so never report its absence or its 0 value as a flaw. \
+					HSTS belongs to SSL; CORS and server banners belong to CONFIGURATION."""), Map.entry("SSL", """
 					Focus: transport security as observable over HTTP: plain-HTTP exposure, missing or weak \
 					HSTS, cookies without the Secure flag, mixed content and http->https redirect gaps. \
 					Report only what the responses actually prove. Other security headers belong to HTTP; \

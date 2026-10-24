@@ -135,6 +135,40 @@ class FindingToolTests {
 		assertThat(ctx.findings()).hasSize(1);
 	}
 
+	@Test
+	void refusesASpeculativeFindingThatNeverReachedTheWeakness() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-logic", 10);
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/rooms/{roomId}/participants/last-message", "POST");
+
+		String reply = tool.reportVulnerability("Missing scope-based authorization",
+				"The endpoint relies on a single scope check. An attacker with the correct scope could potentially "
+						+ "set last-message on any participant in any room.",
+				"MEDIUM", "LOW",
+				"Every request returned 403 insufficient_scope. An attacker with the correct scope could potentially "
+						+ "reach other objects.",
+				"Implement object-level authorization checks.");
+
+		assertThat(reply).startsWith("NOT_RECORDED").contains("speculative");
+		assertThat(ctx.findings()).isEmpty();
+	}
+
+	@Test
+	void keepsAProvenFindingEvenWhenItsImpactSentenceMentionsAnAttacker() throws Exception {
+		RunContext ctx = new RunContext("http://app.test/api", "ai-injection", 10);
+		ctx.recordRequest("GET http://app.test/api/items?id=1 -> HTTP 200 in 20 ms");
+		FindingTool tool = new FindingTool(ctx, "http://app.test/api/items", "GET");
+
+		// The evidence is factual; only the description frames the impact for an
+		// attacker.
+		String reply = tool.reportVulnerability("SQL Injection (Time-Based Blind)",
+				"id is injectable; an attacker could potentially read arbitrary rows.", "HIGH", "HIGH",
+				"Baseline responded Time: 20 ms; the SLEEP(5) payload responded Time: 5040 ms, a reproducible delay.",
+				"Use parameterized queries.");
+
+		assertThat(reply).startsWith("Recorded finding");
+		assertThat(ctx.findings()).hasSize(1);
+	}
+
 	@ParameterizedTest
 	@MethodSource("nonFindings")
 	void refusesAReportThatOnlyRecordsTheAbsenceOfAFlaw(String name, String description, String evidence,

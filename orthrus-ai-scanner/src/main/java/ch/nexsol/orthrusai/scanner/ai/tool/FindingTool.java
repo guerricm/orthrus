@@ -73,6 +73,15 @@ public class FindingTool {
 		.compile("\\b(BUDGET_SPENT|BUDGET_EXCEEDED|TIME_EXCEEDED|NOT_RECORDED|LAST_REQUEST)\\b");
 
 	/**
+	 * Hedging that marks a finding as conditional rather than proven: the weakness was
+	 * never actually reached (typically every probe was refused), so it is speculation.
+	 */
+	private static final Pattern SPECULATIVE = Pattern.compile(
+			"\\b(could potentially|may potentially|might potentially|potentially (allow|be|lead|set|expose|bypass)"
+					+ "|an attacker with|if an attacker|would (be able to|allow)|it is possible that)\\b",
+			Pattern.CASE_INSENSITIVE);
+
+	/**
 	 * A remediation saying there is nothing to fix.
 	 */
 	private static final Pattern NOTHING_TO_FIX = Pattern
@@ -139,6 +148,10 @@ public class FindingTool {
 			return "its evidence rests on a tool-control message (e.g. a spent budget or a failed request), "
 					+ "which is not a server response and proves nothing";
 		}
+		if (isSpeculative(evidence) && isSpeculative(description)) {
+			return "it is speculative: the weakness was never actually reached, only hypothesised "
+					+ "(\"could potentially\", \"an attacker with the right scope\", ...)";
+		}
 		if (isBlank(remediation) || NOTHING_TO_FIX.matcher(remediation.strip()).find()) {
 			return "it has nothing to fix";
 		}
@@ -148,6 +161,10 @@ public class FindingTool {
 			}
 		}
 		return null;
+	}
+
+	private static boolean isSpeculative(String text) {
+		return text != null && SPECULATIVE.matcher(text).find();
 	}
 
 	private static boolean isBlank(String value) {

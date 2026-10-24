@@ -119,4 +119,20 @@ class FamilyPromptsTests {
 			.contains("not a slow server");
 	}
 
+	@Test
+	void treatsXXssProtectionZeroAsCorrectNotAFlaw() {
+		assertThat(prompt("HTTP")).contains("X-XSS-Protection: 0 is the current recommendation")
+			.contains("never report its absence or its 0 value as a flaw");
+	}
+
+	@Test
+	void doesNotCountAStandardFrameworkErrorBodyAsALeak() {
+		assertThat(prompt("CONFIGURATION")).contains("standard framework error").contains("is NOT a leak");
+	}
+
+	@Test
+	void forbidsSpeculativeFindings() {
+		assertThat(prompt("LOGIC")).contains("Report only what you proved").contains("potentially");
+	}
+
 }
