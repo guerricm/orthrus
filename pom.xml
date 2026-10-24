@@ -29,6 +29,10 @@
     <properties>
         <revision>1.1.0-SNAPSHOT</revision>
         <java.version>25</java.version>
+        <!-- Platform for the images build-image pulls. Defaults to the CI runner's
+             architecture (amd64); override on an arm64 host, e.g.
+             -Dorthrus.build-image.platform=linux/arm64 -->
+        <orthrus.build-image.platform>linux/amd64</orthrus.build-image.platform>
         <skip.javaformat>false</skip.javaformat>
         <swagger-parser.version>2.1.48</swagger-parser.version>
         <swagger-core.version>2.2.53</swagger-core.version>
@@ -212,9 +216,9 @@
                             <!-- Pin the platform of every pulled image (builder, run, buildpacks).
                                  The multi-arch builder otherwise resolves to linux/arm64 on the
                                  amd64 CI runner, so the lifecycle creator fails with "exec format
-                                 error" (paketo-buildpacks/builder-noble-java-tiny#344). Keep this in
-                                 step with the runner architecture. -->
-                            <imagePlatform>linux/amd64</imagePlatform>
+                                 error" (paketo-buildpacks/builder-noble-java-tiny#344). Driven by a
+                                 property so an arm64 host can override it. -->
+                            <imagePlatform>${orthrus.build-image.platform}</imagePlatform>
                             <!-- Declaring buildpacks replaces the builder's default order, so the
                                  Java buildpack is listed first; the health checker adds a tiny,
                                  localhost-only HTTP probe (thc) at /workspace/health-check, since
