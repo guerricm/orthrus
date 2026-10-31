@@ -209,16 +209,6 @@
                             <enabled>true</enabled>
                         </layers>
                         <image>
-                            <!-- Pin the builder version: the :latest tag resolves to a
-                                 linux/arm64 lifecycle on the amd64 CI runner, so the creator fails
-                                 with "exec format error" (paketo-buildpacks/builder-noble-java-tiny#344).
-                                 A pinned builder resolves the platform natively on both amd64 (CI) and
-                                 arm64 (local), so no imagePlatform override is needed. -->
-                            <builder>docker.io/paketobuildpacks/builder-noble-java-tiny:0.0.199</builder>
-                            <!-- Declaring buildpacks replaces the builder's default order, so the
-                                 Java buildpack is listed first; the health checker adds a tiny,
-                                 localhost-only HTTP probe (thc) at /workspace/health-check, since
-                                 the images ship neither curl nor a shell. -->
                             <buildpacks>
                                 <buildpack>urn:cnb:builder:paketo-buildpacks/java</buildpack>
                                 <buildpack>docker://docker.io/paketobuildpacks/health-checker:2</buildpack>
